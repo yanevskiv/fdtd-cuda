@@ -11,7 +11,13 @@ FetchContent_MakeAvailable(Catch2)
 include(Catch)
 
 add_executable(fdtd_tests
-    test_smoke.cpp)
+    test_smoke.cpp
+    test_version.cpp)
 target_link_libraries(fdtd_tests PRIVATE fdtd::fdtd fdtd_warnings Catch2::Catch2WithMain)
+target_compile_definitions(fdtd_tests PRIVATE
+    FDTD_TEST_PROJECT_VERSION="${PROJECT_VERSION}"
+    FDTD_TEST_PROJECT_VERSION_MAJOR=${PROJECT_VERSION_MAJOR}
+    FDTD_TEST_PROJECT_VERSION_MINOR=${PROJECT_VERSION_MINOR}
+    FDTD_TEST_PROJECT_VERSION_PATCH=${PROJECT_VERSION_PATCH})
 
 catch_discover_tests(fdtd_tests)
