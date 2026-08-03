@@ -13,3 +13,6 @@ compile_commands.json
 # Python
 .venv/
 __pycache__/
+
+# Personal CMake presets
+CMakeUserPresets.json
