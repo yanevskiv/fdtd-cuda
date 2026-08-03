@@ -1,0 +1,18 @@
+---
+Checks: '-*,readability-identifier-naming'
+CheckOptions:
+  readability-identifier-naming.ClassCase: CamelCase
+  readability-identifier-naming.StructCase: CamelCase
+  readability-identifier-naming.EnumCase: CamelCase
+  readability-identifier-naming.TypedefCase: CamelCase
+  readability-identifier-naming.TypeAliasCase: CamelCase
+  readability-identifier-naming.FunctionCase: lower_case
+  readability-identifier-naming.MethodCase: lower_case
+  readability-identifier-naming.MemberCase: lower_case
+  readability-identifier-naming.MemberPrefix: 'm_'
+  readability-identifier-naming.ParameterCase: camelBack
+  readability-identifier-naming.LocalVariableCase: camelBack
+  readability-identifier-naming.LocalPointerCase: camelBack
+  readability-identifier-naming.LocalConstantCase: camelBack
+  readability-identifier-naming.LocalConstantPointerCase: camelBack
+...
