@@ -1,0 +1,5 @@
+@PACKAGE_INIT@
+
+include("${CMAKE_CURRENT_LIST_DIR}/fdtdTargets.cmake")
+
+check_required_components(fdtd)
