@@ -1,0 +1,17 @@
+include(FetchContent)
+
+# Catch2 v3: an installed copy if one is found, otherwise the pinned release.
+FetchContent_Declare(Catch2
+    GIT_REPOSITORY https://github.com/catchorg/Catch2.git
+    GIT_TAG v3.8.1
+    GIT_SHALLOW TRUE
+    FIND_PACKAGE_ARGS 3)
+FetchContent_MakeAvailable(Catch2)
+
+include(Catch)
+
+add_executable(fdtd_tests
+    test_smoke.cpp)
+target_link_libraries(fdtd_tests PRIVATE fdtd::fdtd fdtd_warnings Catch2::Catch2WithMain)
+
+catch_discover_tests(fdtd_tests)
