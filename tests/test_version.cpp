@@ -36,9 +36,9 @@ TEST_CASE("Header version matches the CMake project version", "[unit][version]")
     CHECK(std::string(FDTD_VERSION_STRING) == FDTD_TEST_PROJECT_VERSION);
 }
 
-// Verify that fdtd::Real follows the FDTD_DOUBLE option.
-TEST_CASE("Real follows FDTD_DOUBLE", "[unit][real]")
+// Verify that fdtd::FloatType follows the FDTD_DOUBLE option.
+TEST_CASE("FloatType follows FDTD_DOUBLE", "[unit][float]")
 {
     using Expected = std::conditional_t<FDTD_DOUBLE != 0, double, float>;
-    STATIC_CHECK(std::is_same_v<fdtd::Real, Expected>);
+    STATIC_CHECK(std::is_same_v<fdtd::FloatType, Expected>);
 }

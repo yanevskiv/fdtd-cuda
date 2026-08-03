@@ -20,7 +20,7 @@
 #ifndef FDTD_H
 #define FDTD_H
 
-#include "fdtd/fdtd_real.h"
+#include "fdtd/fdtd_float.h"
 #include "fdtd/fdtd_version.h"
 
 #endif

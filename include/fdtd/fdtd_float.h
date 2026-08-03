@@ -17,8 +17,8 @@
  * along with fdtd-cuda; if not, see <https://www.gnu.org/licenses/>.
  */
 
-#ifndef FDTD_REAL_H
-#define FDTD_REAL_H
+#ifndef FDTD_FLOAT_H
+#define FDTD_FLOAT_H
 
 #ifndef FDTD_DOUBLE
 #define FDTD_DOUBLE 0
@@ -28,10 +28,10 @@ namespace fdtd
 {
 #if FDTD_DOUBLE
     /** Floating-point type of fields and coefficients, double when FDTD_DOUBLE is set. */
-    using Real = double;
+    using FloatType = double;
 #else
     /** Floating-point type of fields and coefficients, float unless FDTD_DOUBLE is set. */
-    using Real = float;
+    using FloatType = float;
 #endif
 }
 
