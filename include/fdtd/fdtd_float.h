@@ -23,13 +23,16 @@
 #ifndef FDTD_DOUBLE
 #define FDTD_DOUBLE 0
 #endif
+
 /** Namespace for the fdtd library. */
 namespace fdtd
 {
 #if FDTD_DOUBLE
+
     /** Floating-point type of fields and coefficients, double when FDTD_DOUBLE is set. */
     using FloatType = double;
 #else
+
     /** Floating-point type of fields and coefficients, float unless FDTD_DOUBLE is set. */
     using FloatType = float;
 #endif

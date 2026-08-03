@@ -19,12 +19,16 @@
 
 #ifndef FDTD_VERSION_H
 #define FDTD_VERSION_H
+
 /** Major version of the fdtd library. */
 #define FDTD_VERSION_MAJOR 0
+
 /** Minor version of the fdtd library. */
 #define FDTD_VERSION_MINOR 1
+
 /** Patch version of the fdtd library. */
 #define FDTD_VERSION_PATCH 0
+
 /** Full version of the fdtd library as a string. */
 #define FDTD_VERSION_STRING "0.1.0"
 
