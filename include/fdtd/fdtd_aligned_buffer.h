@@ -29,7 +29,7 @@
 namespace fdtd
 {
     /** Alignment in bytes of every field and coefficient array. */
-    inline constexpr std::size_t buffer_alignment = 64;
+    inline constexpr std::size_t BUFFER_ALIGNMENT = 64;
 
     /**
      * Owning, zero-initialized, 64-byte aligned array of trivial values.
@@ -49,7 +49,7 @@ namespace fdtd
          */
         explicit inline AlignedBuffer(std::size_t size)
             : m_data(size ? static_cast<T *>(::operator new(size * sizeof(T),
-                                                            std::align_val_t{buffer_alignment}))
+                                                            std::align_val_t{BUFFER_ALIGNMENT}))
                           : nullptr)
             , m_size(size)
         {
@@ -162,7 +162,7 @@ namespace fdtd
         /** Free the memory and leave the buffer empty. */
         inline void release() noexcept
         {
-            ::operator delete(m_data, std::align_val_t{buffer_alignment});
+            ::operator delete(m_data, std::align_val_t{BUFFER_ALIGNMENT});
             m_data = nullptr;
             m_size = 0;
         }

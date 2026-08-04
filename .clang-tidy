@@ -15,4 +15,6 @@ CheckOptions:
   readability-identifier-naming.LocalPointerCase: camelBack
   readability-identifier-naming.LocalConstantCase: camelBack
   readability-identifier-naming.LocalConstantPointerCase: camelBack
+  readability-identifier-naming.GlobalConstantCase: UPPER_CASE
+  readability-identifier-naming.ConstexprVariableCase: UPPER_CASE
 ...

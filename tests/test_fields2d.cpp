@@ -43,7 +43,7 @@ static bool all_zero(std::span<const fdtd::FloatType> values)
 // Check that a pointer sits on the buffer alignment.
 static bool is_aligned(const void *pointer)
 {
-    return reinterpret_cast<std::uintptr_t>(pointer) % fdtd::buffer_alignment == 0;
+    return reinterpret_cast<std::uintptr_t>(pointer) % fdtd::BUFFER_ALIGNMENT == 0;
 }
 
 // Verify that each array has the grid's size, is aligned and starts zeroed.
