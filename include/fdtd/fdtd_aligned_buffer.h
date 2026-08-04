@@ -47,7 +47,7 @@ namespace fdtd
          *
          * @param size Number of elements.
          */
-        explicit AlignedBuffer(std::size_t size)
+        explicit inline AlignedBuffer(std::size_t size)
             : m_data(size ? static_cast<T *>(::operator new(size * sizeof(T),
                                                             std::align_val_t{buffer_alignment}))
                           : nullptr)
@@ -57,7 +57,7 @@ namespace fdtd
         }
 
         /** Release the memory. */
-        ~AlignedBuffer()
+        inline ~AlignedBuffer()
         {
             release();
         }
@@ -73,7 +73,7 @@ namespace fdtd
          *
          * @param other Buffer left empty.
          */
-        AlignedBuffer(AlignedBuffer &&other) noexcept
+        inline AlignedBuffer(AlignedBuffer &&other) noexcept
             : m_data(std::exchange(other.m_data, nullptr))
             , m_size(std::exchange(other.m_size, 0))
         {
@@ -86,7 +86,7 @@ namespace fdtd
          * @param other Buffer left empty.
          * @return This buffer.
          */
-        AlignedBuffer &operator=(AlignedBuffer &&other) noexcept
+        inline AlignedBuffer &operator=(AlignedBuffer &&other) noexcept
         {
             if (this != &other) {
                 release();
@@ -101,7 +101,7 @@ namespace fdtd
          *
          * @return Aligned pointer, null for an empty buffer.
          */
-        T *data() noexcept
+        inline T *data() noexcept
         {
             return m_data;
         }
@@ -111,7 +111,7 @@ namespace fdtd
          *
          * @return Aligned pointer, null for an empty buffer.
          */
-        const T *data() const noexcept
+        inline const T *data() const noexcept
         {
             return m_data;
         }
@@ -121,7 +121,7 @@ namespace fdtd
          *
          * @return Element count.
          */
-        std::size_t size() const noexcept
+        inline std::size_t size() const noexcept
         {
             return m_size;
         }
@@ -132,7 +132,7 @@ namespace fdtd
          * @param index Element index.
          * @return Reference to the element.
          */
-        T &operator[](std::size_t index) noexcept
+        inline T &operator[](std::size_t index) noexcept
         {
             return m_data[index];
         }
@@ -143,7 +143,7 @@ namespace fdtd
          * @param index Element index.
          * @return Reference to the element.
          */
-        const T &operator[](std::size_t index) const noexcept
+        inline const T &operator[](std::size_t index) const noexcept
         {
             return m_data[index];
         }
@@ -153,14 +153,14 @@ namespace fdtd
          *
          * @param value Value to store.
          */
-        void fill(const T &value) noexcept
+        inline void fill(const T &value) noexcept
         {
             std::fill(m_data, m_data + m_size, value);
         }
 
     private:
         /** Free the memory and leave the buffer empty. */
-        void release() noexcept
+        inline void release() noexcept
         {
             ::operator delete(m_data, std::align_val_t{buffer_alignment});
             m_data = nullptr;
