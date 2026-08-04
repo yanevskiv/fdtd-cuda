@@ -24,13 +24,16 @@ option(FDTD_WERROR "Treat compiler warnings as errors" OFF)
 
 # The library.
 add_library(fdtd
+    src/fdtd/TMz/fdtd_tmz_backend.cpp
     src/fdtd/TMz/fdtd_tmz_fields2d.cpp
-    src/fdtd/TMz/fdtd_tmz_grid2d.cpp)
+    src/fdtd/TMz/fdtd_tmz_grid2d.cpp
+    src/fdtd/TMz/serial/fdtd_tmz_serial_backend.cpp)
 add_library(fdtd::fdtd ALIAS fdtd)
 target_compile_features(fdtd PUBLIC cxx_std_20)
 target_include_directories(fdtd PUBLIC
     $<BUILD_INTERFACE:${PROJECT_SOURCE_DIR}/include>
     $<INSTALL_INTERFACE:${CMAKE_INSTALL_INCLUDEDIR}>)
+target_include_directories(fdtd PRIVATE ${PROJECT_SOURCE_DIR}/src)
 target_compile_definitions(fdtd PUBLIC
     FDTD_DOUBLE=$<BOOL:${FDTD_DOUBLE}>
     FDTD_WITH_OPENMP=$<BOOL:${FDTD_WITH_OPENMP}>

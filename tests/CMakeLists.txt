@@ -11,6 +11,7 @@ FetchContent_MakeAvailable(Catch2)
 include(Catch)
 
 add_executable(fdtd_tests
+    test_backend.cpp
     test_fields2d.cpp
     test_grid2d.cpp
     test_smoke.cpp
