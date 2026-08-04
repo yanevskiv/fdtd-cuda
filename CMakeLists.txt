@@ -18,7 +18,7 @@ set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_CXX_EXTENSIONS OFF)
 set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
 
-option(FDTD_DOUBLE "Use double instead of float for fdtd::Real" OFF)
+option(FDTD_DOUBLE "Use double instead of float for fdtd::FloatType" OFF)
 option(FDTD_BUILD_TESTS "Build the Catch2 tests" ${PROJECT_IS_TOP_LEVEL})
 option(FDTD_WERROR "Treat compiler warnings as errors" OFF)
 
