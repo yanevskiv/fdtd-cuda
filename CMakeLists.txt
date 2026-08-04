@@ -22,17 +22,20 @@ option(FDTD_DOUBLE "Use double instead of float for fdtd::FloatType" OFF)
 option(FDTD_BUILD_TESTS "Build the Catch2 tests" ${PROJECT_IS_TOP_LEVEL})
 option(FDTD_WERROR "Treat compiler warnings as errors" OFF)
 
-# The library. Header-only until the first source file lands.
-add_library(fdtd INTERFACE)
+# The library.
+add_library(fdtd
+    src/fdtd/TMz/fdtd_tmz_fields2d.cpp
+    src/fdtd/TMz/fdtd_tmz_grid2d.cpp)
 add_library(fdtd::fdtd ALIAS fdtd)
-target_compile_features(fdtd INTERFACE cxx_std_20)
-target_include_directories(fdtd INTERFACE
+target_compile_features(fdtd PUBLIC cxx_std_20)
+target_include_directories(fdtd PUBLIC
     $<BUILD_INTERFACE:${PROJECT_SOURCE_DIR}/include>
     $<INSTALL_INTERFACE:${CMAKE_INSTALL_INCLUDEDIR}>)
-target_compile_definitions(fdtd INTERFACE
+target_compile_definitions(fdtd PUBLIC
     FDTD_DOUBLE=$<BOOL:${FDTD_DOUBLE}>
     FDTD_WITH_OPENMP=$<BOOL:${FDTD_WITH_OPENMP}>
     FDTD_WITH_CUDA=$<BOOL:${FDTD_WITH_CUDA}>)
+target_link_libraries(fdtd PRIVATE $<BUILD_INTERFACE:fdtd_warnings>)
 
 if(FDTD_BUILD_TESTS)
     enable_testing()
