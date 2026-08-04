@@ -47,11 +47,11 @@ namespace fdtd
             std::string_view name() const noexcept override;
 
             /**
-             * Kind of the backend.
+             * Type of the backend.
              *
-             * @return BackendKind::Serial.
+             * @return BackendType::Serial.
              */
-            BackendKind kind() const noexcept override;
+            BackendType type() const noexcept override;
 
             /**
              * Grid the backend was made for.

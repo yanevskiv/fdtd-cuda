@@ -35,7 +35,7 @@ namespace fdtd
     namespace TMz
     {
         /** The backends a simulation can run on. */
-        enum class BackendKind {
+        enum class BackendType {
             /** Single-threaded reference backend, the oracle for the others. */
             Serial,
 
@@ -66,11 +66,11 @@ namespace fdtd
             virtual std::string_view name() const noexcept = 0;
 
             /**
-             * Kind of the backend.
+             * Type of the backend.
              *
-             * @return The backend kind.
+             * @return The backend type.
              */
-            virtual BackendKind kind() const noexcept = 0;
+            virtual BackendType type() const noexcept = 0;
 
             /**
              * Grid the backend was made for.
@@ -128,37 +128,37 @@ namespace fdtd
         };
 
         /**
-         * Short lowercase name of a backend kind.
+         * Short lowercase name of a backend type.
          *
-         * @param kind Backend kind.
+         * @param type Backend type.
          * @return "serial", "openmp" or "cuda".
          */
-        std::string_view backend_name(BackendKind kind) noexcept;
+        std::string_view backend_name(BackendType type) noexcept;
 
         /**
          * Backends compiled into this build, serial first.
          *
-         * @return The available kinds.
+         * @return The available types.
          */
-        std::vector<BackendKind> available_backends();
+        std::vector<BackendType> available_backends();
 
         /**
          * Whether a backend is compiled into this build.
          *
-         * @param kind Backend kind.
+         * @param type Backend type.
          * @return True when make_backend() can create it.
          */
-        bool is_backend_available(BackendKind kind);
+        bool is_backend_available(BackendType type);
 
         /**
          * Create a backend with zeroed fields.
          *
-         * @param kind Backend kind.
+         * @param type Backend type.
          * @param grid Grid the backend works on.
          * @return The new backend.
          * @throws std::runtime_error When the backend is not compiled in.
          */
-        std::unique_ptr<Backend> make_backend(BackendKind kind, const Grid2D &grid);
+        std::unique_ptr<Backend> make_backend(BackendType type, const Grid2D &grid);
     }
 }
 

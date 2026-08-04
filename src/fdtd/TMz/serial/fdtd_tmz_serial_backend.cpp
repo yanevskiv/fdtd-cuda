@@ -54,13 +54,13 @@ namespace fdtd::TMz
     // Return the backend name.
     std::string_view SerialBackend::name() const noexcept
     {
-        return backend_name(BackendKind::Serial);
+        return backend_name(BackendType::Serial);
     }
 
-    // Return the backend kind.
-    BackendKind SerialBackend::kind() const noexcept
+    // Return the backend type.
+    BackendType SerialBackend::type() const noexcept
     {
-        return BackendKind::Serial;
+        return BackendType::Serial;
     }
 
     // Return the grid.

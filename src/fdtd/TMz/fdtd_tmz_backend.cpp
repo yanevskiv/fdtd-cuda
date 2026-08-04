@@ -34,44 +34,44 @@ namespace fdtd::TMz
     // Release nothing; derived backends own their resources.
     Backend::~Backend() = default;
 
-    // Map a backend kind to its name.
-    std::string_view backend_name(BackendKind kind) noexcept
+    // Map a backend type to its name.
+    std::string_view backend_name(BackendType type) noexcept
     {
-        switch (kind) {
-            case BackendKind::Serial:
+        switch (type) {
+            case BackendType::Serial:
                 return "serial";
-            case BackendKind::OpenMP:
+            case BackendType::OpenMP:
                 return "openmp";
-            case BackendKind::Cuda:
+            case BackendType::Cuda:
                 return "cuda";
         }
         return "unknown";
     }
 
     // List the backends compiled into this build.
-    std::vector<BackendKind> available_backends()
+    std::vector<BackendType> available_backends()
     {
-        return {BackendKind::Serial};
+        return {BackendType::Serial};
     }
 
     // Check whether a backend is compiled into this build.
-    bool is_backend_available(BackendKind kind)
+    bool is_backend_available(BackendType type)
     {
-        const auto kinds = available_backends();
-        return std::find(kinds.begin(), kinds.end(), kind) != kinds.end();
+        const auto types = available_backends();
+        return std::find(types.begin(), types.end(), type) != types.end();
     }
 
     // Create a backend, or report that it is not compiled in.
-    std::unique_ptr<Backend> make_backend(BackendKind kind, const Grid2D &grid)
+    std::unique_ptr<Backend> make_backend(BackendType type, const Grid2D &grid)
     {
-        switch (kind) {
-            case BackendKind::Serial:
+        switch (type) {
+            case BackendType::Serial:
                 return std::make_unique<SerialBackend>(grid);
-            case BackendKind::OpenMP:
-            case BackendKind::Cuda:
+            case BackendType::OpenMP:
+            case BackendType::Cuda:
                 break;
         }
-        throw std::runtime_error("make_backend: the " + std::string(backend_name(kind)) +
+        throw std::runtime_error("make_backend: the " + std::string(backend_name(type)) +
                                  " backend is not compiled into this build");
     }
 }
