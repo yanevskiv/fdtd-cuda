@@ -100,7 +100,7 @@ namespace fdtd
              * @param j Cell along y, below ny().
              * @return j * pitch() + i.
              */
-            std::size_t index(std::size_t i, std::size_t j) const noexcept
+            inline std::size_t index(std::size_t i, std::size_t j) const noexcept
             {
                 return j * m_pitch + i;
             }
