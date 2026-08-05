@@ -17,6 +17,8 @@ CheckOptions:
   readability-identifier-naming.LocalPointerCase: camelBack
   readability-identifier-naming.LocalConstantCase: camelBack
   readability-identifier-naming.LocalConstantPointerCase: camelBack
+  readability-identifier-naming.LocalPointerIgnoredRegexp: '^(E|H)[xyz]{1,2}$|^C[eh][0-9][xyz]?$'
+  readability-identifier-naming.LocalConstantPointerIgnoredRegexp: '^(E|H)[xyz]{1,2}$|^C[eh][0-9][xyz]?$'
   readability-identifier-naming.GlobalConstantCase: UPPER_CASE
   readability-identifier-naming.ConstexprVariableCase: UPPER_CASE
 ...

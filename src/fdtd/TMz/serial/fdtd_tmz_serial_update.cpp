@@ -36,17 +36,17 @@ namespace fdtd::TMz
         const FloatType invDx = FloatType(1) / grid.dx();
         const FloatType invDy = FloatType(1) / grid.dy();
 
-        const FloatType *__restrict ez = fields.ez().data();
-        FloatType *__restrict hx = fields.hx().data();
-        FloatType *__restrict hy = fields.hy().data();
-        const FloatType *__restrict ch1 = coeffs.ch1().data();
-        const FloatType *__restrict ch2 = coeffs.ch2().data();
+        const FloatType *__restrict Ez = fields.ez().data();
+        FloatType *__restrict Hx = fields.hx().data();
+        FloatType *__restrict Hy = fields.hy().data();
+        const FloatType *__restrict Ch1 = coeffs.ch1().data();
+        const FloatType *__restrict Ch2 = coeffs.ch2().data();
 
         for (std::size_t j = 0; j + 1 < ny; ++j) {
             const std::size_t row = j * pitch;
             for (std::size_t i = 0; i < nx; ++i) {
                 const std::size_t k = row + i;
-                hx[k] = ch1[k] * hx[k] - ch2[k] * invDy * (ez[k + pitch] - ez[k]);
+                Hx[k] = Ch1[k] * Hx[k] - Ch2[k] * invDy * (Ez[k + pitch] - Ez[k]);
             }
         }
 
@@ -54,7 +54,7 @@ namespace fdtd::TMz
             const std::size_t row = j * pitch;
             for (std::size_t i = 0; i + 1 < nx; ++i) {
                 const std::size_t k = row + i;
-                hy[k] = ch1[k] * hy[k] + ch2[k] * invDx * (ez[k + 1] - ez[k]);
+                Hy[k] = Ch1[k] * Hy[k] + Ch2[k] * invDx * (Ez[k + 1] - Ez[k]);
             }
         }
     }
@@ -69,19 +69,19 @@ namespace fdtd::TMz
         const FloatType invDx = FloatType(1) / grid.dx();
         const FloatType invDy = FloatType(1) / grid.dy();
 
-        FloatType *__restrict ez = fields.ez().data();
-        const FloatType *__restrict hx = fields.hx().data();
-        const FloatType *__restrict hy = fields.hy().data();
-        const FloatType *__restrict ce1 = coeffs.ce1().data();
-        const FloatType *__restrict ce2 = coeffs.ce2().data();
+        FloatType *__restrict Ez = fields.ez().data();
+        const FloatType *__restrict Hx = fields.hx().data();
+        const FloatType *__restrict Hy = fields.hy().data();
+        const FloatType *__restrict Ce1 = coeffs.ce1().data();
+        const FloatType *__restrict Ce2 = coeffs.ce2().data();
 
         for (std::size_t j = 1; j + 1 < ny; ++j) {
             const std::size_t row = j * pitch;
             for (std::size_t i = 1; i + 1 < nx; ++i) {
                 const std::size_t k = row + i;
                 const FloatType curl =
-                    (hy[k] - hy[k - 1]) * invDx - (hx[k] - hx[k - pitch]) * invDy;
-                ez[k] = ce1[k] * ez[k] + ce2[k] * curl;
+                    (Hy[k] - Hy[k - 1]) * invDx - (Hx[k] - Hx[k - pitch]) * invDy;
+                Ez[k] = Ce1[k] * Ez[k] + Ce2[k] * curl;
             }
         }
     }
