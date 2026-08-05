@@ -96,9 +96,52 @@ namespace fdtd::TMz
         return m_material;
     }
 
+    // Check the grid, keep the material and upload its coefficients.
+    void Sim2D::set_material(const Material2D &material)
+    {
+        const Grid2D &grid = material.grid();
+        if (grid.nx() != m_grid.nx() || grid.ny() != m_grid.ny() || grid.dx() != m_grid.dx() ||
+            grid.dy() != m_grid.dy()) {
+            throw std::invalid_argument("Sim2D: material grid does not match");
+        }
+        m_material = material;
+        m_backend->upload(Coeffs2D(m_material, m_dt));
+    }
+
     // Return the backend.
     const Backend &Sim2D::backend() const noexcept
     {
         return *m_backend;
+    }
+
+    // Step the backend and count the steps.
+    void Sim2D::run(std::size_t nsteps)
+    {
+        m_backend->step(nsteps);
+        m_step_count += nsteps;
+    }
+
+    // Return the step count.
+    std::size_t Sim2D::step_count() const noexcept
+    {
+        return m_step_count;
+    }
+
+    // Return the simulated time.
+    double Sim2D::time() const noexcept
+    {
+        return static_cast<double>(m_step_count) * m_dt;
+    }
+
+    // Return the host copy of the fields.
+    const Fields2D &Sim2D::fields() const noexcept
+    {
+        return m_fields;
+    }
+
+    // Copy the fields from the backend.
+    void Sim2D::download()
+    {
+        m_backend->download(m_fields);
     }
 }

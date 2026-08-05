@@ -121,11 +121,50 @@ namespace fdtd
             const Material2D &material() const noexcept;
 
             /**
+             * Replace the material and upload the coefficients rebuilt from it.
+             *
+             * @param material New material, on a grid with the same size and cells.
+             * @throws std::invalid_argument When the material's grid does not match.
+             */
+            void set_material(const Material2D &material);
+
+            /**
              * Backend the simulation runs on.
              *
              * @return The backend.
              */
             const Backend &backend() const noexcept;
+
+            /**
+             * Advance the simulation.
+             *
+             * @param nsteps Number of time steps to run.
+             */
+            void run(std::size_t nsteps);
+
+            /**
+             * Number of time steps run so far.
+             *
+             * @return The step count.
+             */
+            std::size_t step_count() const noexcept;
+
+            /**
+             * Simulated time so far.
+             *
+             * @return step_count() * dt() in seconds.
+             */
+            double time() const noexcept;
+
+            /**
+             * Host copy of the fields, as of the last download().
+             *
+             * @return The fields.
+             */
+            const Fields2D &fields() const noexcept;
+
+            /** Copy the fields from the backend into the host copy. */
+            void download();
 
         private:
             /** Settings the simulation was created with. */
@@ -145,6 +184,9 @@ namespace fdtd
 
             /** Backend that owns the working fields and steps them. */
             std::unique_ptr<Backend> m_backend;
+
+            /** Time steps run so far. */
+            std::size_t m_step_count = 0;
         };
     }
 }

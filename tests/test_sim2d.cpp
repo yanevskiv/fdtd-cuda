@@ -35,6 +35,8 @@ using fdtd::FloatType;
 using fdtd::TMz::BackendType;
 using fdtd::TMz::Boundary;
 using fdtd::TMz::courant_dt;
+using fdtd::TMz::Grid2D;
+using fdtd::TMz::Material2D;
 using fdtd::TMz::Sim2D;
 
 // Verify the defaults: millimeter cells, S = 0.99, PEC, serial, stability checked.
@@ -108,4 +110,33 @@ TEST_CASE("Sim2D rejects bad options", "[unit][sim2d]")
     opts = {};
     opts.dt = 1e-9;
     CHECK_THROWS_AS(Sim2D(8, 8, opts), std::invalid_argument);
+}
+
+// Verify that run() counts steps and time, and that download() fills the host fields.
+TEST_CASE("Sim2D counts steps and time", "[unit][sim2d]")
+{
+    Sim2D sim(8, 8);
+    CHECK(sim.step_count() == 0);
+    CHECK(sim.time() == 0);
+
+    sim.run(3);
+    sim.run(4);
+    CHECK(sim.step_count() == 7);
+    CHECK_THAT(sim.time(), WithinRel(7 * sim.dt(), 1e-12));
+
+    sim.download();
+    CHECK(sim.fields().ez().size() == sim.grid().size());
+}
+
+// Verify that set_material() keeps a matching material and rejects another grid.
+TEST_CASE("Sim2D replaces its material", "[unit][sim2d]")
+{
+    Sim2D sim(8, 8);
+    Material2D mat(sim.grid());
+    mat.fill({4, 1, 0, 0});
+    sim.set_material(mat);
+    CHECK(sim.material().eps_r()[0] == FloatType(4));
+
+    const Material2D other(Grid2D(4, 8, sim.grid().dx(), sim.grid().dy()));
+    CHECK_THROWS_AS(sim.set_material(other), std::invalid_argument);
 }
