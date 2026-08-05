@@ -59,8 +59,8 @@ TEST_CASE("Coeffs2D in vacuum", "[unit][coeffs2d]")
     REQUIRE(coeffs.ch2().size() == grid.size());
 
     for (std::size_t k = 0; k < grid.size(); ++k) {
-        CHECK(coeffs.ce1()[k] == 1);
-        CHECK(coeffs.ch1()[k] == 1);
+        CHECK(coeffs.ce1()[k] == fdtd::FloatType(1));
+        CHECK(coeffs.ch1()[k] == fdtd::FloatType(1));
         CHECK_THAT(double(coeffs.ce2()[k]), WithinRel(dt / fdtd::EPS_0, TOL));
         CHECK_THAT(double(coeffs.ch2()[k]), WithinRel(dt / fdtd::MU_0, TOL));
     }
@@ -87,11 +87,11 @@ TEST_CASE("Coeffs2D in a lossy medium", "[unit][coeffs2d]")
     CHECK_THAT(double(coeffs.ce2()[k]), WithinRel(dt / eps / (1 + a), TOL));
     CHECK_THAT(double(coeffs.ch1()[k]), WithinRel((1 - b) / (1 + b), TOL));
     CHECK_THAT(double(coeffs.ch2()[k]), WithinRel(dt / mu / (1 + b), TOL));
-    CHECK(coeffs.ce1()[k] < 1);
-    CHECK(coeffs.ch1()[k] < 1);
+    CHECK(coeffs.ce1()[k] < fdtd::FloatType(1));
+    CHECK(coeffs.ch1()[k] < fdtd::FloatType(1));
 
     const std::size_t v = grid.index(0, 0);
-    CHECK(coeffs.ce1()[v] == 1);
+    CHECK(coeffs.ce1()[v] == fdtd::FloatType(1));
     CHECK_THAT(double(coeffs.ce2()[v]), WithinRel(dt / fdtd::EPS_0, TOL));
 }
 
@@ -100,7 +100,7 @@ TEST_CASE("Coeffs2D approaches a conductor", "[unit][coeffs2d]")
 {
     const Grid2D grid(1, 1);
     Material2D material(grid);
-    material.fill({1, 1, 1e12, 0});
+    material.fill({1, 1, 1e12F, 0});
     const Coeffs2D coeffs(material, 1e-12);
 
     CHECK_THAT(double(coeffs.ce1()[0]), WithinAbs(-1.0, 1e-6));

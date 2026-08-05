@@ -59,8 +59,8 @@ TEST_CASE("Serial update of an Ez impulse", "[unit][serial_update]")
     CHECK_THAT(double(fields.hy()[grid.index(3, 3)]), WithinRel(-h, TOL));
     CHECK_THAT(double(fields.hx()[grid.index(3, 2)]), WithinRel(-h, TOL));
     CHECK_THAT(double(fields.hx()[grid.index(3, 3)]), WithinRel(h, TOL));
-    CHECK(fields.hx()[grid.index(2, 3)] == 0);
-    CHECK(fields.hy()[grid.index(3, 2)] == 0);
+    CHECK(fields.hx()[grid.index(2, 3)] == FloatType(0));
+    CHECK(fields.hy()[grid.index(3, 2)] == FloatType(0));
 
     fdtd::TMz::serial_update_e(fields, coeffs);
     CHECK_THAT(double(fields.ez()[c]), WithinRel(0.5, TOL));
@@ -91,12 +91,12 @@ TEST_CASE("Serial update leaves the edges alone", "[unit][serial_update]")
     fdtd::TMz::serial_update_e(fields, coeffs);
 
     for (std::size_t i = 0; i < grid.nx(); ++i) {
-        CHECK(fields.hx()[grid.index(i, lastRow)] == 0);
+        CHECK(fields.hx()[grid.index(i, lastRow)] == FloatType(0));
         CHECK(fields.ez()[grid.index(i, 0)] == FloatType(1 + i));
         CHECK(fields.ez()[grid.index(i, lastRow)] == FloatType(1 + i + 10 * lastRow));
     }
     for (std::size_t j = 0; j < grid.ny(); ++j) {
-        CHECK(fields.hy()[grid.index(lastCol, j)] == 0);
+        CHECK(fields.hy()[grid.index(lastCol, j)] == FloatType(0));
         CHECK(fields.ez()[grid.index(0, j)] == FloatType(1 + 10 * j));
         CHECK(fields.ez()[grid.index(lastCol, j)] == FloatType(1 + lastCol + 10 * j));
     }
@@ -114,6 +114,6 @@ TEST_CASE("Serial update on degenerate grids", "[unit][serial_update]")
         fdtd::TMz::serial_update_h(fields, coeffs);
         fdtd::TMz::serial_update_e(fields, coeffs);
 
-        CHECK(fields.ez()[0] == 1);
+        CHECK(fields.ez()[0] == FloatType(1));
     }
 }

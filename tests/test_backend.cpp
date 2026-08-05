@@ -167,12 +167,12 @@ TEST_CASE("Serial backend holds the edge Ez at zero under PEC", "[unit][backend]
         backend->step(1);
         const Fields2D f = download(*backend);
         for (std::size_t i = 0; i < grid.nx(); ++i) {
-            CHECK(f.ez()[grid.index(i, 0)] == 0);
-            CHECK(f.ez()[grid.index(i, grid.ny() - 1)] == 0);
+            CHECK(f.ez()[grid.index(i, 0)] == fdtd::FloatType(0));
+            CHECK(f.ez()[grid.index(i, grid.ny() - 1)] == fdtd::FloatType(0));
         }
         for (std::size_t j = 0; j < grid.ny(); ++j) {
-            CHECK(f.ez()[grid.index(0, j)] == 0);
-            CHECK(f.ez()[grid.index(grid.nx() - 1, j)] == 0);
+            CHECK(f.ez()[grid.index(0, j)] == fdtd::FloatType(0));
+            CHECK(f.ez()[grid.index(grid.nx() - 1, j)] == fdtd::FloatType(0));
         }
     }
 }

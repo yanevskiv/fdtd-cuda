@@ -139,9 +139,9 @@ TEST_CASE("PMC boundary keeps a centred impulse symmetric", "[unit][boundary]")
             CHECK_THAT(double(pmc.ez()[grid.index(i, n - j)]), WithinAbs(v, 1e-6));
             CHECK_THAT(double(pmc.ez()[grid.index(j, i)]), WithinAbs(v, 1e-6));
         }
-        CHECK(pec.ez()[grid.index(0, j)] == 0);
+        CHECK(pec.ez()[grid.index(0, j)] == FloatType(0));
     }
-    CHECK(pmc.ez()[grid.index(0, 4)] != 0);
+    CHECK(pmc.ez()[grid.index(0, 4)] != FloatType(0));
 }
 
 // Verify that both conditions handle grids one or two cells wide.
@@ -156,7 +156,7 @@ TEST_CASE("Boundary on degenerate grids", "[unit][boundary]")
         fdtd::TMz::serial_update_boundary(fields, coeffs, Boundary::Pec);
 
         for (const FloatType v : fields.ez()) {
-            CHECK(v == 0);
+            CHECK(v == FloatType(0));
         }
     }
 }
