@@ -30,6 +30,45 @@ namespace fdtd
     namespace TMz
     {
         /**
+         * Pointers to the four coefficient arrays the serial routines read.
+         *
+         * The routines take these rather than a Coeffs2D so the backend can keep its own
+         * arrays, as a GPU backend keeps device arrays. A Coeffs2D converts implicitly.
+         */
+        struct CoeffsView
+        {
+            /**
+             * View the arrays of a coefficient set, which must outlive the view.
+             *
+             * @param coeffs Coefficients to view.
+             */
+            CoeffsView(const Coeffs2D &coeffs) noexcept; // NOLINT(google-explicit-constructor)
+
+            /**
+             * View four arrays over the same grid.
+             *
+             * @param ce1Data Ez decay factors.
+             * @param ce2Data Ez curl factors.
+             * @param ch1Data H decay factors.
+             * @param ch2Data H curl factors.
+             */
+            CoeffsView(const FloatType *ce1Data, const FloatType *ce2Data, const FloatType *ch1Data,
+                       const FloatType *ch2Data) noexcept;
+
+            /** Ez decay factors. */
+            const FloatType *ce1;
+
+            /** Ez curl factors, before 1/dx or 1/dy. */
+            const FloatType *ce2;
+
+            /** H decay factors. */
+            const FloatType *ch1;
+
+            /** H curl factors, before 1/dx or 1/dy. */
+            const FloatType *ch2;
+        };
+
+        /**
          * Advance Hx and Hy by one step from the differences of Ez.
          *
          * With Hx(i, j) at (i, j + 1/2) and Hy(i, j) at (i + 1/2, j):
@@ -41,9 +80,9 @@ namespace fdtd
          * column lie outside the domain and are left untouched. Inner loop along x.
          *
          * @param fields Fields to update.
-         * @param coeffs Coefficients on the same grid as the fields.
+         * @param coeffs Coefficient arrays on the same grid as the fields.
          */
-        void serial_update_h(Fields2D &fields, const Coeffs2D &coeffs) noexcept;
+        void serial_update_h(Fields2D &fields, CoeffsView coeffs) noexcept;
 
         /**
          * Advance Ez by one step from the curl of H.
@@ -55,9 +94,9 @@ namespace fdtd
          * outer boundary. Inner loop along x.
          *
          * @param fields Fields to update.
-         * @param coeffs Coefficients on the same grid as the fields.
+         * @param coeffs Coefficient arrays on the same grid as the fields.
          */
-        void serial_update_e(Fields2D &fields, const Coeffs2D &coeffs) noexcept;
+        void serial_update_e(Fields2D &fields, CoeffsView coeffs) noexcept;
     }
 }
 

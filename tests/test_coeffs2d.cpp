@@ -26,8 +26,7 @@
 #include "fdtd/TMz/fdtd_tmz_courant.h"
 #include "fdtd/fdtd_constants.h"
 
-// Standard library for algorithms, limits and errors.
-#include <algorithm>
+// Standard library for limits and errors.
 #include <cstddef>
 #include <limits>
 #include <stdexcept>
@@ -119,28 +118,4 @@ TEST_CASE("Coeffs2D rejects invalid time steps", "[unit][coeffs2d]")
                     std::invalid_argument);
     CHECK_THROWS_AS(Coeffs2D(material, std::numeric_limits<double>::quiet_NaN()),
                     std::invalid_argument);
-}
-
-// Verify that a copy owns its own arrays with the same values, and that assignment copies.
-TEST_CASE("Coeffs2D copies deeply", "[unit][coeffs2d]")
-{
-    const Grid2D grid(4, 3);
-    Material2D material(grid);
-    material.fill_rect(1, 1, 3, 2, {4, 2, 0.5, 300});
-    const Coeffs2D original(material, 1e-12);
-
-    const Coeffs2D copy(original);
-    CHECK(copy.dt() == original.dt());
-    CHECK(copy.grid().nx() == 4);
-    CHECK(copy.ce1().data() != original.ce1().data());
-    CHECK(std::equal(copy.ce1().begin(), copy.ce1().end(), original.ce1().begin()));
-    CHECK(std::equal(copy.ce2().begin(), copy.ce2().end(), original.ce2().begin()));
-    CHECK(std::equal(copy.ch1().begin(), copy.ch1().end(), original.ch1().begin()));
-    CHECK(std::equal(copy.ch2().begin(), copy.ch2().end(), original.ch2().begin()));
-
-    Coeffs2D assigned(Material2D(Grid2D(2, 2)), 2e-12);
-    assigned = original;
-    CHECK(assigned.dt() == original.dt());
-    CHECK(assigned.ce1().size() == original.ce1().size());
-    CHECK(std::equal(assigned.ch1().begin(), assigned.ch1().end(), original.ch1().begin()));
 }

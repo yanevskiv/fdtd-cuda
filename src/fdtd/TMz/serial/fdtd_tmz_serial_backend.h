@@ -21,8 +21,7 @@
 #define FDTD_TMZ_SERIAL_BACKEND_H
 
 #include "fdtd/TMz/fdtd_tmz_backend.h"
-
-#include <optional>
+#include "fdtd/fdtd_aligned_buffer.h"
 
 /** Namespace for the fdtd library. */
 namespace fdtd
@@ -108,8 +107,20 @@ namespace fdtd
             /** The backend's copy of the fields. */
             Fields2D m_fields;
 
-            /** The backend's copy of the coefficients, empty until uploaded. */
-            std::optional<Coeffs2D> m_coeffs;
+            /** Whether coefficients were uploaded. */
+            bool m_has_coeffs = false;
+
+            /** The backend's copy of Ce1. */
+            AlignedBuffer<FloatType> m_ce1;
+
+            /** The backend's copy of Ce2. */
+            AlignedBuffer<FloatType> m_ce2;
+
+            /** The backend's copy of Ch1. */
+            AlignedBuffer<FloatType> m_ch1;
+
+            /** The backend's copy of Ch2. */
+            AlignedBuffer<FloatType> m_ch2;
 
             /** Outer boundary condition. */
             Boundary m_boundary = Boundary::Pec;

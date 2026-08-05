@@ -21,8 +21,8 @@
 #define FDTD_TMZ_SERIAL_BOUNDARY_H
 
 #include "fdtd/TMz/fdtd_tmz_boundary.h"
-#include "fdtd/TMz/fdtd_tmz_coeffs2d.h"
 #include "fdtd/TMz/fdtd_tmz_fields2d.h"
+#include "fdtd/TMz/serial/fdtd_tmz_serial_update.h"
 
 /** Namespace for the fdtd library. */
 namespace fdtd
@@ -38,10 +38,10 @@ namespace fdtd
          * Hx(i, -1) and Hx(i, ny - 1). Corners combine both.
          *
          * @param fields Fields to update.
-         * @param coeffs Coefficients on the same grid as the fields.
+         * @param coeffs Coefficient arrays on the same grid as the fields.
          * @param boundary Outer boundary condition.
          */
-        void serial_update_boundary(Fields2D &fields, const Coeffs2D &coeffs,
+        void serial_update_boundary(Fields2D &fields, CoeffsView coeffs,
                                     Boundary boundary) noexcept;
     }
 }

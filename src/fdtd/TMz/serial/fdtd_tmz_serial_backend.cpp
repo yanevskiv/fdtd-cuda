@@ -42,15 +42,19 @@ namespace fdtd::TMz
         }
     }
 
-    // Copy one field array into another of the same size.
+    // Copy one array into another of the same size.
     static void copy_field(std::span<const FloatType> source, std::span<FloatType> target)
     {
         std::copy(source.begin(), source.end(), target.begin());
     }
 
-    // Allocate the backend's fields.
+    // Allocate the backend's fields and coefficient arrays.
     SerialBackend::SerialBackend(const Grid2D &grid)
         : m_fields(grid)
+        , m_ce1(grid.size())
+        , m_ce2(grid.size())
+        , m_ch1(grid.size())
+        , m_ch2(grid.size())
     {
         // Empty.
     }
@@ -91,11 +95,15 @@ namespace fdtd::TMz
         copy_field(m_fields.hy(), fields.hy());
     }
 
-    // Keep a copy of the coefficients.
+    // Copy the coefficient arrays in.
     void SerialBackend::upload(const Coeffs2D &coeffs)
     {
         require_same_grid(grid(), coeffs.grid());
-        m_coeffs = coeffs;
+        copy_field(coeffs.ce1(), {m_ce1.data(), m_ce1.size()});
+        copy_field(coeffs.ce2(), {m_ce2.data(), m_ce2.size()});
+        copy_field(coeffs.ch1(), {m_ch1.data(), m_ch1.size()});
+        copy_field(coeffs.ch2(), {m_ch2.data(), m_ch2.size()});
+        m_has_coeffs = true;
     }
 
     // Store the boundary condition.
@@ -113,13 +121,14 @@ namespace fdtd::TMz
     // Run H, the interior E and the edge E once per step.
     void SerialBackend::step(std::size_t nsteps)
     {
-        if (!m_coeffs) {
+        if (!m_has_coeffs) {
             throw std::logic_error("SerialBackend: step before the coefficients were uploaded");
         }
+        const CoeffsView coeffs(m_ce1.data(), m_ce2.data(), m_ch1.data(), m_ch2.data());
         for (std::size_t n = 0; n < nsteps; ++n) {
-            serial_update_h(m_fields, *m_coeffs);
-            serial_update_e(m_fields, *m_coeffs);
-            serial_update_boundary(m_fields, *m_coeffs, m_boundary);
+            serial_update_h(m_fields, coeffs);
+            serial_update_e(m_fields, coeffs);
+            serial_update_boundary(m_fields, coeffs, m_boundary);
         }
     }
 }

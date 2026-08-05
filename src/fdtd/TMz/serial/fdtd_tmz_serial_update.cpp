@@ -26,8 +26,27 @@
 // Namespace for the 2D TMz module.
 namespace fdtd::TMz
 {
+    // Take the arrays of a coefficient set.
+    CoeffsView::CoeffsView(const Coeffs2D &coeffs) noexcept
+        : CoeffsView(coeffs.ce1().data(), coeffs.ce2().data(), coeffs.ch1().data(),
+                     coeffs.ch2().data())
+    {
+        // Empty.
+    }
+
+    // Take four arrays.
+    CoeffsView::CoeffsView(const FloatType *ce1Data, const FloatType *ce2Data,
+                           const FloatType *ch1Data, const FloatType *ch2Data) noexcept
+        : ce1(ce1Data)
+        , ce2(ce2Data)
+        , ch1(ch1Data)
+        , ch2(ch2Data)
+    {
+        // Empty.
+    }
+
     // Update Hx row by row below the last row, then Hy row by row left of the last column.
-    void serial_update_h(Fields2D &fields, const Coeffs2D &coeffs) noexcept
+    void serial_update_h(Fields2D &fields, CoeffsView coeffs) noexcept
     {
         const Grid2D &grid = fields.grid();
         const std::size_t nx = grid.nx();
@@ -39,8 +58,8 @@ namespace fdtd::TMz
         const FloatType *__restrict Ez = fields.ez().data();
         FloatType *__restrict Hx = fields.hx().data();
         FloatType *__restrict Hy = fields.hy().data();
-        const FloatType *__restrict Ch1 = coeffs.ch1().data();
-        const FloatType *__restrict Ch2 = coeffs.ch2().data();
+        const FloatType *__restrict Ch1 = coeffs.ch1;
+        const FloatType *__restrict Ch2 = coeffs.ch2;
 
         for (std::size_t j = 0; j + 1 < ny; ++j) {
             const std::size_t row = j * pitch;
@@ -60,7 +79,7 @@ namespace fdtd::TMz
     }
 
     // Update the interior Ez row by row.
-    void serial_update_e(Fields2D &fields, const Coeffs2D &coeffs) noexcept
+    void serial_update_e(Fields2D &fields, CoeffsView coeffs) noexcept
     {
         const Grid2D &grid = fields.grid();
         const std::size_t nx = grid.nx();
@@ -72,8 +91,8 @@ namespace fdtd::TMz
         FloatType *__restrict Ez = fields.ez().data();
         const FloatType *__restrict Hx = fields.hx().data();
         const FloatType *__restrict Hy = fields.hy().data();
-        const FloatType *__restrict Ce1 = coeffs.ce1().data();
-        const FloatType *__restrict Ce2 = coeffs.ce2().data();
+        const FloatType *__restrict Ce1 = coeffs.ce1;
+        const FloatType *__restrict Ce2 = coeffs.ce2;
 
         for (std::size_t j = 1; j + 1 < ny; ++j) {
             const std::size_t row = j * pitch;

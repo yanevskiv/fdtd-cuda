@@ -47,8 +47,7 @@ namespace fdtd::TMz
     }
 
     // Zero the edge under PEC, or apply the Ez update with H outside the domain read as zero.
-    void serial_update_boundary(Fields2D &fields, const Coeffs2D &coeffs,
-                                Boundary boundary) noexcept
+    void serial_update_boundary(Fields2D &fields, CoeffsView coeffs, Boundary boundary) noexcept
     {
         const Grid2D &grid = fields.grid();
         FloatType *__restrict Ez = fields.ez().data();
@@ -67,8 +66,8 @@ namespace fdtd::TMz
         const FloatType invDy = FloatType(1) / grid.dy();
         const FloatType *__restrict Hx = fields.hx().data();
         const FloatType *__restrict Hy = fields.hy().data();
-        const FloatType *__restrict Ce1 = coeffs.ce1().data();
-        const FloatType *__restrict Ce2 = coeffs.ce2().data();
+        const FloatType *__restrict Ce1 = coeffs.ce1;
+        const FloatType *__restrict Ce2 = coeffs.ce2;
 
         for_each_edge(grid, [&](std::size_t i, std::size_t j) {
             const std::size_t k = grid.index(i, j);
