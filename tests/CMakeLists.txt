@@ -20,6 +20,7 @@ add_executable(fdtd_tests
     test_material2d.cpp
     test_serial_boundary.cpp
     test_serial_update.cpp
+    test_sim2d.cpp
     test_smoke.cpp
     test_version.cpp)
 target_link_libraries(fdtd_tests PRIVATE fdtd::fdtd fdtd_warnings Catch2::Catch2WithMain)
