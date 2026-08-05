@@ -1,0 +1,176 @@
+/*
+ * C++ header for the 2D TMz material map.
+ *
+ * Copyright (C) 2026 Ivan Janevski
+ *
+ * fdtd-cuda  is free software; you can redistribute it and/or modify it
+ * under the terms of the GNU General Public License as published by the
+ * Free  Software  Foundation;  either  version 3 of the License, or (at
+ * your option) any later version.
+ *
+ * fdtd-cuda  is  distributed  in  the  hope that it will be useful, but
+ * WITHOUT   ANY   WARRANTY;   without  even  the  implied  warranty  of
+ * MERCHANTABILITY  or  FITNESS  FOR  A  PARTICULAR PURPOSE. See the GNU
+ * General Public License for more details.
+ *
+ * You  should  have  received  a copy of the GNU General Public License
+ * along with fdtd-cuda; if not, see <https://www.gnu.org/licenses/>.
+ */
+
+#ifndef FDTD_TMZ_MATERIAL2D_H
+#define FDTD_TMZ_MATERIAL2D_H
+
+#include "fdtd/TMz/fdtd_tmz_grid2d.h"
+#include "fdtd/fdtd_float.h"
+
+#include <cstddef>
+#include <span>
+#include <vector>
+
+/** Namespace for the fdtd library. */
+namespace fdtd
+{
+    /** Namespace for the 2D TMz module. */
+    namespace TMz
+    {
+        /**
+         * Per-cell material parameters over a grid, vacuum by default.
+         *
+         * Each array has grid().size() elements, indexed with Grid2D::index. Permittivity
+         * and permeability are relative; the conductivities are in SI units.
+         */
+        class Material2D
+        {
+        public:
+            /** Parameters of a homogeneous medium. */
+            struct Medium
+            {
+                /** Relative permittivity, positive. */
+                FloatType eps_r = 1;
+
+                /** Relative permeability, positive. */
+                FloatType mu_r = 1;
+
+                /** Electric conductivity in S/m, non-negative. */
+                FloatType sigma_e = 0;
+
+                /** Magnetic conductivity in ohm/m, non-negative. */
+                FloatType sigma_m = 0;
+            };
+
+            /**
+             * Fill a grid with vacuum.
+             *
+             * @param grid Grid the material lives on.
+             */
+            explicit Material2D(const Grid2D &grid);
+
+            /**
+             * Grid the material lives on.
+             *
+             * @return The grid.
+             */
+            const Grid2D &grid() const noexcept;
+
+            /**
+             * Medium of one cell.
+             *
+             * @param i Cell along x.
+             * @param j Cell along y.
+             * @return The medium.
+             * @throws std::out_of_range When the cell is outside the grid.
+             */
+            Medium at(std::size_t i, std::size_t j) const;
+
+            /**
+             * Set every cell to a medium.
+             *
+             * @param medium Medium to fill with.
+             * @throws std::invalid_argument When the medium is not physical.
+             */
+            void fill(const Medium &medium);
+
+            /**
+             * Set the cells i0 <= i < i1, j0 <= j < j1 to a medium, clipped to the grid.
+             *
+             * @param i0 First cell along x.
+             * @param j0 First cell along y.
+             * @param i1 One past the last cell along x.
+             * @param j1 One past the last cell along y.
+             * @param medium Medium to fill with.
+             * @throws std::invalid_argument When the medium is not physical.
+             */
+            void fill_rect(std::size_t i0, std::size_t j0, std::size_t i1, std::size_t j1,
+                           const Medium &medium);
+
+            /**
+             * Set the cells whose indices lie within a circle to a medium, clipped to the grid.
+             *
+             * Cell (i, j) is inside when (i - ci)^2 + (j - cj)^2 <= radius^2, so the center
+             * may lie off the grid.
+             *
+             * @param ci Center along x in cells.
+             * @param cj Center along y in cells.
+             * @param radius Radius in cells, non-negative.
+             * @param medium Medium to fill with.
+             * @throws std::invalid_argument When the medium is not physical or the circle
+             *         is not finite and non-negative.
+             */
+            void fill_circle(double ci, double cj, double radius, const Medium &medium);
+
+            /**
+             * Relative permittivity.
+             *
+             * @return Read-only view of the array.
+             */
+            std::span<const FloatType> eps_r() const noexcept;
+
+            /**
+             * Relative permeability.
+             *
+             * @return Read-only view of the array.
+             */
+            std::span<const FloatType> mu_r() const noexcept;
+
+            /**
+             * Electric conductivity in S/m.
+             *
+             * @return Read-only view of the array.
+             */
+            std::span<const FloatType> sigma_e() const noexcept;
+
+            /**
+             * Magnetic conductivity in ohm/m.
+             *
+             * @return Read-only view of the array.
+             */
+            std::span<const FloatType> sigma_m() const noexcept;
+
+        private:
+            /**
+             * Set one cell to a medium, unchecked.
+             *
+             * @param k Index of the cell.
+             * @param medium Medium to set.
+             */
+            void set(std::size_t k, const Medium &medium) noexcept;
+
+            /** Grid the material lives on. */
+            Grid2D m_grid;
+
+            /** Relative permittivity per cell. */
+            std::vector<FloatType> m_eps_r;
+
+            /** Relative permeability per cell. */
+            std::vector<FloatType> m_mu_r;
+
+            /** Electric conductivity per cell in S/m. */
+            std::vector<FloatType> m_sigma_e;
+
+            /** Magnetic conductivity per cell in ohm/m. */
+            std::vector<FloatType> m_sigma_m;
+        };
+    }
+}
+
+#endif

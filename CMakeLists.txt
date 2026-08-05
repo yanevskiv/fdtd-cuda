@@ -27,6 +27,7 @@ add_library(fdtd
     src/fdtd/TMz/fdtd_tmz_backend.cpp
     src/fdtd/TMz/fdtd_tmz_fields2d.cpp
     src/fdtd/TMz/fdtd_tmz_grid2d.cpp
+    src/fdtd/TMz/fdtd_tmz_material2d.cpp
     src/fdtd/TMz/serial/fdtd_tmz_serial_backend.cpp)
 add_library(fdtd::fdtd ALIAS fdtd)
 target_compile_features(fdtd PUBLIC cxx_std_20)

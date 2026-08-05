@@ -10,6 +10,8 @@ CheckOptions:
   readability-identifier-naming.MethodCase: lower_case
   readability-identifier-naming.MemberCase: lower_case
   readability-identifier-naming.MemberPrefix: 'm_'
+  readability-identifier-naming.PublicMemberCase: lower_case
+  readability-identifier-naming.PublicMemberPrefix: ''
   readability-identifier-naming.ParameterCase: camelBack
   readability-identifier-naming.LocalVariableCase: camelBack
   readability-identifier-naming.LocalPointerCase: camelBack

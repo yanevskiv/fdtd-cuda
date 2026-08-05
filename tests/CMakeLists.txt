@@ -15,6 +15,7 @@ add_executable(fdtd_tests
     test_constants.cpp
     test_fields2d.cpp
     test_grid2d.cpp
+    test_material2d.cpp
     test_smoke.cpp
     test_version.cpp)
 target_link_libraries(fdtd_tests PRIVATE fdtd::fdtd fdtd_warnings Catch2::Catch2WithMain)
