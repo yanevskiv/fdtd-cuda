@@ -20,6 +20,8 @@
 #ifndef FDTD_TMZ_BACKEND_H
 #define FDTD_TMZ_BACKEND_H
 
+#include "fdtd/TMz/fdtd_tmz_boundary.h"
+#include "fdtd/TMz/fdtd_tmz_coeffs2d.h"
 #include "fdtd/TMz/fdtd_tmz_fields2d.h"
 #include "fdtd/TMz/fdtd_tmz_grid2d.h"
 
@@ -50,7 +52,9 @@ namespace fdtd
          * A backend that owns a copy of the fields and advances them in time.
          *
          * Fields move in with upload() and out with download(); step() works on the
-         * backend's own copy, which may live on another device.
+         * backend's own copy, which may live on another device. The coefficients move in
+         * with upload() too, and must be there before the first step. The outer boundary
+         * is PEC until set_boundary() says otherwise.
          */
         class Backend
         {
@@ -96,9 +100,32 @@ namespace fdtd
             virtual void download(Fields2D &fields) const = 0;
 
             /**
-             * Advance the fields.
+             * Copy update coefficients into the backend, replacing any before.
+             *
+             * @param coeffs Coefficients on the backend's grid.
+             * @throws std::invalid_argument When the grids differ.
+             */
+            virtual void upload(const Coeffs2D &coeffs) = 0;
+
+            /**
+             * Set the outer boundary condition for the steps that follow.
+             *
+             * @param boundary Outer boundary condition.
+             */
+            virtual void set_boundary(Boundary boundary) = 0;
+
+            /**
+             * Outer boundary condition.
+             *
+             * @return The boundary.
+             */
+            virtual Boundary boundary() const noexcept = 0;
+
+            /**
+             * Advance the fields: per step H, then Ez inside, then the edge Ez.
              *
              * @param nsteps Number of time steps.
+             * @throws std::logic_error When no coefficients were uploaded.
              */
             virtual void step(std::size_t nsteps) = 0;
 

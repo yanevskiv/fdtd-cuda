@@ -19,13 +19,47 @@
 
 // Catch2 declarations for the tests.
 #include <catch2/catch_test_macros.hpp>
+#include <catch2/generators/catch_generators.hpp>
+#include <catch2/matchers/catch_matchers_floating_point.hpp>
 
-// Project header under test.
+// Project headers under test.
 #include "fdtd/TMz/fdtd_tmz_backend.h"
+#include "fdtd/TMz/fdtd_tmz_courant.h"
 
-// Standard library for algorithms and errors.
+// Standard library for algorithms, sizes and errors.
 #include <algorithm>
+#include <cstddef>
 #include <stdexcept>
+
+// Shorthand for the types under test.
+using Catch::Matchers::WithinAbs;
+using Catch::Matchers::WithinRel;
+using fdtd::TMz::Boundary;
+using fdtd::TMz::Coeffs2D;
+using fdtd::TMz::Fields2D;
+using fdtd::TMz::Grid2D;
+using fdtd::TMz::Material2D;
+
+// Create a serial backend in vacuum at a Courant number, with a unit Ez impulse at (ci, cj).
+static auto make_impulse(const Grid2D &grid, double courant, std::size_t ci, std::size_t cj,
+                         Boundary boundary)
+{
+    auto backend = fdtd::TMz::make_backend(fdtd::TMz::BackendType::Serial, grid);
+    backend->upload(Coeffs2D(Material2D(grid), fdtd::TMz::courant_dt(grid, courant)));
+    backend->set_boundary(boundary);
+    Fields2D fields(grid);
+    fields.ez()[grid.index(ci, cj)] = 1;
+    backend->upload(fields);
+    return backend;
+}
+
+// Download a backend's fields.
+static Fields2D download(const fdtd::TMz::Backend &backend)
+{
+    Fields2D fields(backend.grid());
+    backend.download(fields);
+    return fields;
+}
 
 // Verify that serial is always available and comes first.
 TEST_CASE("Registry lists the serial backend first", "[unit][backend]")
@@ -58,7 +92,7 @@ TEST_CASE("Backend types have lowercase names", "[unit][backend]")
     CHECK(fdtd::TMz::backend_name(BackendType::Cuda) == "cuda");
 }
 
-// Verify that the serial backend round-trips fields and that its stub step leaves them alone.
+// Verify that the serial backend round-trips fields.
 TEST_CASE("Serial backend round-trips fields", "[unit][backend][serial]")
 {
     const fdtd::TMz::Grid2D grid(7, 5);
@@ -73,7 +107,6 @@ TEST_CASE("Serial backend round-trips fields", "[unit][backend][serial]")
     input.hx()[grid.index(6, 0)] = 2;
     input.hy()[grid.index(0, 4)] = 3;
     backend->upload(input);
-    backend->step(10);
 
     fdtd::TMz::Fields2D output(grid);
     backend->download(output);
@@ -89,4 +122,105 @@ TEST_CASE("Serial backend rejects fields on another grid", "[unit][backend][seri
     fdtd::TMz::Fields2D other(fdtd::TMz::Grid2D(5, 7));
     CHECK_THROWS_AS(backend->upload(other), std::invalid_argument);
     CHECK_THROWS_AS(backend->download(other), std::invalid_argument);
+}
+
+// Verify the coefficient upload checks and the boundary default.
+TEST_CASE("Serial backend takes coefficients and a boundary", "[unit][backend][serial]")
+{
+    const Grid2D grid(7, 5);
+    auto backend = fdtd::TMz::make_backend(fdtd::TMz::BackendType::Serial, grid);
+
+    CHECK(backend->boundary() == Boundary::Pec);
+    CHECK_THROWS_AS(backend->step(1), std::logic_error);
+
+    const Grid2D other(5, 7);
+    CHECK_THROWS_AS(backend->upload(Coeffs2D(Material2D(other), 1e-12)), std::invalid_argument);
+
+    backend->upload(Coeffs2D(Material2D(grid), fdtd::TMz::courant_dt(grid, 0.9)));
+    backend->set_boundary(Boundary::Pmc);
+    CHECK(backend->boundary() == Boundary::Pmc);
+    CHECK_NOTHROW(backend->step(1));
+}
+
+// Verify one step from a unit impulse in vacuum on square cells with S = 1/2: the centre
+// falls to 1/2 and each neighbour rises to 1/8, as c^2 dt^2 / dx^2 = S^2 / 2.
+TEST_CASE("Serial backend steps an impulse", "[unit][backend][serial]")
+{
+    const Grid2D grid(7, 7, 1e-3F, 1e-3F);
+    auto backend = make_impulse(grid, 0.5, 3, 3, Boundary::Pec);
+    backend->step(1);
+    const Fields2D f = download(*backend);
+
+    CHECK_THAT(double(f.ez()[grid.index(3, 3)]), WithinRel(0.5, 1e-5));
+    CHECK_THAT(double(f.ez()[grid.index(2, 3)]), WithinRel(0.125, 1e-5));
+    CHECK_THAT(double(f.ez()[grid.index(4, 3)]), WithinRel(0.125, 1e-5));
+    CHECK_THAT(double(f.ez()[grid.index(3, 2)]), WithinRel(0.125, 1e-5));
+    CHECK_THAT(double(f.ez()[grid.index(3, 4)]), WithinRel(0.125, 1e-5));
+}
+
+// Verify that under PEC the edge Ez is zero after every step, even when uploaded non-zero.
+TEST_CASE("Serial backend holds the edge Ez at zero under PEC", "[unit][backend][serial]")
+{
+    const Grid2D grid(6, 5);
+    auto backend = make_impulse(grid, 0.9, 0, 2, Boundary::Pec);
+    for (int n = 0; n < 15; ++n) {
+        backend->step(1);
+        const Fields2D f = download(*backend);
+        for (std::size_t i = 0; i < grid.nx(); ++i) {
+            CHECK(f.ez()[grid.index(i, 0)] == 0);
+            CHECK(f.ez()[grid.index(i, grid.ny() - 1)] == 0);
+        }
+        for (std::size_t j = 0; j < grid.ny(); ++j) {
+            CHECK(f.ez()[grid.index(0, j)] == 0);
+            CHECK(f.ez()[grid.index(grid.nx() - 1, j)] == 0);
+        }
+    }
+}
+
+// Verify that a centred impulse stays symmetric about x, about y and about the centre on
+// rectangular cells, and about the diagonal on square ones, under both boundaries.
+TEST_CASE("Serial backend keeps a centred impulse symmetric", "[unit][backend][serial]")
+{
+    const Boundary boundary = GENERATE(Boundary::Pec, Boundary::Pmc);
+    const auto symmetric = [](const Grid2D &grid, bool diagonal, Boundary b) {
+        const std::size_t mx = grid.nx() - 1;
+        const std::size_t my = grid.ny() - 1;
+        auto backend = make_impulse(grid, 0.8, mx / 2, my / 2, b);
+        backend->step(40);
+        const Fields2D f = download(*backend);
+        const auto ez = [&](std::size_t i, std::size_t j) {
+            return double(f.ez()[grid.index(i, j)]);
+        };
+        for (std::size_t j = 0; j <= my; ++j) {
+            for (std::size_t i = 0; i <= mx; ++i) {
+                const double v = ez(i, j);
+                CHECK_THAT(ez(mx - i, j), WithinAbs(v, 1e-6));
+                CHECK_THAT(ez(i, my - j), WithinAbs(v, 1e-6));
+                CHECK_THAT(ez(mx - i, my - j), WithinAbs(v, 1e-6));
+                if (diagonal) {
+                    CHECK_THAT(ez(j, i), WithinAbs(v, 1e-6));
+                }
+            }
+        }
+    };
+
+    symmetric(Grid2D(13, 9, 1e-3F, 2e-3F), false, boundary);
+    symmetric(Grid2D(11, 11, 1e-3F, 1e-3F), true, boundary);
+}
+
+// Verify that step(a) then step(b) matches step(a + b) bit for bit.
+TEST_CASE("Serial backend steps compose", "[unit][backend][serial]")
+{
+    const Grid2D grid(10, 8);
+    auto split = make_impulse(grid, 0.9, 3, 4, Boundary::Pmc);
+    auto whole = make_impulse(grid, 0.9, 3, 4, Boundary::Pmc);
+    split->step(7);
+    split->step(5);
+    whole->step(12);
+    const Fields2D a = download(*split);
+    const Fields2D b = download(*whole);
+
+    CHECK(std::equal(a.ez().begin(), a.ez().end(), b.ez().begin()));
+    CHECK(std::equal(a.hx().begin(), a.hx().end(), b.hx().begin()));
+    CHECK(std::equal(a.hy().begin(), a.hy().end(), b.hy().begin()));
 }

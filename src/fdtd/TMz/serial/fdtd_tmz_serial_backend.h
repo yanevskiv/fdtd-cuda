@@ -22,13 +22,15 @@
 
 #include "fdtd/TMz/fdtd_tmz_backend.h"
 
+#include <optional>
+
 /** Namespace for the fdtd library. */
 namespace fdtd
 {
     /** Namespace for the 2D TMz module. */
     namespace TMz
     {
-        /** Single-threaded reference backend. Its step() is a no-op until M2. */
+        /** Single-threaded reference backend, the oracle for the others. */
         class SerialBackend final : public Backend
         {
         public:
@@ -75,6 +77,27 @@ namespace fdtd
             void download(Fields2D &fields) const override;
 
             /**
+             * Copy update coefficients into the backend.
+             *
+             * @param coeffs Coefficients on the backend's grid.
+             */
+            void upload(const Coeffs2D &coeffs) override;
+
+            /**
+             * Set the outer boundary condition.
+             *
+             * @param boundary Outer boundary condition.
+             */
+            void set_boundary(Boundary boundary) override;
+
+            /**
+             * Outer boundary condition.
+             *
+             * @return The boundary.
+             */
+            Boundary boundary() const noexcept override;
+
+            /**
              * Advance the fields.
              *
              * @param nsteps Number of time steps.
@@ -84,6 +107,12 @@ namespace fdtd
         private:
             /** The backend's copy of the fields. */
             Fields2D m_fields;
+
+            /** The backend's copy of the coefficients, empty until uploaded. */
+            std::optional<Coeffs2D> m_coeffs;
+
+            /** Outer boundary condition. */
+            Boundary m_boundary = Boundary::Pec;
         };
     }
 }

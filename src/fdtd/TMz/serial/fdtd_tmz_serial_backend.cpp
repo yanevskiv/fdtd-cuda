@@ -20,6 +20,10 @@
 // Class declaration.
 #include "fdtd/TMz/serial/fdtd_tmz_serial_backend.h"
 
+// Serial update and boundary routines.
+#include "fdtd/TMz/serial/fdtd_tmz_serial_boundary.h"
+#include "fdtd/TMz/serial/fdtd_tmz_serial_update.h"
+
 // Standard library for copies and errors.
 #include <algorithm>
 #include <span>
@@ -34,7 +38,7 @@ namespace fdtd::TMz
         if (expected.nx() != actual.nx() || expected.ny() != actual.ny() ||
             expected.pitch() != actual.pitch() || expected.dx() != actual.dx() ||
             expected.dy() != actual.dy()) {
-            throw std::invalid_argument("SerialBackend: the fields are on a different grid");
+            throw std::invalid_argument("SerialBackend: the data is on a different grid");
         }
     }
 
@@ -87,9 +91,35 @@ namespace fdtd::TMz
         copy_field(m_fields.hy(), fields.hy());
     }
 
-    // Leave the fields unchanged until the update lands in M2.
+    // Keep a copy of the coefficients.
+    void SerialBackend::upload(const Coeffs2D &coeffs)
+    {
+        require_same_grid(grid(), coeffs.grid());
+        m_coeffs = coeffs;
+    }
+
+    // Store the boundary condition.
+    void SerialBackend::set_boundary(Boundary boundary)
+    {
+        m_boundary = boundary;
+    }
+
+    // Return the boundary condition.
+    Boundary SerialBackend::boundary() const noexcept
+    {
+        return m_boundary;
+    }
+
+    // Run H, the interior E and the edge E once per step.
     void SerialBackend::step(std::size_t nsteps)
     {
-        static_cast<void>(nsteps);
+        if (!m_coeffs) {
+            throw std::logic_error("SerialBackend: step before the coefficients were uploaded");
+        }
+        for (std::size_t n = 0; n < nsteps; ++n) {
+            serial_update_h(m_fields, *m_coeffs);
+            serial_update_e(m_fields, *m_coeffs);
+            serial_update_boundary(m_fields, *m_coeffs, m_boundary);
+        }
     }
 }

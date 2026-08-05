@@ -59,6 +59,34 @@ namespace fdtd
             Coeffs2D(const Material2D &material, double dt);
 
             /**
+             * Copy the coefficients into new arrays; a backend keeps its own copy.
+             *
+             * @param other Coefficients to copy.
+             */
+            Coeffs2D(const Coeffs2D &other);
+
+            /**
+             * Replace the coefficients with a copy of another set.
+             *
+             * @param other Coefficients to copy.
+             * @return These coefficients.
+             */
+            Coeffs2D &operator=(const Coeffs2D &other);
+
+            /** Take over another set's arrays. */
+            Coeffs2D(Coeffs2D &&) noexcept = default;
+
+            /**
+             * Take over another set's arrays.
+             *
+             * @return These coefficients.
+             */
+            Coeffs2D &operator=(Coeffs2D &&) noexcept = default;
+
+            /** Release the arrays. */
+            ~Coeffs2D() = default;
+
+            /**
              * Grid the coefficients live on.
              *
              * @return The grid.

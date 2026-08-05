@@ -23,7 +23,8 @@
 // Project constants for the vacuum permittivity and permeability.
 #include "fdtd/fdtd_constants.h"
 
-// Standard library for math and errors.
+// Standard library for copies, math and errors.
+#include <algorithm>
 #include <cmath>
 #include <cstddef>
 #include <stdexcept>
@@ -59,6 +60,36 @@ namespace fdtd::TMz
             m_ch1.data()[k] = FloatType((1.0 - b) / (1.0 + b));
             m_ch2.data()[k] = FloatType((dt / mu) / (1.0 + b));
         }
+    }
+
+    // Copy one array into another of the same size.
+    static void copy_array(const AlignedBuffer<FloatType> &source, AlignedBuffer<FloatType> &target)
+    {
+        std::copy(source.data(), source.data() + source.size(), target.data());
+    }
+
+    // Allocate arrays of the same size and copy the values over.
+    Coeffs2D::Coeffs2D(const Coeffs2D &other)
+        : m_grid(other.m_grid)
+        , m_dt(other.m_dt)
+        , m_ce1(other.m_ce1.size())
+        , m_ce2(other.m_ce2.size())
+        , m_ch1(other.m_ch1.size())
+        , m_ch2(other.m_ch2.size())
+    {
+        copy_array(other.m_ce1, m_ce1);
+        copy_array(other.m_ce2, m_ce2);
+        copy_array(other.m_ch1, m_ch1);
+        copy_array(other.m_ch2, m_ch2);
+    }
+
+    // Copy into a temporary, then move it in.
+    Coeffs2D &Coeffs2D::operator=(const Coeffs2D &other)
+    {
+        if (this != &other) {
+            *this = Coeffs2D(other);
+        }
+        return *this;
     }
 
     // Return the grid.
