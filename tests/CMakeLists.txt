@@ -18,9 +18,12 @@ add_executable(fdtd_tests
     test_fields2d.cpp
     test_grid2d.cpp
     test_material2d.cpp
+    test_serial_update.cpp
     test_smoke.cpp
     test_version.cpp)
 target_link_libraries(fdtd_tests PRIVATE fdtd::fdtd fdtd_warnings Catch2::Catch2WithMain)
+# Private library headers, for testing the backends directly.
+target_include_directories(fdtd_tests PRIVATE ${PROJECT_SOURCE_DIR}/src)
 target_compile_definitions(fdtd_tests PRIVATE
     FDTD_TEST_PROJECT_VERSION="${PROJECT_VERSION}"
     FDTD_TEST_PROJECT_VERSION_MAJOR=${PROJECT_VERSION_MAJOR}
