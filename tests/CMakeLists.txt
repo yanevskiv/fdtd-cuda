@@ -12,6 +12,7 @@ include(Catch)
 
 add_executable(fdtd_tests
     test_backend.cpp
+    test_coeffs2d.cpp
     test_constants.cpp
     test_courant.cpp
     test_fields2d.cpp
