@@ -18,6 +18,7 @@ add_executable(fdtd_tests
     test_fields2d.cpp
     test_grid2d.cpp
     test_material2d.cpp
+    test_serial_boundary.cpp
     test_serial_update.cpp
     test_smoke.cpp
     test_version.cpp)

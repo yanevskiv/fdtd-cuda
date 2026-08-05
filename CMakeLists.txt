@@ -31,6 +31,7 @@ add_library(fdtd
     src/fdtd/TMz/fdtd_tmz_grid2d.cpp
     src/fdtd/TMz/fdtd_tmz_material2d.cpp
     src/fdtd/TMz/serial/fdtd_tmz_serial_backend.cpp
+    src/fdtd/TMz/serial/fdtd_tmz_serial_boundary.cpp
     src/fdtd/TMz/serial/fdtd_tmz_serial_update.cpp)
 add_library(fdtd::fdtd ALIAS fdtd)
 target_compile_features(fdtd PUBLIC cxx_std_20)
