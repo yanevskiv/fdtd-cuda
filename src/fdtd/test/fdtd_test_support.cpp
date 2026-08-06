@@ -43,7 +43,7 @@ namespace fdtd::test
             }
         }
 
-        // Sum the energy with Ez from one set of fields and H as the mean of two.
+        // Sum the energy with Ez from one set of fields and the product of H from two.
         double energy(std::span<const FloatType> ez, const TMz::Fields2D &h0,
                       const TMz::Fields2D &h1, const TMz::Material2D &material)
         {
@@ -55,10 +55,9 @@ namespace fdtd::test
                 for (std::size_t i = 0; i < grid.nx(); ++i) {
                     const std::size_t k = grid.index(i, j);
                     const double e = ez[k];
-                    const double hx = 0.5 * (double(h0.hx()[k]) + double(h1.hx()[k]));
-                    const double hy = 0.5 * (double(h0.hy()[k]) + double(h1.hy()[k]));
-                    sum += EPS_0 * double(epsR[k]) * e * e +
-                           MU_0 * double(muR[k]) * (hx * hx + hy * hy);
+                    const double hh = double(h0.hx()[k]) * double(h1.hx()[k]) +
+                                      double(h0.hy()[k]) * double(h1.hy()[k]);
+                    sum += EPS_0 * double(epsR[k]) * e * e + MU_0 * double(muR[k]) * hh;
                 }
             }
             return 0.5 * sum * double(grid.dx()) * double(grid.dy());
@@ -72,13 +71,13 @@ namespace fdtd::test
         return energy(fields.ez(), fields, fields, material);
     }
 
-    // Sum the energy with H averaged over the two half steps around Ez.
-    double field_energy(const TMz::Fields2D &before, const TMz::Fields2D &after,
+    // Sum the energy with Ez from the first fields and H from the half steps around it.
+    double field_energy(const TMz::Fields2D &fields, const TMz::Fields2D &next,
                         const TMz::Material2D &material)
     {
-        require_same_size(before.grid(), material.grid());
-        require_same_size(after.grid(), material.grid());
-        return energy(after.ez(), before, after, material);
+        require_same_size(fields.grid(), material.grid());
+        require_same_size(next.grid(), material.grid());
+        return energy(fields.ez(), fields, next, material);
     }
 
     // Scan for the largest magnitude.

@@ -54,20 +54,22 @@ TEST_CASE("field_energy sums the cell energies", "[unit][support]")
     CHECK_THAT(fdtd::test::field_energy(fields, material), WithinRel(expected, 1e-6));
 }
 
-// Verify that the two-step energy averages H and takes Ez from the later fields.
-TEST_CASE("field_energy averages H over two half steps", "[unit][support]")
+// Verify that the two-step energy takes Ez from the first fields and multiplies H.
+TEST_CASE("field_energy multiplies H over two half steps", "[unit][support]")
 {
     const Grid2D grid(3, 3);
     const Material2D material(grid);
-    Fields2D before(grid);
-    Fields2D after(grid);
-    before.ez()[grid.index(1, 1)] = FloatType(100);
-    before.hx()[grid.index(1, 1)] = FloatType(1);
-    after.hx()[grid.index(1, 1)] = FloatType(3);
-    after.ez()[grid.index(1, 1)] = FloatType(1);
+    Fields2D fields(grid);
+    Fields2D next(grid);
+    fields.ez()[grid.index(1, 1)] = FloatType(1);
+    fields.hx()[grid.index(1, 1)] = FloatType(1);
+    fields.hy()[grid.index(2, 1)] = FloatType(2);
+    next.ez()[grid.index(1, 1)] = FloatType(100);
+    next.hx()[grid.index(1, 1)] = FloatType(3);
+    next.hy()[grid.index(2, 1)] = FloatType(-1);
 
-    const double expected = 0.5 * (fdtd::EPS_0 * 1 + fdtd::MU_0 * 4);
-    CHECK_THAT(fdtd::test::field_energy(before, after, material), WithinRel(expected, 1e-6));
+    const double expected = 0.5 * (fdtd::EPS_0 * 1 + fdtd::MU_0 * (3 - 2));
+    CHECK_THAT(fdtd::test::field_energy(fields, next, material), WithinRel(expected, 1e-6));
     CHECK_THROWS_AS(fdtd::test::field_energy(Fields2D(Grid2D(2, 3)), material),
                     std::invalid_argument);
 }

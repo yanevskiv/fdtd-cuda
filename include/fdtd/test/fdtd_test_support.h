@@ -70,18 +70,21 @@ namespace fdtd
         double field_energy(const TMz::Fields2D &fields, const TMz::Material2D &material);
 
         /**
-         * Energy per unit length in z with H taken as the mean of two half steps.
+         * Energy per unit length in z that the Yee scheme conserves, in J/m.
          *
-         * Ez is at a whole step and H half a step off, so the mean of H half a step before
-         * and half a step after puts both at the same time.
+         * Ez at step n sits between H at n - 1/2 and n + 1/2, so the magnetic term takes
+         * the product of the two: eps |Ez^n|^2 / 2 + mu H^(n-1/2) . H^(n+1/2) / 2, summed
+         * over every cell, times dx dy. In a lossless closed box it stays constant to
+         * rounding once the sources are off, where field_energy() of one set of fields
+         * oscillates by a few percent.
          *
-         * @param before Fields one step earlier; only H is used.
-         * @param after Fields at the step; Ez and H are used.
+         * @param fields Fields after n steps; Ez and H are used.
+         * @param next Fields after n + 1 steps; only H is used.
          * @param material Per-cell permittivity and permeability.
          * @return The energy.
          * @throws std::invalid_argument When the grids differ in size.
          */
-        double field_energy(const TMz::Fields2D &before, const TMz::Fields2D &after,
+        double field_energy(const TMz::Fields2D &fields, const TMz::Fields2D &next,
                             const TMz::Material2D &material);
 
         /**
