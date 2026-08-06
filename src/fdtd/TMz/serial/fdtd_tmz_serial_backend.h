@@ -96,12 +96,16 @@ namespace fdtd
              */
             Boundary boundary() const noexcept override;
 
+        protected:
             /**
-             * Advance the fields.
+             * Advance the fields and add the sources.
              *
              * @param nsteps Number of time steps.
+             * @param points Distinct cells inside the grid.
+             * @param values One value per point per step, step-major.
              */
-            void step(std::size_t nsteps) override;
+            void advance(std::size_t nsteps, std::span<const PointInjection> points,
+                         std::span<const FloatType> values) override;
 
         private:
             /** The backend's copy of the fields. */

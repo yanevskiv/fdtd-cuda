@@ -23,16 +23,53 @@
 // Backend implementations.
 #include "fdtd/TMz/serial/fdtd_tmz_serial_backend.h"
 
-// Standard library for algorithms, errors and strings.
+// Standard library for algorithms, limits, errors and strings.
 #include <algorithm>
+#include <limits>
 #include <stdexcept>
 #include <string>
+#include <utility>
 
 // Namespace for the 2D TMz module.
 namespace fdtd::TMz
 {
     // Release nothing; derived backends own their resources.
     Backend::~Backend() = default;
+
+    // Advance with no sources.
+    void Backend::step(std::size_t nsteps)
+    {
+        advance(nsteps, {}, {});
+    }
+
+    // Check the values, cells and distinctness, then advance.
+    void Backend::step(std::size_t nsteps, std::span<const PointInjection> points,
+                       std::span<const FloatType> values)
+    {
+        const std::size_t npoints = points.size();
+        if (npoints != 0 && nsteps > std::numeric_limits<std::size_t>::max() / npoints) {
+            throw std::invalid_argument("Backend: too many source values");
+        }
+        if (values.size() != nsteps * npoints) {
+            throw std::invalid_argument("Backend: need one source value per point per step");
+        }
+
+        const Grid2D &g = grid();
+        std::vector<std::pair<int, std::size_t>> keys;
+        keys.reserve(npoints);
+        for (const PointInjection &point : points) {
+            if (point.index % g.pitch() >= g.nx() || point.index / g.pitch() >= g.ny()) {
+                throw std::invalid_argument("Backend: source point outside the grid");
+            }
+            keys.emplace_back(static_cast<int>(point.component), point.index);
+        }
+        std::sort(keys.begin(), keys.end());
+        if (std::adjacent_find(keys.begin(), keys.end()) != keys.end()) {
+            throw std::invalid_argument("Backend: source points must be distinct");
+        }
+
+        advance(nsteps, points, values);
+    }
 
     // Map a backend type to its name.
     std::string_view backend_name(BackendType type) noexcept

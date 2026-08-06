@@ -48,6 +48,32 @@ namespace fdtd::TMz
         std::copy(source.begin(), source.end(), target.begin());
     }
 
+    // Add one step's values to the points of the H components, or of Ez.
+    static void add_sources(Fields2D &fields, std::span<const PointInjection> points,
+                            const FloatType *values, bool magnetic)
+    {
+        for (std::size_t k = 0; k < points.size(); ++k) {
+            const PointInjection &point = points[k];
+            switch (point.component) {
+                case Component::Ez:
+                    if (!magnetic) {
+                        fields.ez()[point.index] += values[k];
+                    }
+                    break;
+                case Component::Hx:
+                    if (magnetic) {
+                        fields.hx()[point.index] += values[k];
+                    }
+                    break;
+                case Component::Hy:
+                    if (magnetic) {
+                        fields.hy()[point.index] += values[k];
+                    }
+                    break;
+            }
+        }
+    }
+
     // Allocate the backend's fields and coefficient arrays.
     SerialBackend::SerialBackend(const Grid2D &grid)
         : m_fields(grid)
@@ -118,17 +144,21 @@ namespace fdtd::TMz
         return m_boundary;
     }
 
-    // Run H, the interior E and the edge E once per step.
-    void SerialBackend::step(std::size_t nsteps)
+    // Run H, the H sources, the interior E, the edge E and the Ez sources once per step.
+    void SerialBackend::advance(std::size_t nsteps, std::span<const PointInjection> points,
+                                std::span<const FloatType> values)
     {
         if (!m_has_coeffs) {
             throw std::logic_error("SerialBackend: step before the coefficients were uploaded");
         }
         const CoeffsView coeffs(m_ce1.data(), m_ce2.data(), m_ch1.data(), m_ch2.data());
         for (std::size_t n = 0; n < nsteps; ++n) {
+            const FloatType *row = values.data() + n * points.size();
             serial_update_h(m_fields, coeffs);
+            add_sources(m_fields, points, row, true);
             serial_update_e(m_fields, coeffs);
             serial_update_boundary(m_fields, coeffs, m_boundary);
+            add_sources(m_fields, points, row, false);
         }
     }
 }

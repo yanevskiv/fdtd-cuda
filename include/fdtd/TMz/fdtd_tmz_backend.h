@@ -22,11 +22,14 @@
 
 #include "fdtd/TMz/fdtd_tmz_boundary.h"
 #include "fdtd/TMz/fdtd_tmz_coeffs2d.h"
+#include "fdtd/TMz/fdtd_tmz_component.h"
 #include "fdtd/TMz/fdtd_tmz_fields2d.h"
 #include "fdtd/TMz/fdtd_tmz_grid2d.h"
+#include "fdtd/fdtd_float.h"
 
 #include <cstddef>
 #include <memory>
+#include <span>
 #include <string_view>
 #include <vector>
 
@@ -46,6 +49,16 @@ namespace fdtd
 
             /** GPU backend. */
             Cuda
+        };
+
+        /** A cell of one field component that a soft source adds to every step. */
+        struct PointInjection
+        {
+            /** Component the value is added to. */
+            Component component;
+
+            /** Flat index of the cell, as given by Grid2D::index. */
+            std::size_t index;
         };
 
         /**
@@ -122,14 +135,41 @@ namespace fdtd
             virtual Boundary boundary() const noexcept = 0;
 
             /**
-             * Advance the fields: per step H, then Ez inside, then the edge Ez.
+             * Advance the fields with no sources.
              *
              * @param nsteps Number of time steps.
              * @throws std::logic_error When no coefficients were uploaded.
              */
-            virtual void step(std::size_t nsteps) = 0;
+            void step(std::size_t nsteps);
+
+            /**
+             * Advance the fields and add soft point sources.
+             *
+             * Per step: H, then the Hx and Hy sources, then Ez inside, then the edge Ez,
+             * then the Ez sources. Step n adds values[n * points.size() + k] to point k.
+             *
+             * @param nsteps Number of time steps.
+             * @param points Distinct cells to add to.
+             * @param values One value per point per step, step-major.
+             * @throws std::invalid_argument When the values do not match the points and
+             *         steps, a point lies outside the grid, or two points are the same.
+             * @throws std::logic_error When no coefficients were uploaded.
+             */
+            void step(std::size_t nsteps, std::span<const PointInjection> points,
+                      std::span<const FloatType> values);
 
         protected:
+            /**
+             * Advance the fields and add the sources; called by step() after its checks.
+             *
+             * @param nsteps Number of time steps.
+             * @param points Distinct cells inside the grid.
+             * @param values One value per point per step, step-major.
+             * @throws std::logic_error When no coefficients were uploaded.
+             */
+            virtual void advance(std::size_t nsteps, std::span<const PointInjection> points,
+                                 std::span<const FloatType> values) = 0;
+
             /** Create a backend. */
             Backend() = default;
 

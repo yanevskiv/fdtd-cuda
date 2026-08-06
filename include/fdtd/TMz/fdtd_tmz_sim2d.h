@@ -22,13 +22,16 @@
 
 #include "fdtd/TMz/fdtd_tmz_backend.h"
 #include "fdtd/TMz/fdtd_tmz_boundary.h"
+#include "fdtd/TMz/fdtd_tmz_component.h"
 #include "fdtd/TMz/fdtd_tmz_fields2d.h"
 #include "fdtd/TMz/fdtd_tmz_grid2d.h"
 #include "fdtd/TMz/fdtd_tmz_material2d.h"
 #include "fdtd/fdtd_float.h"
+#include "fdtd/fdtd_waveform.h"
 
 #include <cstddef>
 #include <memory>
+#include <vector>
 
 /** Namespace for the fdtd library. */
 namespace fdtd
@@ -136,6 +139,30 @@ namespace fdtd
             const Backend &backend() const noexcept;
 
             /**
+             * Add a soft point source: the waveform is added to one cell every step.
+             *
+             * Ez sources are sampled at the end of each step, (n + 1) * dt, and added after
+             * the edge update. Hx and Hy sources are sampled at (n + 1/2) * dt and added
+             * after the H update. Sources on the same cell add up.
+             *
+             * @param i Column of the cell.
+             * @param j Row of the cell.
+             * @param component Field the waveform is added to.
+             * @param waveform Value at a time in seconds.
+             * @throws std::invalid_argument When the cell is outside the grid or is never
+             *         updated (Ez on the edge under PEC, Hx in the last row, Hy in the last
+             *         column), or the waveform is empty.
+             */
+            void add_source(std::size_t i, std::size_t j, Component component, Waveform waveform);
+
+            /**
+             * Number of sources added.
+             *
+             * @return The source count.
+             */
+            std::size_t source_count() const noexcept;
+
+            /**
              * Advance the simulation.
              *
              * @param nsteps Number of time steps to run.
@@ -167,6 +194,16 @@ namespace fdtd
             void download();
 
         private:
+            /** A point source: the cell it adds to and its waveform. */
+            struct Source
+            {
+                /** Component and cell. */
+                PointInjection point;
+
+                /** Value at a time in seconds. */
+                Waveform waveform;
+            };
+
             /** Settings the simulation was created with. */
             Options m_options;
 
@@ -187,6 +224,9 @@ namespace fdtd
 
             /** Time steps run so far. */
             std::size_t m_step_count = 0;
+
+            /** Point sources, in the order added. */
+            std::vector<Source> m_sources;
         };
     }
 }

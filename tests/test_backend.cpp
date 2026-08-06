@@ -28,17 +28,22 @@
 
 // Standard library for algorithms, sizes and errors.
 #include <algorithm>
+#include <array>
 #include <cstddef>
+#include <span>
 #include <stdexcept>
 
 // Shorthand for the types under test.
 using Catch::Matchers::WithinAbs;
 using Catch::Matchers::WithinRel;
+using fdtd::FloatType;
 using fdtd::TMz::Boundary;
 using fdtd::TMz::Coeffs2D;
+using fdtd::TMz::Component;
 using fdtd::TMz::Fields2D;
 using fdtd::TMz::Grid2D;
 using fdtd::TMz::Material2D;
+using fdtd::TMz::PointInjection;
 
 // Create a serial backend in vacuum at a Courant number, with a unit Ez impulse at (ci, cj).
 static auto make_impulse(const Grid2D &grid, double courant, std::size_t ci, std::size_t cj,
@@ -223,4 +228,71 @@ TEST_CASE("Serial backend steps compose", "[unit][backend][serial]")
     CHECK(std::equal(a.ez().begin(), a.ez().end(), b.ez().begin()));
     CHECK(std::equal(a.hx().begin(), a.hx().end(), b.hx().begin()));
     CHECK(std::equal(a.hy().begin(), a.hy().end(), b.hy().begin()));
+}
+
+// Verify that each source value lands on its cell: Ez after the edge update, H after the
+// H update, so a step from zero fields leaves exactly the injected values there; the H
+// sources land before the E update, so the Ez next to them moves.
+TEST_CASE("Serial backend adds point sources", "[unit][backend][serial]")
+{
+    const Grid2D grid(9, 7);
+    auto backend = make_impulse(grid, 0.5, 4, 3, Boundary::Pec);
+    backend->upload(Fields2D(grid));
+
+    const std::array points{PointInjection{Component::Ez, grid.index(4, 3)},
+                            PointInjection{Component::Hx, grid.index(1, 1)},
+                            PointInjection{Component::Hy, grid.index(6, 5)}};
+    const std::array values{FloatType(2), FloatType(3), FloatType(5)};
+    backend->step(1, points, values);
+    const Fields2D f = download(*backend);
+
+    CHECK(f.ez()[grid.index(4, 3)] == FloatType(2));
+    CHECK(f.hx()[grid.index(1, 1)] == FloatType(3));
+    CHECK(f.hy()[grid.index(6, 5)] == FloatType(5));
+    CHECK(f.ez()[grid.index(1, 1)] != FloatType(0));
+    CHECK(f.ez()[grid.index(6, 5)] != FloatType(0));
+}
+
+// Verify that values are read step-major: a zero in step 0 and a one in step 1 leave only
+// the one, since nothing has moved yet when it lands.
+TEST_CASE("Serial backend reads source values per step", "[unit][backend][serial]")
+{
+    const Grid2D grid(9, 9);
+    auto backend = make_impulse(grid, 0.5, 4, 4, Boundary::Pec);
+    backend->upload(Fields2D(grid));
+
+    const std::array points{PointInjection{Component::Ez, grid.index(4, 4)}};
+    const std::array values{FloatType(0), FloatType(1)};
+    backend->step(2, points, values);
+    const Fields2D f = download(*backend);
+
+    CHECK(f.ez()[grid.index(4, 4)] == FloatType(1));
+    CHECK(f.ez()[grid.index(3, 4)] == FloatType(0));
+}
+
+// Verify that bad source arguments throw before any step runs.
+TEST_CASE("Serial backend rejects bad sources", "[unit][backend][serial]")
+{
+    const Grid2D grid(9, 7);
+    auto backend = make_impulse(grid, 0.5, 4, 3, Boundary::Pec);
+    const PointInjection centre{Component::Ez, grid.index(4, 3)};
+    const std::array one{centre};
+    const std::array value{FloatType(1)};
+    const std::array twoValues{FloatType(1), FloatType(1)};
+
+    CHECK_THROWS_AS(backend->step(1, one, twoValues), std::invalid_argument);
+    CHECK_THROWS_AS(backend->step(2, one, value), std::invalid_argument);
+
+    const std::array outside{PointInjection{Component::Ez, grid.size()}};
+    CHECK_THROWS_AS(backend->step(1, outside, value), std::invalid_argument);
+    if (grid.pitch() > grid.nx()) {
+        const std::array padding{PointInjection{Component::Ez, grid.nx()}};
+        CHECK_THROWS_AS(backend->step(1, padding, value), std::invalid_argument);
+    }
+
+    const std::array twice{centre, centre};
+    CHECK_THROWS_AS(backend->step(1, twice, twoValues), std::invalid_argument);
+    const std::array distinct{centre, PointInjection{Component::Hx, centre.index}};
+    CHECK_NOTHROW(backend->step(1, distinct, twoValues));
+    CHECK_NOTHROW(backend->step(0, distinct, std::span<const FloatType>{}));
 }

@@ -24,9 +24,11 @@
 #include "fdtd/TMz/fdtd_tmz_coeffs2d.h"
 #include "fdtd/TMz/fdtd_tmz_courant.h"
 
-// Standard library for math and errors.
+// Standard library for algorithms, math, errors and moves.
+#include <algorithm>
 #include <cmath>
 #include <stdexcept>
+#include <utility>
 
 // Namespace for the 2D TMz module.
 namespace fdtd::TMz
@@ -114,10 +116,64 @@ namespace fdtd::TMz
         return *m_backend;
     }
 
-    // Step the backend and count the steps.
+    // Check the cell and keep the source.
+    void Sim2D::add_source(std::size_t i, std::size_t j, Component component, Waveform waveform)
+    {
+        const std::size_t nx = m_grid.nx();
+        const std::size_t ny = m_grid.ny();
+        if (i >= nx || j >= ny) {
+            throw std::invalid_argument("Sim2D: source outside the grid");
+        }
+        if (!waveform) {
+            throw std::invalid_argument("Sim2D: empty source waveform");
+        }
+        const bool edge = i == 0 || j == 0 || i + 1 == nx || j + 1 == ny;
+        if ((component == Component::Ez && edge && m_options.boundary == Boundary::Pec) ||
+            (component == Component::Hx && j + 1 == ny) ||
+            (component == Component::Hy && i + 1 == nx)) {
+            throw std::invalid_argument("Sim2D: source on a cell that is never updated");
+        }
+        m_sources.push_back({{component, m_grid.index(i, j)}, std::move(waveform)});
+    }
+
+    // Return the number of sources.
+    std::size_t Sim2D::source_count() const noexcept
+    {
+        return m_sources.size();
+    }
+
+    // Merge sources on the same cell, sample every source for the steps ahead, then step
+    // the backend and count the steps.
     void Sim2D::run(std::size_t nsteps)
     {
-        m_backend->step(nsteps);
+        std::vector<PointInjection> points;
+        std::vector<std::size_t> slots;
+        slots.reserve(m_sources.size());
+        for (const Source &source : m_sources) {
+            const auto it =
+                std::find_if(points.begin(), points.end(), [&source](const PointInjection &point) {
+                    return point.component == source.point.component &&
+                           point.index == source.point.index;
+                });
+            slots.push_back(static_cast<std::size_t>(it - points.begin()));
+            if (it == points.end()) {
+                points.push_back(source.point);
+            }
+        }
+
+        const std::size_t npoints = points.size();
+        std::vector<FloatType> values(nsteps * npoints, FloatType(0));
+        for (std::size_t s = 0; s < m_sources.size(); ++s) {
+            const Source &source = m_sources[s];
+            const double offset = source.point.component == Component::Ez ? 1.0 : 0.5;
+            const auto samples =
+                sample_waveform(source.waveform, m_dt, m_step_count, nsteps, offset);
+            for (std::size_t n = 0; n < nsteps; ++n) {
+                values[n * npoints + slots[s]] += samples[n];
+            }
+        }
+
+        m_backend->step(nsteps, points, values);
         m_step_count += nsteps;
     }
 
