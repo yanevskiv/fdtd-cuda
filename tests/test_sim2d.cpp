@@ -112,6 +112,17 @@ TEST_CASE("Sim2D rejects bad options", "[unit][sim2d]")
     CHECK_THROWS_AS(Sim2D(8, 8, opts), std::invalid_argument);
 }
 
+// Verify that check_stability = false accepts an explicit dt above the Courant limit.
+TEST_CASE("Sim2D accepts an unstable dt without the check", "[unit][sim2d]")
+{
+    Sim2D::Options opts;
+    opts.dt = 1e-9;
+    opts.check_stability = false;
+    Sim2D sim(8, 8, opts);
+    CHECK(sim.dt() == 1e-9);
+    CHECK(sim.dt() > courant_dt(sim.grid(), 1.0));
+}
+
 // Verify that run() counts steps and time, and that download() fills the host fields.
 TEST_CASE("Sim2D counts steps and time", "[unit][sim2d]")
 {
