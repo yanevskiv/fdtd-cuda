@@ -53,7 +53,8 @@ if(FDTD_BUILD_TESTS)
 endif()
 
 # Installation and package export.
-install(DIRECTORY include/ DESTINATION ${CMAKE_INSTALL_INCLUDEDIR})
+install(DIRECTORY include/ DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}
+    PATTERN test EXCLUDE)
 install(TARGETS fdtd EXPORT fdtdTargets)
 install(EXPORT fdtdTargets
     NAMESPACE fdtd::

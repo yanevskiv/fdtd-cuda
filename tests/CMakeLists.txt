@@ -10,6 +10,11 @@ FetchContent_MakeAvailable(Catch2)
 
 include(Catch)
 
+# Physics test helpers, on the public API only; linked by the tests, never installed.
+add_library(fdtd_test_support STATIC
+    ${PROJECT_SOURCE_DIR}/src/fdtd/test/fdtd_test_support.cpp)
+target_link_libraries(fdtd_test_support PUBLIC fdtd::fdtd PRIVATE fdtd_warnings)
+
 add_executable(fdtd_tests
     test_backend.cpp
     test_coeffs2d.cpp
@@ -22,9 +27,10 @@ add_executable(fdtd_tests
     test_serial_update.cpp
     test_sim2d.cpp
     test_smoke.cpp
+    test_support.cpp
     test_version.cpp
     test_waveform.cpp)
-target_link_libraries(fdtd_tests PRIVATE fdtd::fdtd fdtd_warnings Catch2::Catch2WithMain)
+target_link_libraries(fdtd_tests PRIVATE fdtd::fdtd fdtd_test_support fdtd_warnings Catch2::Catch2WithMain)
 # Private library headers, for testing the backends directly.
 target_include_directories(fdtd_tests PRIVATE ${PROJECT_SOURCE_DIR}/src)
 target_compile_definitions(fdtd_tests PRIVATE
@@ -33,4 +39,5 @@ target_compile_definitions(fdtd_tests PRIVATE
     FDTD_TEST_PROJECT_VERSION_MINOR=${PROJECT_VERSION_MINOR}
     FDTD_TEST_PROJECT_VERSION_PATCH=${PROJECT_VERSION_PATCH})
 
-catch_discover_tests(fdtd_tests)
+# Catch tags such as [unit] and [physics] become CTest labels.
+catch_discover_tests(fdtd_tests ADD_TAGS_AS_LABELS)
