@@ -120,3 +120,25 @@ TEST_CASE("Pulses travel at the speed of light", "[physics][speed]")
     CHECK(std::abs(diagonalRatio - 1) < 0.01);
     CHECK(axialRatio > diagonalRatio);
 }
+
+// Verify that the peak of a cylindrical wave falls off as 1 / sqrt(r) in the far field,
+// within 3%: dispersion spreads the pulse and lowers the peak a little with distance.
+TEST_CASE("Far-field peak follows 1 / sqrt(r)", "[physics][falloff]")
+{
+    Sim2D sim(256, 256);
+    const std::size_t distances[] = {30, 50, 70, 90, 110};
+    std::vector<Cell> probes;
+    for (const std::size_t r : distances) {
+        probes.push_back({128 + r, 128});
+    }
+    const auto traces = fdtd::test::point_source_traces(
+        sim, {128, 128}, fdtd::Gaussian::from_steps(sim.dt(), 8), probes, 240);
+
+    const double reference = fdtd::test::find_peak(traces[0]).value * std::sqrt(30.0);
+    for (std::size_t k = 1; k < probes.size(); ++k) {
+        const double ratio =
+            fdtd::test::find_peak(traces[k]).value * std::sqrt(double(distances[k])) / reference;
+        CAPTURE(distances[k], ratio);
+        CHECK(std::abs(ratio - 1) < 0.03);
+    }
+}
