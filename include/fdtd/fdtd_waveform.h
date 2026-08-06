@@ -102,20 +102,24 @@ namespace fdtd
     };
 
     /**
-     * Sample a waveform once per time step: value n is taken at tFirst + n * dt.
+     * Sample a waveform once per time step: value n is taken at (firstStep + n + offset) * dt.
      *
-     * Times are computed in double and converted to FloatType only for the call, so they
-     * do not drift over long runs in float builds.
+     * Each time comes from its whole step index, so sampling steps [a, a + b) in one call
+     * or in two gives the same values bit for bit. Times are computed in double and
+     * converted to FloatType only for the call, so they do not drift over long runs in
+     * float builds.
      *
      * @param waveform Waveform to sample.
-     * @param tFirst Time of the first sample in seconds.
      * @param dt Time step in seconds.
+     * @param firstStep Step index of the first sample.
      * @param nsteps Number of samples.
+     * @param offset Offset in steps added to every index, such as 0.5 for H.
      * @return The samples.
      * @throws std::invalid_argument When the waveform is empty.
      */
-    std::vector<FloatType> sample_waveform(const Waveform &waveform, double tFirst, double dt,
-                                           std::size_t nsteps);
+    std::vector<FloatType> sample_waveform(const Waveform &waveform, double dt,
+                                           std::size_t firstStep, std::size_t nsteps,
+                                           double offset = 0);
 }
 
 #endif

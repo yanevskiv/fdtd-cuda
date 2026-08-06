@@ -74,10 +74,10 @@ TEST_CASE("sample_waveform takes one value per step", "[unit][waveform]")
 {
     const double dt = 1e-12;
     const Gaussian g = Gaussian::from_steps(dt, 10);
-    const auto samples = sample_waveform(g, 0.5 * dt, dt, 100);
+    const auto samples = sample_waveform(g, dt, 0, 100, 0.5);
     REQUIRE(samples.size() == 100);
     for (std::size_t n = 0; n < samples.size(); ++n) {
-        CHECK(samples[n] == g(FloatType(0.5 * dt + double(n) * dt)));
+        CHECK(samples[n] == g(FloatType((double(n) + 0.5) * dt)));
     }
     CHECK_THAT(double(samples[30]), WithinAbs(1.0, 1e-2));
 }
@@ -89,13 +89,25 @@ TEST_CASE("sample_waveform takes any callable", "[unit][waveform]")
         [](FloatType t) {
             return t;
         },
-        1.0, 0.5, 3);
+        0.5, 2, 3);
     CHECK(samples == std::vector<FloatType>{FloatType(1), FloatType(1.5), FloatType(2)});
     CHECK(sample_waveform(
               [](FloatType) {
                   return FloatType(0);
               },
-              0, 1, 0)
+              1, 0, 0)
               .empty());
-    CHECK_THROWS_AS(sample_waveform(fdtd::Waveform{}, 0, 1, 1), std::invalid_argument);
+    CHECK_THROWS_AS(sample_waveform(fdtd::Waveform{}, 1, 0, 1), std::invalid_argument);
+}
+
+// Verify that sampling in two calls gives the same values as one call, bit for bit.
+TEST_CASE("sample_waveform splits without drift", "[unit][waveform]")
+{
+    const double dt = 1.3e-12;
+    const Gaussian g = Gaussian::from_steps(dt, 10);
+    const auto whole = sample_waveform(g, dt, 0, 100, 0.5);
+    auto split = sample_waveform(g, dt, 0, 37, 0.5);
+    const auto rest = sample_waveform(g, dt, 37, 63, 0.5);
+    split.insert(split.end(), rest.begin(), rest.end());
+    CHECK(split == whole);
 }

@@ -76,16 +76,16 @@ namespace fdtd
         return FloatType(m_amplitude * std::exp(-x * x));
     }
 
-    // Take one sample per step at tFirst + n * dt.
-    std::vector<FloatType> sample_waveform(const Waveform &waveform, double tFirst, double dt,
-                                           std::size_t nsteps)
+    // Take one sample per step at (firstStep + n + offset) * dt.
+    std::vector<FloatType> sample_waveform(const Waveform &waveform, double dt,
+                                           std::size_t firstStep, std::size_t nsteps, double offset)
     {
         if (!waveform) {
             throw std::invalid_argument("sample_waveform: empty waveform");
         }
         std::vector<FloatType> samples(nsteps);
         for (std::size_t n = 0; n < nsteps; ++n) {
-            samples[n] = waveform(FloatType(tFirst + double(n) * dt));
+            samples[n] = waveform(FloatType((double(firstStep + n) + offset) * dt));
         }
         return samples;
     }
