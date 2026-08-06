@@ -191,10 +191,60 @@ namespace fdtd::TMz
         return times;
     }
 
-    // Merge sources on the same cell, sample every source for the steps ahead, then step
-    // the backend and count the steps.
+    // Take the snapshot now, or keep its step in order unless it is already known.
+    void Sim2D::add_snapshot(std::size_t step)
+    {
+        if (step < m_step_count) {
+            throw std::invalid_argument("Sim2D: snapshot step already passed");
+        }
+        const bool taken =
+            std::any_of(m_snapshots.begin(), m_snapshots.end(), [step](const Snapshot &snap) {
+                return snap.step == step;
+            });
+        const auto it = std::lower_bound(m_snapshot_steps.begin(), m_snapshot_steps.end(), step);
+        if (taken || (it != m_snapshot_steps.end() && *it == step)) {
+            return;
+        }
+        if (step == m_step_count) {
+            m_snapshots.push_back(snapshot());
+            return;
+        }
+        m_snapshot_steps.insert(it, step);
+    }
+
+    // Download the backend's fields into a new snapshot.
+    Sim2D::Snapshot Sim2D::snapshot() const
+    {
+        Snapshot snap{m_step_count, Fields2D(m_grid)};
+        m_backend->download(snap.fields);
+        return snap;
+    }
+
+    // Return the snapshots taken.
+    const std::vector<Sim2D::Snapshot> &Sim2D::snapshots() const noexcept
+    {
+        return m_snapshots;
+    }
+
+    // Advance in pieces that end at the scheduled snapshots and take each one.
     void Sim2D::run(std::size_t nsteps)
     {
+        const std::size_t end = m_step_count + nsteps;
+        while (!m_snapshot_steps.empty() && m_snapshot_steps.front() <= end) {
+            advance(m_snapshot_steps.front() - m_step_count);
+            m_snapshots.push_back(snapshot());
+            m_snapshot_steps.erase(m_snapshot_steps.begin());
+        }
+        advance(end - m_step_count);
+    }
+
+    // Skip an empty run; otherwise merge sources on the same cell, sample every source for
+    // the steps ahead, then step the backend and count the steps.
+    void Sim2D::advance(std::size_t nsteps)
+    {
+        if (nsteps == 0) {
+            return;
+        }
         std::vector<PointInjection> points;
         std::vector<std::size_t> slots;
         slots.reserve(m_sources.size());

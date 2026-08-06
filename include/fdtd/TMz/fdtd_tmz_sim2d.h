@@ -48,6 +48,16 @@ namespace fdtd
         class Sim2D
         {
         public:
+            /** Copy of the fields taken after a number of steps. */
+            struct Snapshot
+            {
+                /** Steps run when the copy was taken; Ez is at step * dt, H half a step earlier. */
+                std::size_t step;
+
+                /** The fields at that step. */
+                Fields2D fields;
+            };
+
             /** Settings of a simulation, each with a usable default. */
             struct Options
             {
@@ -204,7 +214,33 @@ namespace fdtd
             std::vector<double> probe_times(std::size_t id) const;
 
             /**
-             * Advance the simulation.
+             * Schedule a snapshot of Ez, Hx and Hy after a number of steps.
+             *
+             * A later run() stops at the step to copy the fields, then carries on. A step
+             * equal to step_count() is taken at once, and a step already scheduled or taken
+             * is ignored.
+             *
+             * @param step Steps run when the snapshot is taken.
+             * @throws std::invalid_argument When the step is below step_count().
+             */
+            void add_snapshot(std::size_t step);
+
+            /**
+             * Take a snapshot of the fields as they are now, without keeping it.
+             *
+             * @return The fields at step_count().
+             */
+            Snapshot snapshot() const;
+
+            /**
+             * Snapshots taken so far.
+             *
+             * @return The snapshots, in step order.
+             */
+            const std::vector<Snapshot> &snapshots() const noexcept;
+
+            /**
+             * Advance the simulation, stopping at scheduled snapshots.
              *
              * @param nsteps Number of time steps to run.
              */
@@ -235,6 +271,13 @@ namespace fdtd
             void download();
 
         private:
+            /**
+             * Sample the sources and step the backend.
+             *
+             * @param nsteps Number of time steps to run.
+             */
+            void advance(std::size_t nsteps);
+
             /** A point source: the cell it adds to and its waveform. */
             struct Source
             {
@@ -271,6 +314,12 @@ namespace fdtd
 
             /** Probe cells, in the order added. */
             std::vector<PointProbe> m_probes;
+
+            /** Steps of the snapshots still to take, in increasing order. */
+            std::vector<std::size_t> m_snapshot_steps;
+
+            /** Snapshots taken, in step order. */
+            std::vector<Snapshot> m_snapshots;
         };
     }
 }

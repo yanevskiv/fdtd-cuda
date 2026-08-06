@@ -311,3 +311,56 @@ TEST_CASE("Sim2D checks probes", "[unit][sim2d]")
     CHECK(sim.probe_count() == 1);
     CHECK(sim.probe_data(0) == std::vector<FloatType>{FloatType(0)});
 }
+
+// Verify that scheduled snapshots match the fields of a simulation stopped at the same step.
+TEST_CASE("Sim2D takes scheduled snapshots", "[unit][sim2d]")
+{
+    Sim2D sim(16, 12);
+    Sim2D ref(16, 12);
+    for (Sim2D *s : {&sim, &ref}) {
+        s->add_source(5, 6, Component::Ez, fdtd::Gaussian::from_steps(s->dt(), 4));
+    }
+    sim.add_snapshot(20);
+    sim.add_snapshot(7);
+    sim.add_snapshot(0);
+    sim.add_snapshot(7);
+    CHECK(sim.snapshots().size() == 1);
+    sim.run(10);
+    sim.run(15);
+    REQUIRE(sim.snapshots().size() == 3);
+    CHECK(sim.step_count() == 25);
+
+    const std::size_t steps[] = {0, 7, 20};
+    for (std::size_t k = 0; k < 3; ++k) {
+        const auto &snap = sim.snapshots()[k];
+        CHECK(snap.step == steps[k]);
+        ref.run(steps[k] - ref.step_count());
+        ref.download();
+        const auto &a = snap.fields;
+        const auto &b = ref.fields();
+        CHECK(std::equal(a.ez().begin(), a.ez().end(), b.ez().begin()));
+        CHECK(std::equal(a.hx().begin(), a.hx().end(), b.hx().begin()));
+        CHECK(std::equal(a.hy().begin(), a.hy().end(), b.hy().begin()));
+    }
+    CHECK(std::any_of(sim.snapshots()[2].fields.ez().begin(), sim.snapshots()[2].fields.ez().end(),
+                      [](FloatType v) {
+                          return v != 0;
+                      }));
+
+    ref.run(5);
+    ref.download();
+    const auto last = sim.snapshot();
+    CHECK(last.step == 25);
+    CHECK(std::equal(last.fields.ez().begin(), last.fields.ez().end(), ref.fields().ez().begin()));
+}
+
+// Verify that a snapshot step already passed throws.
+TEST_CASE("Sim2D checks snapshot steps", "[unit][sim2d]")
+{
+    Sim2D sim(8, 6);
+    sim.run(3);
+    CHECK_THROWS_AS(sim.add_snapshot(2), std::invalid_argument);
+    sim.add_snapshot(3);
+    REQUIRE(sim.snapshots().size() == 1);
+    CHECK(sim.snapshots()[0].step == 3);
+}
