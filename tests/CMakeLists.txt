@@ -22,7 +22,8 @@ add_executable(fdtd_tests
     test_serial_update.cpp
     test_sim2d.cpp
     test_smoke.cpp
-    test_version.cpp)
+    test_version.cpp
+    test_waveform.cpp)
 target_link_libraries(fdtd_tests PRIVATE fdtd::fdtd fdtd_warnings Catch2::Catch2WithMain)
 # Private library headers, for testing the backends directly.
 target_include_directories(fdtd_tests PRIVATE ${PROJECT_SOURCE_DIR}/src)

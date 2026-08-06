@@ -23,5 +23,6 @@
 #include "fdtd/fdtd_constants.h"
 #include "fdtd/fdtd_float.h"
 #include "fdtd/fdtd_version.h"
+#include "fdtd/fdtd_waveform.h"
 
 #endif
