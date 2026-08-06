@@ -23,6 +23,7 @@
 
 #include "fdtd/TMz/fdtd_tmz_courant.h"
 #include "fdtd/TMz/fdtd_tmz_sim2d.h"
+#include "fdtd/fdtd_constants.h"
 #include "fdtd/fdtd_waveform.h"
 #include "fdtd/test/fdtd_test_support.h"
 
@@ -31,6 +32,7 @@
 #include <vector>
 
 using fdtd::FloatType;
+using fdtd::test::Cell;
 using fdtd::TMz::courant_dt;
 using fdtd::TMz::Grid2D;
 using fdtd::TMz::Sim2D;
@@ -53,6 +55,20 @@ namespace
             history.push_back(fdtd::test::field_energy(now.fields, next.fields, sim.material()));
         }
         return history;
+    }
+
+    // Return the step of a trace's peak, refined between steps by a parabola through the
+    // largest sample and its neighbours.
+    double peak_step(const std::vector<FloatType> &trace)
+    {
+        const std::size_t k = fdtd::test::find_peak(trace).index;
+        if (k == 0 || k + 1 == trace.size()) {
+            return double(k);
+        }
+        const double a = trace[k - 1];
+        const double b = trace[k];
+        const double c = trace[k + 1];
+        return double(k) + 0.5 * (a - c) / (a - 2 * b + c);
     }
 }
 
@@ -83,4 +99,24 @@ TEST_CASE("S = 1.01 grows with check_stability off", "[physics][stability]")
     const double growth = history.back() / history.front();
     CAPTURE(growth);
     CHECK((!std::isfinite(growth) || growth > 1e6));
+}
+
+// Verify that a pulse travels at C_0 along an axis and along the diagonal within 1%, and
+// that the axis is the slower direction, as Yee dispersion has it near the Courant limit.
+TEST_CASE("Pulses travel at the speed of light", "[physics][speed]")
+{
+    Sim2D sim(256, 256);
+    const std::vector<Cell> probes{{168, 128}, {218, 128}, {156, 156}, {191, 191}};
+    const auto traces = fdtd::test::point_source_traces(
+        sim, {128, 128}, fdtd::Gaussian::from_steps(sim.dt(), 8), probes, 220);
+    const double cellSteps = double(sim.grid().dx()) / (fdtd::C_0 * sim.dt());
+
+    const double axial = peak_step(traces[1]) - peak_step(traces[0]);
+    const double diagonal = peak_step(traces[3]) - peak_step(traces[2]);
+    const double axialRatio = axial / (50 * cellSteps);
+    const double diagonalRatio = diagonal / (35 * std::sqrt(2.0) * cellSteps);
+    CAPTURE(axialRatio, diagonalRatio);
+    CHECK(std::abs(axialRatio - 1) < 0.01);
+    CHECK(std::abs(diagonalRatio - 1) < 0.01);
+    CHECK(axialRatio > diagonalRatio);
 }
