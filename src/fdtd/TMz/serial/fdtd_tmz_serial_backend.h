@@ -23,6 +23,10 @@
 #include "fdtd/TMz/fdtd_tmz_backend.h"
 #include "fdtd/fdtd_aligned_buffer.h"
 
+#include <cstddef>
+#include <span>
+#include <vector>
+
 /** Namespace for the fdtd library. */
 namespace fdtd
 {
@@ -96,6 +100,27 @@ namespace fdtd
              */
             Boundary boundary() const noexcept override;
 
+            /**
+             * Number of probes set.
+             *
+             * @return The probe count.
+             */
+            std::size_t probe_count() const noexcept override;
+
+            /**
+             * Number of steps recorded since the probes were set.
+             *
+             * @return The recorded step count.
+             */
+            std::size_t probe_steps() const noexcept override;
+
+            /**
+             * Copy the probe records out, step-major.
+             *
+             * @return The records.
+             */
+            std::vector<FloatType> fetch_probes() const override;
+
         protected:
             /**
              * Advance the fields and add the sources.
@@ -106,6 +131,13 @@ namespace fdtd
              */
             void advance(std::size_t nsteps, std::span<const PointInjection> points,
                          std::span<const FloatType> values) override;
+
+            /**
+             * Replace the probes and clear the records.
+             *
+             * @param points Cells inside the grid.
+             */
+            void reset_probes(std::span<const PointProbe> points) override;
 
         private:
             /** The backend's copy of the fields. */
@@ -128,6 +160,12 @@ namespace fdtd
 
             /** Outer boundary condition. */
             Boundary m_boundary = Boundary::Pec;
+
+            /** Probe cells. */
+            std::vector<PointProbe> m_probes;
+
+            /** Probe records, step-major. */
+            std::vector<FloatType> m_records;
         };
     }
 }

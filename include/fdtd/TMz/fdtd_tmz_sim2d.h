@@ -163,6 +163,47 @@ namespace fdtd
             std::size_t source_count() const noexcept;
 
             /**
+             * Add a point probe that records one component of a cell every step.
+             *
+             * Each step records the value at its end: Ez at (n + 1) * dt and Hx or Hy at
+             * (n + 1/2) * dt, as probe_times() gives them. Probes are added before the
+             * first run so that they all cover the same steps.
+             *
+             * @param i Column of the cell.
+             * @param j Row of the cell.
+             * @param component Field to record.
+             * @return Id of the probe, counting from zero in the order added.
+             * @throws std::invalid_argument When the cell is outside the grid.
+             * @throws std::logic_error When steps have already run.
+             */
+            std::size_t add_probe(std::size_t i, std::size_t j, Component component);
+
+            /**
+             * Number of probes added.
+             *
+             * @return The probe count.
+             */
+            std::size_t probe_count() const noexcept;
+
+            /**
+             * Values a probe recorded, fetched from the backend.
+             *
+             * @param id Id from add_probe().
+             * @return One value per step run.
+             * @throws std::out_of_range When the id is unknown.
+             */
+            std::vector<FloatType> probe_data(std::size_t id) const;
+
+            /**
+             * Times a probe's values belong to.
+             *
+             * @param id Id from add_probe().
+             * @return (n + 1) * dt for Ez, (n + 1/2) * dt for Hx and Hy, one per step run.
+             * @throws std::out_of_range When the id is unknown.
+             */
+            std::vector<double> probe_times(std::size_t id) const;
+
+            /**
              * Advance the simulation.
              *
              * @param nsteps Number of time steps to run.
@@ -227,6 +268,9 @@ namespace fdtd
 
             /** Point sources, in the order added. */
             std::vector<Source> m_sources;
+
+            /** Probe cells, in the order added. */
+            std::vector<PointProbe> m_probes;
         };
     }
 }

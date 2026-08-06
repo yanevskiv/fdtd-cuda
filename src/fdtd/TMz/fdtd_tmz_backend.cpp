@@ -33,6 +33,12 @@
 // Namespace for the 2D TMz module.
 namespace fdtd::TMz
 {
+    // Check that a flat index names a cell inside the grid, not padding.
+    static bool inside(const Grid2D &grid, std::size_t index)
+    {
+        return index % grid.pitch() < grid.nx() && index / grid.pitch() < grid.ny();
+    }
+
     // Release nothing; derived backends own their resources.
     Backend::~Backend() = default;
 
@@ -58,7 +64,7 @@ namespace fdtd::TMz
         std::vector<std::pair<int, std::size_t>> keys;
         keys.reserve(npoints);
         for (const PointInjection &point : points) {
-            if (point.index % g.pitch() >= g.nx() || point.index / g.pitch() >= g.ny()) {
+            if (!inside(g, point.index)) {
                 throw std::invalid_argument("Backend: source point outside the grid");
             }
             keys.emplace_back(static_cast<int>(point.component), point.index);
@@ -69,6 +75,17 @@ namespace fdtd::TMz
         }
 
         advance(nsteps, points, values);
+    }
+
+    // Check the probe cells, then replace the probes.
+    void Backend::set_probes(std::span<const PointProbe> points)
+    {
+        for (const PointProbe &point : points) {
+            if (!inside(grid(), point.index)) {
+                throw std::invalid_argument("Backend: probe point outside the grid");
+            }
+        }
+        reset_probes(points);
     }
 
     // Map a backend type to its name.

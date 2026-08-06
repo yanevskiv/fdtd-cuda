@@ -142,6 +142,55 @@ namespace fdtd::TMz
         return m_sources.size();
     }
 
+    // Check the cell and the step count, keep the probe and hand all probes to the backend.
+    std::size_t Sim2D::add_probe(std::size_t i, std::size_t j, Component component)
+    {
+        if (i >= m_grid.nx() || j >= m_grid.ny()) {
+            throw std::invalid_argument("Sim2D: probe outside the grid");
+        }
+        if (m_step_count != 0) {
+            throw std::logic_error("Sim2D: probes must be added before the first run");
+        }
+        m_probes.push_back({component, m_grid.index(i, j)});
+        m_backend->set_probes(m_probes);
+        return m_probes.size() - 1;
+    }
+
+    // Return the number of probes.
+    std::size_t Sim2D::probe_count() const noexcept
+    {
+        return m_probes.size();
+    }
+
+    // Fetch the records and pick out one probe's column.
+    std::vector<FloatType> Sim2D::probe_data(std::size_t id) const
+    {
+        if (id >= m_probes.size()) {
+            throw std::out_of_range("Sim2D: unknown probe id");
+        }
+        const std::vector<FloatType> records = m_backend->fetch_probes();
+        const std::size_t nprobes = m_probes.size();
+        std::vector<FloatType> data(records.size() / nprobes);
+        for (std::size_t n = 0; n < data.size(); ++n) {
+            data[n] = records[n * nprobes + id];
+        }
+        return data;
+    }
+
+    // Build the Yee time of every recorded step for one probe.
+    std::vector<double> Sim2D::probe_times(std::size_t id) const
+    {
+        if (id >= m_probes.size()) {
+            throw std::out_of_range("Sim2D: unknown probe id");
+        }
+        const double offset = m_probes[id].component == Component::Ez ? 1.0 : 0.5;
+        std::vector<double> times(m_backend->probe_steps());
+        for (std::size_t n = 0; n < times.size(); ++n) {
+            times[n] = (static_cast<double>(n) + offset) * m_dt;
+        }
+        return times;
+    }
+
     // Merge sources on the same cell, sample every source for the steps ahead, then step
     // the backend and count the steps.
     void Sim2D::run(std::size_t nsteps)

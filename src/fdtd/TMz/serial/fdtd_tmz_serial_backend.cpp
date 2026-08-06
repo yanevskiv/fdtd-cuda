@@ -24,10 +24,11 @@
 #include "fdtd/TMz/serial/fdtd_tmz_serial_boundary.h"
 #include "fdtd/TMz/serial/fdtd_tmz_serial_update.h"
 
-// Standard library for copies and errors.
+// Standard library for copies, errors and buffers.
 #include <algorithm>
 #include <span>
 #include <stdexcept>
+#include <vector>
 
 // Namespace for the 2D TMz module.
 namespace fdtd::TMz
@@ -72,6 +73,20 @@ namespace fdtd::TMz
                     break;
             }
         }
+    }
+
+    // Return the value of one component at a cell.
+    static FloatType read_point(const Fields2D &fields, const PointProbe &point)
+    {
+        switch (point.component) {
+            case Component::Hx:
+                return fields.hx()[point.index];
+            case Component::Hy:
+                return fields.hy()[point.index];
+            case Component::Ez:
+                break;
+        }
+        return fields.ez()[point.index];
     }
 
     // Allocate the backend's fields and coefficient arrays.
@@ -144,7 +159,33 @@ namespace fdtd::TMz
         return m_boundary;
     }
 
-    // Run H, the H sources, the interior E, the edge E and the Ez sources once per step.
+    // Return the number of probes.
+    std::size_t SerialBackend::probe_count() const noexcept
+    {
+        return m_probes.size();
+    }
+
+    // Return the number of recorded steps.
+    std::size_t SerialBackend::probe_steps() const noexcept
+    {
+        return m_probes.empty() ? 0 : m_records.size() / m_probes.size();
+    }
+
+    // Copy the records out.
+    std::vector<FloatType> SerialBackend::fetch_probes() const
+    {
+        return m_records;
+    }
+
+    // Keep the probe cells and clear the records.
+    void SerialBackend::reset_probes(std::span<const PointProbe> points)
+    {
+        m_probes.assign(points.begin(), points.end());
+        m_records.clear();
+    }
+
+    // Run H, the H sources, the interior E, the edge E and the Ez sources once per step,
+    // then record the probes.
     void SerialBackend::advance(std::size_t nsteps, std::span<const PointInjection> points,
                                 std::span<const FloatType> values)
     {
@@ -152,6 +193,7 @@ namespace fdtd::TMz
             throw std::logic_error("SerialBackend: step before the coefficients were uploaded");
         }
         const CoeffsView coeffs(m_ce1.data(), m_ce2.data(), m_ch1.data(), m_ch2.data());
+        m_records.reserve(m_records.size() + nsteps * m_probes.size());
         for (std::size_t n = 0; n < nsteps; ++n) {
             const FloatType *row = values.data() + n * points.size();
             serial_update_h(m_fields, coeffs);
@@ -159,6 +201,9 @@ namespace fdtd::TMz
             serial_update_e(m_fields, coeffs);
             serial_update_boundary(m_fields, coeffs, m_boundary);
             add_sources(m_fields, points, row, false);
+            for (const PointProbe &probe : m_probes) {
+                m_records.push_back(read_point(m_fields, probe));
+            }
         }
     }
 }

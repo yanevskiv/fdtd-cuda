@@ -61,6 +61,16 @@ namespace fdtd
             std::size_t index;
         };
 
+        /** A cell of one field component that a probe records at the end of every step. */
+        struct PointProbe
+        {
+            /** Component the value is read from. */
+            Component component;
+
+            /** Flat index of the cell, as given by Grid2D::index. */
+            std::size_t index;
+        };
+
         /**
          * A backend that owns a copy of the fields and advances them in time.
          *
@@ -158,7 +168,49 @@ namespace fdtd
             void step(std::size_t nsteps, std::span<const PointInjection> points,
                       std::span<const FloatType> values);
 
+            /**
+             * Replace the probes and drop everything recorded so far.
+             *
+             * Every step after this appends the value of each probe at the end of the
+             * step, after the sources: Ez is then at (n + 1) * dt and H at (n + 1/2) * dt.
+             * The records stay in the backend until fetch_probes() copies them out.
+             *
+             * @param points Cells to record; the same cell may appear twice.
+             * @throws std::invalid_argument When a point lies outside the grid.
+             */
+            void set_probes(std::span<const PointProbe> points);
+
+            /**
+             * Number of probes set.
+             *
+             * @return The probe count.
+             */
+            virtual std::size_t probe_count() const noexcept = 0;
+
+            /**
+             * Number of steps recorded since the probes were set.
+             *
+             * @return The recorded step count.
+             */
+            virtual std::size_t probe_steps() const noexcept = 0;
+
+            /**
+             * Copy the probe records out.
+             *
+             * @return probe_steps() * probe_count() values, step-major: step n of probe k
+             *         is at n * probe_count() + k.
+             */
+            virtual std::vector<FloatType> fetch_probes() const = 0;
+
         protected:
+            /**
+             * Replace the probes and clear the records; called by set_probes() after its
+             * checks.
+             *
+             * @param points Cells inside the grid.
+             */
+            virtual void reset_probes(std::span<const PointProbe> points) = 0;
+
             /**
              * Advance the fields and add the sources; called by step() after its checks.
              *

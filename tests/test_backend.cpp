@@ -32,6 +32,7 @@
 #include <cstddef>
 #include <span>
 #include <stdexcept>
+#include <vector>
 
 // Shorthand for the types under test.
 using Catch::Matchers::WithinAbs;
@@ -44,6 +45,7 @@ using fdtd::TMz::Fields2D;
 using fdtd::TMz::Grid2D;
 using fdtd::TMz::Material2D;
 using fdtd::TMz::PointInjection;
+using fdtd::TMz::PointProbe;
 
 // Create a serial backend in vacuum at a Courant number, with a unit Ez impulse at (ci, cj).
 static auto make_impulse(const Grid2D &grid, double courant, std::size_t ci, std::size_t cj,
@@ -295,4 +297,54 @@ TEST_CASE("Serial backend rejects bad sources", "[unit][backend][serial]")
     const std::array distinct{centre, PointInjection{Component::Hx, centre.index}};
     CHECK_NOTHROW(backend->step(1, distinct, twoValues));
     CHECK_NOTHROW(backend->step(0, distinct, std::span<const FloatType>{}));
+}
+
+// Verify that every step appends each probe's value as it stands at the end of the step,
+// and that setting the probes again clears the records.
+TEST_CASE("Serial backend records probes", "[unit][backend][serial]")
+{
+    const Grid2D grid(9, 9);
+    auto backend = make_impulse(grid, 0.5, 4, 4, Boundary::Pec);
+    const std::array probes{
+        PointProbe{Component::Ez, grid.index(4, 4)}, PointProbe{Component::Hx, grid.index(4, 3)},
+        PointProbe{Component::Hy, grid.index(3, 4)}, PointProbe{Component::Ez, grid.index(4, 4)}};
+    backend->set_probes(probes);
+    CHECK(backend->probe_count() == 4);
+    CHECK(backend->probe_steps() == 0);
+
+    std::vector<FloatType> expected;
+    for (int n = 0; n < 3; ++n) {
+        backend->step(1);
+        const Fields2D f = download(*backend);
+        expected.push_back(f.ez()[grid.index(4, 4)]);
+        expected.push_back(f.hx()[grid.index(4, 3)]);
+        expected.push_back(f.hy()[grid.index(3, 4)]);
+        expected.push_back(f.ez()[grid.index(4, 4)]);
+    }
+    CHECK(backend->probe_steps() == 3);
+    CHECK(backend->fetch_probes() == expected);
+    CHECK(expected[1] != FloatType(0));
+    CHECK(expected[2] != FloatType(0));
+
+    backend->set_probes(std::span(probes).first(1));
+    CHECK(backend->probe_count() == 1);
+    CHECK(backend->probe_steps() == 0);
+    CHECK(backend->fetch_probes().empty());
+}
+
+// Verify that probes outside the grid or in the padding throw and keep the old probes.
+TEST_CASE("Serial backend rejects probes outside the grid", "[unit][backend][serial]")
+{
+    const Grid2D grid(9, 7);
+    auto backend = make_impulse(grid, 0.5, 4, 3, Boundary::Pec);
+    const std::array inside{PointProbe{Component::Ez, grid.index(4, 3)}};
+    backend->set_probes(inside);
+
+    const std::array outside{PointProbe{Component::Hx, grid.size()}};
+    CHECK_THROWS_AS(backend->set_probes(outside), std::invalid_argument);
+    if (grid.pitch() > grid.nx()) {
+        const std::array padding{PointProbe{Component::Ez, grid.nx()}};
+        CHECK_THROWS_AS(backend->set_probes(padding), std::invalid_argument);
+    }
+    CHECK(backend->probe_count() == 1);
 }

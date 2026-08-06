@@ -29,6 +29,7 @@
 #include <algorithm>
 #include <limits>
 #include <stdexcept>
+#include <vector>
 
 // Shorthand for the types under test.
 using Catch::Matchers::WithinRel;
@@ -241,4 +242,72 @@ TEST_CASE("Sim2D runs compose with sources", "[unit][sim2d]")
     CHECK(std::any_of(a.ez().begin(), a.ez().end(), [](FloatType v) {
         return v != 0;
     }));
+}
+
+// Verify that probes record at their Yee times and match the downloaded fields.
+TEST_CASE("Sim2D probes record at their Yee times", "[unit][sim2d]")
+{
+    Sim2D sim(9, 9);
+    sim.add_source(4, 4, Component::Ez, ramp);
+    sim.add_source(1, 1, Component::Hx, ramp);
+    const std::size_t ez = sim.add_probe(4, 4, Component::Ez);
+    const std::size_t hx = sim.add_probe(1, 1, Component::Hx);
+    const std::size_t hy = sim.add_probe(6, 2, Component::Hy);
+    CHECK(sim.probe_count() == 3);
+    CHECK(sim.probe_data(ez).empty());
+
+    sim.run(1);
+    const double dt = sim.dt();
+    CHECK(sim.probe_data(ez) == std::vector<FloatType>{FloatType(dt)});
+    CHECK(sim.probe_data(hx) == std::vector<FloatType>{FloatType(0.5 * dt)});
+    CHECK(sim.probe_times(ez) == std::vector<double>{dt});
+    CHECK(sim.probe_times(hx) == std::vector<double>{0.5 * dt});
+
+    sim.run(4);
+    sim.download();
+    const auto data = sim.probe_data(hy);
+    const auto times = sim.probe_times(hy);
+    REQUIRE(data.size() == 5);
+    REQUIRE(times.size() == 5);
+    CHECK(data.back() == sim.fields().hy()[sim.grid().index(6, 2)]);
+    CHECK(times.back() == 4.5 * dt);
+}
+
+// Verify that probe records from run(a) then run(b) match run(a + b) bit for bit.
+TEST_CASE("Sim2D probe records compose", "[unit][sim2d]")
+{
+    Sim2D split(16, 12);
+    Sim2D whole(16, 12);
+    for (Sim2D *sim : {&split, &whole}) {
+        sim->add_source(5, 6, Component::Ez, fdtd::Gaussian::from_steps(sim->dt(), 4));
+        sim->add_probe(10, 6, Component::Ez);
+        sim->add_probe(10, 6, Component::Hy);
+    }
+    split.run(13);
+    split.run(18);
+    whole.run(31);
+    for (std::size_t id = 0; id < 2; ++id) {
+        CHECK(split.probe_data(id) == whole.probe_data(id));
+        CHECK(split.probe_times(id) == whole.probe_times(id));
+    }
+    const auto ez = whole.probe_data(0);
+    CHECK(std::any_of(ez.begin(), ez.end(), [](FloatType v) {
+        return v != 0;
+    }));
+}
+
+// Verify that bad probes throw: outside the grid, after a run, or an unknown id.
+TEST_CASE("Sim2D checks probes", "[unit][sim2d]")
+{
+    Sim2D sim(8, 6);
+    CHECK_THROWS_AS(sim.add_probe(8, 0, Component::Ez), std::invalid_argument);
+    CHECK_THROWS_AS(sim.add_probe(0, 6, Component::Hx), std::invalid_argument);
+    CHECK(sim.add_probe(7, 5, Component::Hy) == 0);
+    CHECK_THROWS_AS(sim.probe_data(1), std::out_of_range);
+    CHECK_THROWS_AS(sim.probe_times(1), std::out_of_range);
+
+    sim.run(1);
+    CHECK_THROWS_AS(sim.add_probe(2, 2, Component::Ez), std::logic_error);
+    CHECK(sim.probe_count() == 1);
+    CHECK(sim.probe_data(0) == std::vector<FloatType>{FloatType(0)});
 }
