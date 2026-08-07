@@ -21,7 +21,7 @@ set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
 option(FDTD_DOUBLE "Use double instead of float for fdtd::FloatType" OFF)
 option(FDTD_BUILD_TESTS "Build the Catch2 tests" ${PROJECT_IS_TOP_LEVEL})
 option(FDTD_WERROR "Treat compiler warnings as errors" OFF)
-option(FDTD_BUILD_EXAMPLES "Build the examples" ${PROJECT_IS_TOP_LEVEL})
+option(FDTD_BUILD_SAMPLES "Build the samples" ${PROJECT_IS_TOP_LEVEL})
 
 # The library.
 add_library(fdtd
@@ -34,9 +34,7 @@ add_library(fdtd
     src/fdtd/TMz/fdtd_tmz_material2d.cpp
     src/fdtd/TMz/fdtd_tmz_output.cpp
     src/fdtd/TMz/fdtd_tmz_sim2d.cpp
-    src/fdtd/TMz/serial/fdtd_tmz_serial_backend.cpp
-    src/fdtd/TMz/serial/fdtd_tmz_serial_boundary.cpp
-    src/fdtd/TMz/serial/fdtd_tmz_serial_update.cpp)
+    src/fdtd/TMz/backends/fdtd_tmz_backend_serial.cpp)
 add_library(fdtd::fdtd ALIAS fdtd)
 target_compile_features(fdtd PUBLIC cxx_std_20)
 target_include_directories(fdtd PUBLIC
@@ -49,16 +47,16 @@ target_compile_definitions(fdtd PUBLIC
 target_link_libraries(fdtd PRIVATE $<BUILD_INTERFACE:fdtd_warnings>)
 
 # The command-line driver: a static library the tests link, and the fdtd program.
-add_library(fdtd_driver STATIC src/fdtd/fdtd_driver.cpp)
+add_library(fdtd_driver STATIC src/fdtd/driver/fdtd_driver.cpp)
 target_link_libraries(fdtd_driver PUBLIC fdtd::fdtd PRIVATE fdtd_warnings)
 
 add_executable(fdtd_cli src/main.cpp)
 set_target_properties(fdtd_cli PROPERTIES OUTPUT_NAME fdtd)
 target_link_libraries(fdtd_cli PRIVATE fdtd_driver fdtd_warnings)
 
-if(FDTD_BUILD_EXAMPLES)
-    add_executable(point_source examples/point_source.cpp)
-    target_link_libraries(point_source PRIVATE fdtd::fdtd fdtd_warnings)
+if(FDTD_BUILD_SAMPLES)
+    add_executable(sample_point_source samples/sample_point_source.cpp)
+    target_link_libraries(sample_point_source PRIVATE fdtd::fdtd fdtd_warnings)
 endif()
 
 if(FDTD_BUILD_TESTS)
@@ -69,8 +67,8 @@ endif()
 # Installation and package export.
 install(DIRECTORY include/ DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}
     PATTERN test EXCLUDE
-    PATTERN serial EXCLUDE
-    PATTERN fdtd_driver.h EXCLUDE)
+    PATTERN backends EXCLUDE
+    PATTERN driver EXCLUDE)
 install(TARGETS fdtd EXPORT fdtdTargets)
 install(TARGETS fdtd_cli RUNTIME DESTINATION ${CMAKE_INSTALL_BINDIR})
 install(EXPORT fdtdTargets

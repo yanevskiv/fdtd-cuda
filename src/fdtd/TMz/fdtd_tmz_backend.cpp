@@ -21,7 +21,7 @@
 #include "fdtd/TMz/fdtd_tmz_backend.h"
 
 // Backend implementations.
-#include "fdtd/TMz/serial/fdtd_tmz_serial_backend.h"
+#include "fdtd/TMz/backends/fdtd_tmz_backend_serial.h"
 
 // Standard library for algorithms, limits, errors and strings.
 #include <algorithm>

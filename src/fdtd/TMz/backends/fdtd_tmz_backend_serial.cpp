@@ -1,5 +1,5 @@
 /*
- * C++ file for the 2D TMz serial backend.
+ * C++ file for the 2D TMz serial backend and its update routines.
  *
  * Copyright (C) 2026 Ivan Janevski
  *
@@ -17,15 +17,12 @@
  * along with fdtd-cuda; if not, see <https://www.gnu.org/licenses/>.
  */
 
-// Class declaration.
-#include "fdtd/TMz/serial/fdtd_tmz_serial_backend.h"
+// Class and routine declarations.
+#include "fdtd/TMz/backends/fdtd_tmz_backend_serial.h"
 
-// Serial update and boundary routines.
-#include "fdtd/TMz/serial/fdtd_tmz_serial_boundary.h"
-#include "fdtd/TMz/serial/fdtd_tmz_serial_update.h"
-
-// Standard library for copies, errors and buffers.
+// Standard library for copies, sizes, errors and buffers.
 #include <algorithm>
+#include <cstddef>
 #include <span>
 #include <stdexcept>
 #include <vector>
@@ -33,6 +30,139 @@
 // Namespace for the 2D TMz module.
 namespace fdtd::TMz
 {
+    // Take the arrays of a coefficient set.
+    CoeffsView::CoeffsView(const Coeffs2D &coeffs) noexcept
+        : CoeffsView(coeffs.ce1().data(), coeffs.ce2().data(), coeffs.ch1().data(),
+                     coeffs.ch2().data())
+    {
+        // Empty.
+    }
+
+    // Take four arrays.
+    CoeffsView::CoeffsView(const FloatType *ce1Data, const FloatType *ce2Data,
+                           const FloatType *ch1Data, const FloatType *ch2Data) noexcept
+        : ce1(ce1Data)
+        , ce2(ce2Data)
+        , ch1(ch1Data)
+        , ch2(ch2Data)
+    {
+        // Empty.
+    }
+
+    // Update Hx row by row below the last row, then Hy row by row left of the last column.
+    void serial_update_h(Fields2D &fields, CoeffsView coeffs) noexcept
+    {
+        const Grid2D &grid = fields.grid();
+        const std::size_t nx = grid.nx();
+        const std::size_t ny = grid.ny();
+        const std::size_t pitch = grid.pitch();
+        const FloatType invDx = FloatType(1) / grid.dx();
+        const FloatType invDy = FloatType(1) / grid.dy();
+
+        const FloatType *__restrict Ez = fields.ez().data();
+        FloatType *__restrict Hx = fields.hx().data();
+        FloatType *__restrict Hy = fields.hy().data();
+        const FloatType *__restrict Ch1 = coeffs.ch1;
+        const FloatType *__restrict Ch2 = coeffs.ch2;
+
+        for (std::size_t j = 0; j + 1 < ny; ++j) {
+            const std::size_t row = j * pitch;
+            for (std::size_t i = 0; i < nx; ++i) {
+                const std::size_t k = row + i;
+                Hx[k] = Ch1[k] * Hx[k] - Ch2[k] * invDy * (Ez[k + pitch] - Ez[k]);
+            }
+        }
+
+        for (std::size_t j = 0; j < ny; ++j) {
+            const std::size_t row = j * pitch;
+            for (std::size_t i = 0; i + 1 < nx; ++i) {
+                const std::size_t k = row + i;
+                Hy[k] = Ch1[k] * Hy[k] + Ch2[k] * invDx * (Ez[k + 1] - Ez[k]);
+            }
+        }
+    }
+
+    // Update the interior Ez row by row.
+    void serial_update_e(Fields2D &fields, CoeffsView coeffs) noexcept
+    {
+        const Grid2D &grid = fields.grid();
+        const std::size_t nx = grid.nx();
+        const std::size_t ny = grid.ny();
+        const std::size_t pitch = grid.pitch();
+        const FloatType invDx = FloatType(1) / grid.dx();
+        const FloatType invDy = FloatType(1) / grid.dy();
+
+        FloatType *__restrict Ez = fields.ez().data();
+        const FloatType *__restrict Hx = fields.hx().data();
+        const FloatType *__restrict Hy = fields.hy().data();
+        const FloatType *__restrict Ce1 = coeffs.ce1;
+        const FloatType *__restrict Ce2 = coeffs.ce2;
+
+        for (std::size_t j = 1; j + 1 < ny; ++j) {
+            const std::size_t row = j * pitch;
+            for (std::size_t i = 1; i + 1 < nx; ++i) {
+                const std::size_t k = row + i;
+                const FloatType curl =
+                    (Hy[k] - Hy[k - 1]) * invDx - (Hx[k] - Hx[k - pitch]) * invDy;
+                Ez[k] = Ce1[k] * Ez[k] + Ce2[k] * curl;
+            }
+        }
+    }
+
+    // Visit the edge cells once each: the first and last rows whole, then the first and
+    // last cells of the rows between, which also covers grids one cell wide.
+    template <typename Visit> static void for_each_edge(const Grid2D &grid, Visit visit)
+    {
+        const std::size_t nx = grid.nx();
+        const std::size_t ny = grid.ny();
+        for (std::size_t i = 0; i < nx; ++i) {
+            visit(i, std::size_t(0));
+            if (ny > 1) {
+                visit(i, ny - 1);
+            }
+        }
+        for (std::size_t j = 1; j + 1 < ny; ++j) {
+            visit(std::size_t(0), j);
+            if (nx > 1) {
+                visit(nx - 1, j);
+            }
+        }
+    }
+
+    // Zero the edge under PEC, or apply the Ez update with H outside the domain read as zero.
+    void serial_update_boundary(Fields2D &fields, CoeffsView coeffs, Boundary boundary) noexcept
+    {
+        const Grid2D &grid = fields.grid();
+        FloatType *__restrict Ez = fields.ez().data();
+
+        if (boundary == Boundary::Pec) {
+            for_each_edge(grid, [&](std::size_t i, std::size_t j) {
+                Ez[grid.index(i, j)] = 0;
+            });
+            return;
+        }
+
+        const std::size_t nx = grid.nx();
+        const std::size_t ny = grid.ny();
+        const std::size_t pitch = grid.pitch();
+        const FloatType invDx = FloatType(1) / grid.dx();
+        const FloatType invDy = FloatType(1) / grid.dy();
+        const FloatType *__restrict Hx = fields.hx().data();
+        const FloatType *__restrict Hy = fields.hy().data();
+        const FloatType *__restrict Ce1 = coeffs.ce1;
+        const FloatType *__restrict Ce2 = coeffs.ce2;
+
+        for_each_edge(grid, [&](std::size_t i, std::size_t j) {
+            const std::size_t k = grid.index(i, j);
+            const FloatType hyRight = i + 1 < nx ? Hy[k] : FloatType(0);
+            const FloatType hyLeft = i > 0 ? Hy[k - 1] : FloatType(0);
+            const FloatType hxTop = j + 1 < ny ? Hx[k] : FloatType(0);
+            const FloatType hxBottom = j > 0 ? Hx[k - pitch] : FloatType(0);
+            const FloatType curl = (hyRight - hyLeft) * invDx - (hxTop - hxBottom) * invDy;
+            Ez[k] = Ce1[k] * Ez[k] + Ce2[k] * curl;
+        });
+    }
+
     // Check that two grids hold the same geometry.
     static void require_same_grid(const Grid2D &expected, const Grid2D &actual)
     {

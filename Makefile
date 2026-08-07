@@ -3,7 +3,7 @@
 PRESET ?= debug
 
 SOURCES = $(shell git ls-files --cached --others --exclude-standard 'include/*.h' 'src/*.h' 'src/*.cpp' 'src/*.cu' 'src/*.cuh' \
-	'tests/*.cpp' 'tests/*.h' 'examples/*.cpp')
+	'tests/*.cpp' 'tests/*.h' 'samples/*.cpp')
 
 .PHONY: all configure build test install workflow lint format clean
 

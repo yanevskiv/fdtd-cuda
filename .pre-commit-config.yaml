@@ -6,9 +6,9 @@ repos:
         entry: clang-format --dry-run --Werror
         language: system
         types_or: [c++, c, cuda]
-        files: ^(include/|src/|tests/|examples/)
+        files: ^(include/|src/|tests/|samples/)
       - id: clang-tidy-naming
         name: clang-tidy naming
         entry: clang-tidy -p build/debug --quiet --header-filter=^.*/include/fdtd/.* --warnings-as-errors=readability-identifier-naming
         language: system
-        files: ^(src/|tests/|examples/).*\.cpp$
+        files: ^(src/|tests/|samples/).*\.cpp$

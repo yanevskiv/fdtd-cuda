@@ -16,25 +16,23 @@ add_library(fdtd_test_support STATIC
 target_link_libraries(fdtd_test_support PUBLIC fdtd::fdtd PRIVATE fdtd_warnings)
 
 add_executable(fdtd_tests
-    test_backend.cpp
-    test_coeffs2d.cpp
-    test_constants.cpp
-    test_courant.cpp
-    test_driver.cpp
-    test_fields2d.cpp
-    test_grid2d.cpp
-    test_material2d.cpp
-    test_output.cpp
+    test_fdtd_constants.cpp
+    test_fdtd_driver.cpp
+    test_fdtd_test_support.cpp
+    test_fdtd_tmz_backend.cpp
+    test_fdtd_tmz_backend_serial.cpp
+    test_fdtd_tmz_coeffs2d.cpp
+    test_fdtd_tmz_courant.cpp
+    test_fdtd_tmz_fields2d.cpp
+    test_fdtd_tmz_grid2d.cpp
+    test_fdtd_tmz_material2d.cpp
+    test_fdtd_tmz_output.cpp
+    test_fdtd_tmz_sim2d.cpp
+    test_fdtd_version.cpp
     test_physics.cpp
-    test_serial_boundary.cpp
-    test_serial_update.cpp
-    test_sim2d.cpp
     test_smoke.cpp
-    test_support.cpp
-    test_version.cpp
-    test_waveform.cpp)
+    test_fdtd_waveform.cpp)
 target_link_libraries(fdtd_tests PRIVATE fdtd::fdtd fdtd_driver fdtd_test_support fdtd_warnings Catch2::Catch2WithMain)
-# Private library headers, for testing the backends directly.
 target_compile_definitions(fdtd_tests PRIVATE
     FDTD_TEST_PROJECT_VERSION="${PROJECT_VERSION}"
     FDTD_TEST_PROJECT_VERSION_MAJOR=${PROJECT_VERSION_MAJOR}
