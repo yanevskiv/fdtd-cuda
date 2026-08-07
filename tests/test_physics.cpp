@@ -24,8 +24,8 @@
 
 #include "fdtd/TMz/fdtd_tmz_courant.h"
 #include "fdtd/TMz/fdtd_tmz_sim2d.h"
+#include "fdtd/TMz/fdtd_tmz_waveform.h"
 #include "fdtd/fdtd_constants.h"
-#include "fdtd/fdtd_waveform.h"
 #include "fdtd/test/fdtd_test_support.h"
 
 #include <algorithm>
@@ -50,7 +50,7 @@ namespace
     {
         const std::size_t n = sim.grid().nx();
         sim.add_source(n / 2, n / 2, fdtd::TMz::Component::Ez,
-                       fdtd::Gaussian::from_steps(sim.dt(), 10));
+                       fdtd::TMz::Gaussian::from_steps(sim.dt(), 10));
         std::vector<double> history;
         for (std::size_t b = 0; b < blocks; ++b) {
             sim.run(blockSteps);
@@ -113,7 +113,7 @@ TEST_CASE("Pulses travel at the speed of light", "[physics][speed]")
     Sim2D sim(256, 256);
     const std::vector<Cell> probes{{168, 128}, {218, 128}, {156, 156}, {191, 191}};
     const auto traces = fdtd::test::point_source_traces(
-        sim, {128, 128}, fdtd::Gaussian::from_steps(sim.dt(), 8), probes, 220);
+        sim, {128, 128}, fdtd::TMz::Gaussian::from_steps(sim.dt(), 8), probes, 220);
     const double cellSteps = double(sim.grid().dx()) / (fdtd::C_0 * sim.dt());
 
     const double axial = peak_step(traces[1]) - peak_step(traces[0]);
@@ -137,7 +137,7 @@ TEST_CASE("Far-field peak follows 1 / sqrt(r)", "[physics][falloff]")
         probes.push_back({128 + r, 128});
     }
     const auto traces = fdtd::test::point_source_traces(
-        sim, {128, 128}, fdtd::Gaussian::from_steps(sim.dt(), 8), probes, 240);
+        sim, {128, 128}, fdtd::TMz::Gaussian::from_steps(sim.dt(), 8), probes, 240);
 
     const double reference = fdtd::test::find_peak(traces[0]).value * std::sqrt(30.0);
     for (std::size_t k = 1; k < probes.size(); ++k) {
@@ -159,7 +159,7 @@ TEST_CASE("Closed box conserves energy", "[physics][energy]")
     Material2D material(sim.grid());
     material.fill_circle(80, 70, 15, {FloatType(4), FloatType(1), FloatType(0), FloatType(0)});
     sim.set_material(material);
-    sim.add_source(40, 50, fdtd::TMz::Component::Ez, fdtd::Gaussian::from_steps(sim.dt(), 8));
+    sim.add_source(40, 50, fdtd::TMz::Component::Ez, fdtd::TMz::Gaussian::from_steps(sim.dt(), 8));
 
     std::vector<double> history;
     for (std::size_t b = 0; b < 20; ++b) {

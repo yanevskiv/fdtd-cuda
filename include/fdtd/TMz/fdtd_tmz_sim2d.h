@@ -26,8 +26,8 @@
 #include "fdtd/TMz/fdtd_tmz_fields2d.h"
 #include "fdtd/TMz/fdtd_tmz_grid2d.h"
 #include "fdtd/TMz/fdtd_tmz_material2d.h"
+#include "fdtd/TMz/fdtd_tmz_waveform.h"
 #include "fdtd/fdtd_float.h"
-#include "fdtd/fdtd_waveform.h"
 
 #include <cstddef>
 #include <memory>

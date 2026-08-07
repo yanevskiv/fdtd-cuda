@@ -90,7 +90,7 @@ TEST_CASE("point_source_traces records every probe", "[unit][support]")
     Sim2D sim(16, 16);
     const std::vector<Cell> probes{{8, 8}, {12, 8}};
     const auto traces = fdtd::test::point_source_traces(
-        sim, {8, 8}, fdtd::Gaussian::from_steps(sim.dt(), 4), probes, 20);
+        sim, {8, 8}, fdtd::TMz::Gaussian::from_steps(sim.dt(), 4), probes, 20);
     REQUIRE(traces.size() == 2);
     CHECK(traces[0].size() == 20);
     CHECK(traces[1].size() == 20);

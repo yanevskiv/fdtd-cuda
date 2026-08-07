@@ -1,5 +1,5 @@
 /*
- * C++ file for source waveforms sampled on the host.
+ * C++ file for the 2D TMz source waveforms sampled on the host.
  *
  * Copyright (C) 2026 Ivan Janevski
  *
@@ -18,14 +18,14 @@
  */
 
 // Class and function declarations.
-#include "fdtd/fdtd_waveform.h"
+#include "fdtd/TMz/fdtd_tmz_waveform.h"
 
 // Standard library for math and errors.
 #include <cmath>
 #include <stdexcept>
 
-// Namespace for the fdtd library.
-namespace fdtd
+// Namespace for the 2D TMz module.
+namespace fdtd::TMz
 {
     // Check the parameters and keep them.
     Gaussian::Gaussian(double t0, double tau, double amplitude)

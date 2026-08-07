@@ -25,7 +25,7 @@ option(FDTD_BUILD_SAMPLES "Build the samples" ${PROJECT_IS_TOP_LEVEL})
 
 # The library.
 add_library(fdtd
-    src/fdtd/fdtd_waveform.cpp
+    src/fdtd/TMz/fdtd_tmz_waveform.cpp
     src/fdtd/TMz/fdtd_tmz_backend.cpp
     src/fdtd/TMz/fdtd_tmz_coeffs2d.cpp
     src/fdtd/TMz/fdtd_tmz_courant.cpp

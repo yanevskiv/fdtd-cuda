@@ -24,7 +24,7 @@
 // The simulation, its output files and the source waveform.
 #include "fdtd/TMz/fdtd_tmz_output.h"
 #include "fdtd/TMz/fdtd_tmz_sim2d.h"
-#include "fdtd/fdtd_waveform.h"
+#include "fdtd/TMz/fdtd_tmz_waveform.h"
 
 // Standard library for parsing, formatting, math and errors.
 #include <charconv>
@@ -257,11 +257,11 @@ namespace fdtd::driver
 
         if (options.pulses.empty()) {
             sim.add_source(options.nx / 2, ny / 2, TMz::Component::Ez,
-                           Gaussian::from_steps(sim.dt(), 30));
+                           TMz::Gaussian::from_steps(sim.dt(), 30));
         }
         for (const PulseSpec &pulse : options.pulses) {
             sim.add_source(pulse.i, pulse.j, TMz::Component::Ez,
-                           Gaussian::from_steps(sim.dt(), pulse.width));
+                           TMz::Gaussian::from_steps(sim.dt(), pulse.width));
         }
         for (const ProbeSpec &probe : options.probes) {
             sim.add_probe(probe.i, probe.j, TMz::Component::Ez);

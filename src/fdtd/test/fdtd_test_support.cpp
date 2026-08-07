@@ -98,7 +98,7 @@ namespace fdtd::test
 
     // Add the source and the probes, run, and collect every probe's trace.
     std::vector<std::vector<FloatType>> point_source_traces(TMz::Sim2D &sim, Cell source,
-                                                            Waveform waveform,
+                                                            TMz::Waveform waveform,
                                                             std::span<const Cell> probes,
                                                             std::size_t nsteps)
     {

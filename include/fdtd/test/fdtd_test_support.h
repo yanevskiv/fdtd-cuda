@@ -24,8 +24,8 @@
 #include "fdtd/TMz/fdtd_tmz_fields2d.h"
 #include "fdtd/TMz/fdtd_tmz_material2d.h"
 #include "fdtd/TMz/fdtd_tmz_sim2d.h"
+#include "fdtd/TMz/fdtd_tmz_waveform.h"
 #include "fdtd/fdtd_float.h"
-#include "fdtd/fdtd_waveform.h"
 
 #include <cstddef>
 #include <span>
@@ -109,7 +109,7 @@ namespace fdtd
          * @return One trace per probe cell, one value per step.
          */
         std::vector<std::vector<FloatType>> point_source_traces(TMz::Sim2D &sim, Cell source,
-                                                                Waveform waveform,
+                                                                TMz::Waveform waveform,
                                                                 std::span<const Cell> probes,
                                                                 std::size_t nsteps);
     }

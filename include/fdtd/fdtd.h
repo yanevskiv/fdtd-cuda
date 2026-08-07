@@ -20,9 +20,9 @@
 #ifndef FDTD_H
 #define FDTD_H
 
+#include "fdtd/TMz/fdtd_tmz_waveform.h"
 #include "fdtd/fdtd_constants.h"
 #include "fdtd/fdtd_float.h"
 #include "fdtd/fdtd_version.h"
-#include "fdtd/fdtd_waveform.h"
 
 #endif

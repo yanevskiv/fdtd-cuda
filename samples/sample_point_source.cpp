@@ -21,8 +21,8 @@
 // The simulation, its output files and the source waveform.
 #include "fdtd/TMz/fdtd_tmz_output.h"
 #include "fdtd/TMz/fdtd_tmz_sim2d.h"
+#include "fdtd/TMz/fdtd_tmz_waveform.h"
 #include "fdtd/fdtd_constants.h"
-#include "fdtd/fdtd_waveform.h"
 
 // Standard library for math and printing.
 #include <cmath>
@@ -39,7 +39,7 @@ int main()
     TMz::Sim2D sim(200, 200);
 
     // Shape a Gaussian pulse 10 steps wide.
-    const Gaussian pulse = Gaussian::from_steps(sim.dt(), 10);
+    const TMz::Gaussian pulse = TMz::Gaussian::from_steps(sim.dt(), 10);
 
     // Add the pulse to Ez at the centre as a soft source.
     sim.add_source(100, 100, TMz::Component::Ez, pulse);

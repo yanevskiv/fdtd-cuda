@@ -31,7 +31,7 @@ add_executable(fdtd_tests
     test_fdtd_version.cpp
     test_physics.cpp
     test_smoke.cpp
-    test_fdtd_waveform.cpp)
+    test_fdtd_tmz_waveform.cpp)
 target_link_libraries(fdtd_tests PRIVATE fdtd::fdtd fdtd_driver fdtd_test_support fdtd_warnings Catch2::Catch2WithMain)
 target_compile_definitions(fdtd_tests PRIVATE
     FDTD_TEST_PROJECT_VERSION="${PROJECT_VERSION}"

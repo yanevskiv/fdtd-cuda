@@ -171,7 +171,8 @@ TEST_CASE("Sim2D checks source cells", "[unit][sim2d]")
     CHECK_THROWS_AS(sim.add_source(2, 5, Component::Ez, ramp), std::invalid_argument);
     CHECK_THROWS_AS(sim.add_source(2, 5, Component::Hx, ramp), std::invalid_argument);
     CHECK_THROWS_AS(sim.add_source(7, 2, Component::Hy, ramp), std::invalid_argument);
-    CHECK_THROWS_AS(sim.add_source(2, 2, Component::Ez, fdtd::Waveform{}), std::invalid_argument);
+    CHECK_THROWS_AS(sim.add_source(2, 2, Component::Ez, fdtd::TMz::Waveform{}),
+                    std::invalid_argument);
     CHECK(sim.source_count() == 0);
 
     CHECK_NOTHROW(sim.add_source(2, 2, Component::Ez, ramp));
@@ -225,8 +226,8 @@ TEST_CASE("Sim2D runs compose with sources", "[unit][sim2d]")
     Sim2D split(16, 12, opts);
     Sim2D whole(16, 12, opts);
     for (Sim2D *sim : {&split, &whole}) {
-        sim->add_source(5, 6, Component::Ez, fdtd::Gaussian::from_steps(sim->dt(), 4));
-        sim->add_source(9, 3, Component::Hy, fdtd::Gaussian::from_steps(sim->dt(), 6));
+        sim->add_source(5, 6, Component::Ez, fdtd::TMz::Gaussian::from_steps(sim->dt(), 4));
+        sim->add_source(9, 3, Component::Hy, fdtd::TMz::Gaussian::from_steps(sim->dt(), 6));
     }
     split.run(13);
     split.run(18);
@@ -279,7 +280,7 @@ TEST_CASE("Sim2D probe records compose", "[unit][sim2d]")
     Sim2D split(16, 12);
     Sim2D whole(16, 12);
     for (Sim2D *sim : {&split, &whole}) {
-        sim->add_source(5, 6, Component::Ez, fdtd::Gaussian::from_steps(sim->dt(), 4));
+        sim->add_source(5, 6, Component::Ez, fdtd::TMz::Gaussian::from_steps(sim->dt(), 4));
         sim->add_probe(10, 6, Component::Ez);
         sim->add_probe(10, 6, Component::Hy);
     }
@@ -318,7 +319,7 @@ TEST_CASE("Sim2D takes scheduled snapshots", "[unit][sim2d]")
     Sim2D sim(16, 12);
     Sim2D ref(16, 12);
     for (Sim2D *s : {&sim, &ref}) {
-        s->add_source(5, 6, Component::Ez, fdtd::Gaussian::from_steps(s->dt(), 4));
+        s->add_source(5, 6, Component::Ez, fdtd::TMz::Gaussian::from_steps(s->dt(), 4));
     }
     sim.add_snapshot(20);
     sim.add_snapshot(7);

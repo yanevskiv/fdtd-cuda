@@ -22,7 +22,7 @@
 #include <catch2/matchers/catch_matchers_floating_point.hpp>
 
 // Project header under test.
-#include "fdtd/fdtd_waveform.h"
+#include "fdtd/TMz/fdtd_tmz_waveform.h"
 
 // Standard library for math, limits and errors.
 #include <cmath>
@@ -33,8 +33,8 @@
 using Catch::Matchers::WithinAbs;
 using Catch::Matchers::WithinRel;
 using fdtd::FloatType;
-using fdtd::Gaussian;
-using fdtd::sample_waveform;
+using fdtd::TMz::Gaussian;
+using fdtd::TMz::sample_waveform;
 
 // Verify the peak, the symmetry about t0 and the value one width away.
 TEST_CASE("Gaussian shape", "[unit][waveform]")
@@ -97,7 +97,7 @@ TEST_CASE("sample_waveform takes any callable", "[unit][waveform]")
               },
               1, 0, 0)
               .empty());
-    CHECK_THROWS_AS(sample_waveform(fdtd::Waveform{}, 1, 0, 1), std::invalid_argument);
+    CHECK_THROWS_AS(sample_waveform(fdtd::TMz::Waveform{}, 1, 0, 1), std::invalid_argument);
 }
 
 // Verify that sampling in two calls gives the same values as one call, bit for bit.
