@@ -54,7 +54,7 @@ namespace fdtd::test
             for (std::size_t j = 0; j < grid.ny(); ++j) {
                 for (std::size_t i = 0; i < grid.nx(); ++i) {
                     const std::size_t k = grid.index(i, j);
-                    const double e = ez[k];
+                    const double e = double(ez[k]);
                     const double hh = double(h0.hx()[k]) * double(h1.hx()[k]) +
                                       double(h0.hy()[k]) * double(h1.hy()[k]);
                     sum += EPS_0 * double(epsR[k]) * e * e + MU_0 * double(muR[k]) * hh;
