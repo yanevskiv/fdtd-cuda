@@ -31,6 +31,7 @@ add_library(fdtd
     src/fdtd/TMz/fdtd_tmz_fields2d.cpp
     src/fdtd/TMz/fdtd_tmz_grid2d.cpp
     src/fdtd/TMz/fdtd_tmz_material2d.cpp
+    src/fdtd/TMz/fdtd_tmz_output.cpp
     src/fdtd/TMz/fdtd_tmz_sim2d.cpp
     src/fdtd/TMz/serial/fdtd_tmz_serial_backend.cpp
     src/fdtd/TMz/serial/fdtd_tmz_serial_boundary.cpp
@@ -47,6 +48,15 @@ target_compile_definitions(fdtd PUBLIC
     FDTD_WITH_CUDA=$<BOOL:${FDTD_WITH_CUDA}>)
 target_link_libraries(fdtd PRIVATE $<BUILD_INTERFACE:fdtd_warnings>)
 
+# The command-line driver: a static library the tests link, and the fdtd program.
+add_library(fdtd_driver STATIC src/driver/fdtd_driver.cpp)
+target_include_directories(fdtd_driver PUBLIC ${PROJECT_SOURCE_DIR}/src)
+target_link_libraries(fdtd_driver PUBLIC fdtd::fdtd PRIVATE fdtd_warnings)
+
+add_executable(fdtd_cli src/main.cpp)
+set_target_properties(fdtd_cli PROPERTIES OUTPUT_NAME fdtd)
+target_link_libraries(fdtd_cli PRIVATE fdtd_driver fdtd_warnings)
+
 if(FDTD_BUILD_TESTS)
     enable_testing()
     add_subdirectory(tests)
@@ -56,6 +66,7 @@ endif()
 install(DIRECTORY include/ DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}
     PATTERN test EXCLUDE)
 install(TARGETS fdtd EXPORT fdtdTargets)
+install(TARGETS fdtd_cli RUNTIME DESTINATION ${CMAKE_INSTALL_BINDIR})
 install(EXPORT fdtdTargets
     NAMESPACE fdtd::
     DESTINATION ${CMAKE_INSTALL_LIBDIR}/cmake/fdtd)

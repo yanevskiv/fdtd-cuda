@@ -20,6 +20,7 @@ add_executable(fdtd_tests
     test_coeffs2d.cpp
     test_constants.cpp
     test_courant.cpp
+    test_driver.cpp
     test_fields2d.cpp
     test_grid2d.cpp
     test_material2d.cpp
@@ -31,7 +32,7 @@ add_executable(fdtd_tests
     test_support.cpp
     test_version.cpp
     test_waveform.cpp)
-target_link_libraries(fdtd_tests PRIVATE fdtd::fdtd fdtd_test_support fdtd_warnings Catch2::Catch2WithMain)
+target_link_libraries(fdtd_tests PRIVATE fdtd::fdtd fdtd_driver fdtd_test_support fdtd_warnings Catch2::Catch2WithMain)
 # Private library headers, for testing the backends directly.
 target_include_directories(fdtd_tests PRIVATE ${PROJECT_SOURCE_DIR}/src)
 target_compile_definitions(fdtd_tests PRIVATE
