@@ -21,6 +21,7 @@ set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
 option(FDTD_DOUBLE "Use double instead of float for fdtd::FloatType" OFF)
 option(FDTD_BUILD_TESTS "Build the Catch2 tests" ${PROJECT_IS_TOP_LEVEL})
 option(FDTD_WERROR "Treat compiler warnings as errors" OFF)
+option(FDTD_BUILD_EXAMPLES "Build the examples" ${PROJECT_IS_TOP_LEVEL})
 
 # The library.
 add_library(fdtd
@@ -56,6 +57,11 @@ target_link_libraries(fdtd_driver PUBLIC fdtd::fdtd PRIVATE fdtd_warnings)
 add_executable(fdtd_cli src/main.cpp)
 set_target_properties(fdtd_cli PROPERTIES OUTPUT_NAME fdtd)
 target_link_libraries(fdtd_cli PRIVATE fdtd_driver fdtd_warnings)
+
+if(FDTD_BUILD_EXAMPLES)
+    add_executable(point_source examples/point_source.cpp)
+    target_link_libraries(point_source PRIVATE fdtd::fdtd fdtd_warnings)
+endif()
 
 if(FDTD_BUILD_TESTS)
     enable_testing()

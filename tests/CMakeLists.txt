@@ -44,3 +44,13 @@ target_compile_definitions(fdtd_tests PRIVATE
 
 # Catch tags such as [unit] and [physics] become CTest labels.
 catch_discover_tests(fdtd_tests ADD_TAGS_AS_LABELS)
+
+# The fdtd program end to end: help, a bad option, and a small run.
+add_test(NAME "fdtd program help" COMMAND fdtd_cli --help)
+add_test(NAME "fdtd program rejects bad options" COMMAND fdtd_cli --nx)
+set_tests_properties("fdtd program rejects bad options" PROPERTIES WILL_FAIL TRUE)
+add_test(NAME "fdtd program runs"
+    COMMAND fdtd_cli --nx 32 --steps 20 --probe 20,16 --snapshot-every 10
+            --output ${CMAKE_CURRENT_BINARY_DIR}/fdtd_program_run)
+set_tests_properties("fdtd program help" "fdtd program rejects bad options" "fdtd program runs"
+    PROPERTIES LABELS "unit;driver")

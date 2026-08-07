@@ -21,8 +21,13 @@
 #include <catch2/catch_test_macros.hpp>
 
 #include "driver/fdtd_driver.h"
+#include "fdtd/TMz/fdtd_tmz_output.h"
 
+#include <filesystem>
+#include <fstream>
+#include <sstream>
 #include <stdexcept>
+#include <string>
 #include <string_view>
 #include <vector>
 
@@ -108,4 +113,39 @@ TEST_CASE("Driver rejects bad arguments", "[unit][driver]")
     CHECK_THROWS_AS(parse({"--output="}), std::invalid_argument);
     CHECK_THROWS_AS(parse({"--frobnicate", "1"}), std::invalid_argument);
     CHECK_THROWS_AS(parse({"stray"}), std::invalid_argument);
+}
+
+// Verify that a small run writes the snapshots and probe file it promises, and that the
+// last snapshot and the probe agree on Ez at the probe cell.
+TEST_CASE("Driver smoke run", "[unit][driver]")
+{
+    const auto dir = std::filesystem::temp_directory_path() / "fdtd_test_driver_smoke";
+    std::filesystem::remove_all(dir);
+    auto options = parse({"--nx", "32", "--ny", "24", "--steps", "25", "--probe", "20,12",
+                          "--snapshot-every", "10", "--boundary", "pmc"});
+    options.output = dir;
+    std::ostringstream log;
+    fdtd::driver::run(options, log);
+
+    for (const char *name : {"snapshot_000000.bin", "snapshot_000010.bin", "snapshot_000020.bin",
+                             "snapshot_000025.bin", "probe_0.csv"}) {
+        CAPTURE(name);
+        CHECK(std::filesystem::exists(dir / name));
+    }
+    const auto last = fdtd::TMz::read_snapshot(dir / "snapshot_000025.bin");
+    CHECK(last.nx == 32);
+    CHECK(last.ny == 24);
+    CHECK(last.step == 25);
+
+    std::ifstream csv(dir / "probe_0.csv");
+    std::string line;
+    std::string previous;
+    while (std::getline(csv, line)) {
+        previous = line;
+    }
+    const std::string value = previous.substr(previous.rfind(',') + 1);
+    CHECK(std::stod(value) == last.ez[12 * 32 + 20]);
+    CHECK(std::stod(value) != 0);
+    CHECK(log.str().find("probe_0.csv") != std::string::npos);
+    std::filesystem::remove_all(dir);
 }
