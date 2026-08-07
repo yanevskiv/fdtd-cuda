@@ -70,9 +70,9 @@ namespace
         if (k == 0 || k + 1 == trace.size()) {
             return double(k);
         }
-        const double a = trace[k - 1];
-        const double b = trace[k];
-        const double c = trace[k + 1];
+        const double a = double(trace[k - 1]);
+        const double b = double(trace[k]);
+        const double c = double(trace[k + 1]);
         return double(k) + 0.5 * (a - c) / (a - 2 * b + c);
     }
 }
