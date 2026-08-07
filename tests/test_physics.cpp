@@ -19,6 +19,7 @@
  */
 
 #include <catch2/catch_test_macros.hpp>
+#include <catch2/generators/catch_generators.hpp>
 #include <catch2/matchers/catch_matchers_floating_point.hpp>
 
 #include "fdtd/TMz/fdtd_tmz_courant.h"
@@ -27,14 +28,18 @@
 #include "fdtd/fdtd_waveform.h"
 #include "fdtd/test/fdtd_test_support.h"
 
+#include <algorithm>
 #include <cmath>
 #include <cstddef>
+#include <limits>
 #include <vector>
 
 using fdtd::FloatType;
 using fdtd::test::Cell;
+using fdtd::TMz::Boundary;
 using fdtd::TMz::courant_dt;
 using fdtd::TMz::Grid2D;
+using fdtd::TMz::Material2D;
 using fdtd::TMz::Sim2D;
 
 namespace
@@ -141,4 +146,35 @@ TEST_CASE("Far-field peak follows 1 / sqrt(r)", "[physics][falloff]")
         CAPTURE(distances[k], ratio);
         CHECK(std::abs(ratio - 1) < 0.03);
     }
+}
+
+// Verify that a closed box with a dielectric rod keeps the energy Yee conserves, within a
+// bound of 1000 rounding units of FloatType over 2000 steps, under PEC and under PMC.
+TEST_CASE("Closed box conserves energy", "[physics][energy]")
+{
+    const Boundary boundary = GENERATE(Boundary::Pec, Boundary::Pmc);
+    Sim2D::Options opts;
+    opts.boundary = boundary;
+    Sim2D sim(128, 128, opts);
+    Material2D material(sim.grid());
+    material.fill_circle(80, 70, 15, {FloatType(4), FloatType(1), FloatType(0), FloatType(0)});
+    sim.set_material(material);
+    sim.add_source(40, 50, fdtd::TMz::Component::Ez, fdtd::Gaussian::from_steps(sim.dt(), 8));
+
+    std::vector<double> history;
+    for (std::size_t b = 0; b < 20; ++b) {
+        sim.run(b == 0 ? 100 : 99);
+        const auto now = sim.snapshot();
+        sim.run(1);
+        const auto next = sim.snapshot();
+        history.push_back(fdtd::test::field_energy(now.fields, next.fields, sim.material()));
+    }
+    const double bound = 1000 * double(std::numeric_limits<FloatType>::epsilon());
+    double drift = 0;
+    for (const double e : history) {
+        drift = std::max(drift, std::abs(e / history.front() - 1));
+    }
+    CAPTURE(boundary == Boundary::Pec, drift, bound);
+    CHECK(history.front() > 0);
+    CHECK(drift < bound);
 }
