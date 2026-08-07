@@ -29,6 +29,7 @@
 #include <filesystem>
 #include <span>
 #include <string_view>
+#include <vector>
 
 /** Namespace for the fdtd library. */
 namespace fdtd
@@ -44,6 +45,31 @@ namespace fdtd
 
         /** Size of the snapshot header in bytes; Ez follows it. */
         inline constexpr std::size_t SNAPSHOT_HEADER_SIZE = 64;
+
+        /** Contents of a snapshot file, with Ez widened to double. */
+        struct SnapshotData
+        {
+            /** Cells along x. */
+            std::size_t nx;
+
+            /** Cells along y. */
+            std::size_t ny;
+
+            /** Steps run when the snapshot was taken. */
+            std::size_t step;
+
+            /** Time step in seconds. */
+            double dt;
+
+            /** Cell size along x in meters. */
+            double dx;
+
+            /** Cell size along y in meters. */
+            double dy;
+
+            /** Ez, nx * ny values, row by row with x fastest. */
+            std::vector<double> ez;
+        };
 
         /**
          * Write Ez to a binary snapshot file.
@@ -61,6 +87,17 @@ namespace fdtd
          */
         void write_snapshot(const std::filesystem::path &path, const Fields2D &fields,
                             std::size_t step, double dt);
+
+        /**
+         * Read a snapshot file written with float or double values.
+         *
+         * @param path File to read.
+         * @return The contents.
+         * @throws std::runtime_error When the file cannot be read, has another magic or
+         *         version, a value size other than 4 or 8, or a length that does not match
+         *         its header.
+         */
+        SnapshotData read_snapshot(const std::filesystem::path &path);
 
         /**
          * Write a probe's record as CSV with the columns step, time and ez.

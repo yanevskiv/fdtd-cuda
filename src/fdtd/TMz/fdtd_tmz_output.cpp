@@ -22,9 +22,11 @@
 #include "fdtd/TMz/fdtd_tmz_output.h"
 
 // Standard library for byte order, files, formatting and errors.
+#include <algorithm>
 #include <bit>
 #include <fstream>
 #include <ios>
+#include <iterator>
 #include <limits>
 #include <stdexcept>
 #include <string>
@@ -35,6 +37,8 @@ namespace fdtd::TMz
 {
     static_assert(std::endian::native == std::endian::little,
                   "snapshot files are written in the host's byte order, little-endian");
+    static_assert(sizeof(float) == 4 && sizeof(double) == 8,
+                  "snapshot values are 4-byte floats or 8-byte doubles");
 
     // Helpers private to this file.
     namespace
@@ -44,6 +48,26 @@ namespace fdtd::TMz
         {
             const auto *bytes = reinterpret_cast<const char *>(&value);
             buffer.insert(buffer.end(), bytes, bytes + sizeof(T));
+        }
+
+        // Read a value from a buffer at an offset.
+        template <typename T> T get(const std::vector<char> &buffer, std::size_t offset)
+        {
+            T value;
+            std::copy_n(buffer.data() + offset, sizeof(T), reinterpret_cast<char *>(&value));
+            return value;
+        }
+
+        // Widen count values of type T from a buffer into doubles.
+        template <typename T>
+        std::vector<double> widen(const std::vector<char> &buffer, std::size_t offset,
+                                  std::size_t count)
+        {
+            std::vector<double> values(count);
+            for (std::size_t k = 0; k < count; ++k) {
+                values[k] = static_cast<double>(get<T>(buffer, offset + k * sizeof(T)));
+            }
+            return values;
         }
 
         // Open a file for writing or throw.
@@ -90,6 +114,47 @@ namespace fdtd::TMz
                       static_cast<std::streamsize>(grid.nx() * sizeof(FloatType)));
         }
         require_written(out, path);
+    }
+
+    // Read the whole file, check the header against its length and widen Ez.
+    SnapshotData read_snapshot(const std::filesystem::path &path)
+    {
+        std::ifstream in(path, std::ios::binary);
+        if (!in) {
+            throw std::runtime_error("cannot read " + path.string());
+        }
+        const std::vector<char> buffer((std::istreambuf_iterator<char>(in)),
+                                       std::istreambuf_iterator<char>());
+        const std::string name = path.string();
+        if (buffer.size() < SNAPSHOT_HEADER_SIZE ||
+            !std::equal(std::begin(SNAPSHOT_MAGIC), std::end(SNAPSHOT_MAGIC), buffer.begin())) {
+            throw std::runtime_error(name + ": not a snapshot file");
+        }
+        if (get<std::uint32_t>(buffer, 8) != SNAPSHOT_VERSION) {
+            throw std::runtime_error(name + ": unsupported snapshot version");
+        }
+        const auto size = get<std::uint32_t>(buffer, 12);
+        if (size != 4 && size != 8) {
+            throw std::runtime_error(name + ": unsupported value size");
+        }
+        SnapshotData data{get<std::uint64_t>(buffer, 16),
+                          get<std::uint64_t>(buffer, 24),
+                          get<std::uint64_t>(buffer, 32),
+                          get<double>(buffer, 40),
+                          get<double>(buffer, 48),
+                          get<double>(buffer, 56),
+                          {}};
+        const std::size_t count = data.nx * data.ny;
+        if (data.ny != 0 && count / data.ny != data.nx) {
+            throw std::runtime_error(name + ": length does not match the header");
+        }
+        if ((buffer.size() - SNAPSHOT_HEADER_SIZE) / size != count ||
+            (buffer.size() - SNAPSHOT_HEADER_SIZE) % size != 0) {
+            throw std::runtime_error(name + ": length does not match the header");
+        }
+        data.ez = size == 4 ? widen<float>(buffer, SNAPSHOT_HEADER_SIZE, count)
+                            : widen<double>(buffer, SNAPSHOT_HEADER_SIZE, count);
+        return data;
     }
 
     // Write the comment, the header and one row per value, with full precision.
