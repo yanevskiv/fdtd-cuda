@@ -35,7 +35,6 @@ add_executable(fdtd_tests
     test_waveform.cpp)
 target_link_libraries(fdtd_tests PRIVATE fdtd::fdtd fdtd_driver fdtd_test_support fdtd_warnings Catch2::Catch2WithMain)
 # Private library headers, for testing the backends directly.
-target_include_directories(fdtd_tests PRIVATE ${PROJECT_SOURCE_DIR}/src)
 target_compile_definitions(fdtd_tests PRIVATE
     FDTD_TEST_PROJECT_VERSION="${PROJECT_VERSION}"
     FDTD_TEST_PROJECT_VERSION_MAJOR=${PROJECT_VERSION_MAJOR}

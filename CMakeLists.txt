@@ -42,7 +42,6 @@ target_compile_features(fdtd PUBLIC cxx_std_20)
 target_include_directories(fdtd PUBLIC
     $<BUILD_INTERFACE:${PROJECT_SOURCE_DIR}/include>
     $<INSTALL_INTERFACE:${CMAKE_INSTALL_INCLUDEDIR}>)
-target_include_directories(fdtd PRIVATE ${PROJECT_SOURCE_DIR}/src)
 target_compile_definitions(fdtd PUBLIC
     FDTD_DOUBLE=$<BOOL:${FDTD_DOUBLE}>
     FDTD_WITH_OPENMP=$<BOOL:${FDTD_WITH_OPENMP}>
@@ -50,8 +49,7 @@ target_compile_definitions(fdtd PUBLIC
 target_link_libraries(fdtd PRIVATE $<BUILD_INTERFACE:fdtd_warnings>)
 
 # The command-line driver: a static library the tests link, and the fdtd program.
-add_library(fdtd_driver STATIC src/driver/fdtd_driver.cpp)
-target_include_directories(fdtd_driver PUBLIC ${PROJECT_SOURCE_DIR}/src)
+add_library(fdtd_driver STATIC src/fdtd/fdtd_driver.cpp)
 target_link_libraries(fdtd_driver PUBLIC fdtd::fdtd PRIVATE fdtd_warnings)
 
 add_executable(fdtd_cli src/main.cpp)
@@ -70,7 +68,9 @@ endif()
 
 # Installation and package export.
 install(DIRECTORY include/ DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}
-    PATTERN test EXCLUDE)
+    PATTERN test EXCLUDE
+    PATTERN serial EXCLUDE
+    PATTERN fdtd_driver.h EXCLUDE)
 install(TARGETS fdtd EXPORT fdtdTargets)
 install(TARGETS fdtd_cli RUNTIME DESTINATION ${CMAKE_INSTALL_BINDIR})
 install(EXPORT fdtdTargets

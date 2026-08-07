@@ -19,7 +19,7 @@
  */
 
 // The driver and the version.
-#include "driver/fdtd_driver.h"
+#include "fdtd/fdtd_driver.h"
 #include "fdtd/fdtd_version.h"
 
 // Standard library for streams and errors.

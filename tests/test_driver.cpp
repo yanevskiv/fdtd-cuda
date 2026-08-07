@@ -20,8 +20,8 @@
 
 #include <catch2/catch_test_macros.hpp>
 
-#include "driver/fdtd_driver.h"
 #include "fdtd/TMz/fdtd_tmz_output.h"
+#include "fdtd/fdtd_driver.h"
 
 #include <filesystem>
 #include <fstream>

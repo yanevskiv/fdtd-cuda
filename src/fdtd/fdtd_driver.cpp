@@ -19,7 +19,7 @@
  */
 
 // Function declarations.
-#include "driver/fdtd_driver.h"
+#include "fdtd/fdtd_driver.h"
 
 // The simulation, its output files and the source waveform.
 #include "fdtd/TMz/fdtd_tmz_output.h"
