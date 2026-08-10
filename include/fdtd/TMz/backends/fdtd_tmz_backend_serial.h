@@ -109,25 +109,49 @@ namespace fdtd
         void serial_update_h(Fields2D &fields, CoeffsView coeffs) noexcept;
 
         /**
-         * Advance Ez by one step from the curl of H.
+         * Advance Ez by one step from the curl of H, inside the PML.
          *
          *     Ez(i, j) = Cex1 Ez(i, j) + Cex2 ((Hy(i, j) - Hy(i - 1, j)) / dx
          *                                    - (Hx(i, j) - Hx(i, j - 1)) / dy)
          *
-         * over the interior 0 < i < nx - 1, 0 < j < ny - 1, with the x coefficients, which
-         * equal the y ones outside a PML. The edge Ez is left to the outer boundary. Inner
-         * loop along x.
+         * over max(pml, 1) <= i < nx - max(pml, 1) and the same along j, with the x
+         * coefficients, which equal the y ones there. With no PML that is the whole
+         * interior. The PML is left to serial_update_pml, the edge Ez to the outer boundary.
+         * Inner loop along x.
          *
          * @param fields Fields to update.
          * @param coeffs Coefficient arrays on the same grid as the fields.
+         * @param pml PML thickness in cells, zero for none.
          */
-        void serial_update_e(Fields2D &fields, CoeffsView coeffs) noexcept;
+        void serial_update_e(Fields2D &fields, CoeffsView coeffs, std::size_t pml) noexcept;
 
         /**
-         * Update the edge Ez, which serial_update_e leaves alone; call it right after.
+         * Advance Ez inside the PML by one step as the split fields Ezx and Ezy.
          *
-         * Under PEC and PML the edge Ez is set to zero. Under PMC it takes the interior update,
-         * with the x coefficients, and every H outside the domain read as zero: Hy(-1, j) and Hy(nx
+         *     Ezx(i, j) = Cex1 Ezx(i, j) + Cex2 / dx (Hy(i, j) - Hy(i - 1, j)),
+         *     Ezy(i, j) = Cey1 Ezy(i, j) - Cey2 / dy (Hx(i, j) - Hx(i, j - 1)),
+         *     Ez(i, j)  = Ezx(i, j) + Ezy(i, j),
+         *
+         * over the non-edge cells that serial_update_e leaves out: the bottom and top slabs
+         * of pml - 1 rows across the width, then the left and right slabs of pml - 1
+         * columns between them. The corners lie in the bottom and top slabs and carry both
+         * conductivities through the coefficients. Ez there is rebuilt from its parts each
+         * step, so fields put in by hand keep Ez = Ezx + Ezy inside the PML. Inner loop
+         * along x.
+         *
+         * @param fields Fields to update.
+         * @param coeffs Coefficient arrays on the same grid as the fields.
+         * @param pml PML thickness in cells, with 2 pml below nx and ny; zero for none.
+         */
+        void serial_update_pml(Fields2D &fields, CoeffsView coeffs, std::size_t pml) noexcept;
+
+        /**
+         * Update the edge Ez, which serial_update_e and serial_update_pml leave alone; call it
+         * right after them.
+         *
+         * Under PEC and PML the edge Ez is set to zero, with Ezx and Ezy. Under PMC it takes the
+         * interior update, with the x coefficients, and every H outside the domain read as zero:
+         * Hy(-1, j) and Hy(nx
          * - 1, j), Hx(i, -1) and Hx(i, ny - 1). Corners combine both.
          *
          * @param fields Fields to update.
@@ -249,6 +273,9 @@ namespace fdtd
 
             /** Whether coefficients were uploaded. */
             bool m_has_coeffs = false;
+
+            /** PML thickness the uploaded coefficients carry, used under Boundary::Pml. */
+            std::size_t m_pml_thickness = 0;
 
             /** The backend's copy of the Ez decay factors along x. */
             AlignedBuffer<FloatType> m_coeff_ez_x1;

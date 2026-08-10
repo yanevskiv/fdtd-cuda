@@ -218,6 +218,26 @@ TEST_CASE("Sim2D rejects an edge Ez source with the PML", "[unit][sim2d][pml]")
     CHECK_THROWS_AS(sim.add_source(0, 3, Component::Ez, ramp), std::invalid_argument);
 }
 
+// Verify that sources inside the PML are rejected for every component, and taken just past
+// it or under PEC.
+TEST_CASE("Sim2D rejects sources inside the PML", "[unit][sim2d][pml]")
+{
+    Sim2D::Options opts;
+    opts.boundary = Boundary::Pml;
+    opts.pml_thickness = 3;
+    Sim2D sim(12, 12, opts);
+    CHECK_THROWS_AS(sim.add_source(2, 6, Component::Ez, ramp), std::invalid_argument);
+    CHECK_THROWS_AS(sim.add_source(6, 2, Component::Ez, ramp), std::invalid_argument);
+    CHECK_THROWS_AS(sim.add_source(6, 9, Component::Hx, ramp), std::invalid_argument);
+    CHECK_THROWS_AS(sim.add_source(9, 6, Component::Hy, ramp), std::invalid_argument);
+    CHECK_NOTHROW(sim.add_source(3, 3, Component::Ez, ramp));
+    CHECK_NOTHROW(sim.add_source(8, 8, Component::Hy, ramp));
+    CHECK(sim.source_count() == 2);
+
+    Sim2D pec(12, 12);
+    CHECK_NOTHROW(pec.add_source(2, 6, Component::Ez, ramp));
+}
+
 // Verify that run() counts steps and time, and that download() fills the host fields.
 TEST_CASE("Sim2D counts steps and time", "[unit][sim2d]")
 {

@@ -91,13 +91,14 @@ namespace fdtd::TMz
         }
     }
 
-    // Update the interior Ez row by row.
-    void serial_update_e(Fields2D &fields, CoeffsView coeffs) noexcept
+    // Update the interior Ez row by row, inside the PML when there is one.
+    void serial_update_e(Fields2D &fields, CoeffsView coeffs, std::size_t pml) noexcept
     {
         const Grid2D &grid = fields.grid();
-        const std::size_t nx = grid.nx();
-        const std::size_t ny = grid.ny();
         const std::size_t pitch = grid.pitch();
+        const std::size_t lo = std::max<std::size_t>(pml, 1);
+        const std::size_t iEnd = grid.nx() - std::min(lo, grid.nx());
+        const std::size_t jEnd = grid.ny() - std::min(lo, grid.ny());
         const FloatType invDx = FloatType(1) / grid.dx();
         const FloatType invDy = FloatType(1) / grid.dy();
 
@@ -107,15 +108,60 @@ namespace fdtd::TMz
         const FloatType *__restrict Cex1 = coeffs.coeff_ez_x1;
         const FloatType *__restrict Cex2 = coeffs.coeff_ez_x2;
 
-        for (std::size_t j = 1; j + 1 < ny; ++j) {
+        for (std::size_t j = lo; j < jEnd; ++j) {
             const std::size_t row = j * pitch;
-            for (std::size_t i = 1; i + 1 < nx; ++i) {
+            for (std::size_t i = lo; i < iEnd; ++i) {
                 const std::size_t k = row + i;
                 const FloatType curl =
                     (Hy[k] - Hy[k - 1]) * invDx - (Hx[k] - Hx[k - pitch]) * invDy;
                 Ez[k] = Cex1[k] * Ez[k] + Cex2[k] * curl;
             }
         }
+    }
+
+    // Update Ezx and Ezy over a rectangle of non-edge cells row by row, and Ez as their sum.
+    static void split_update_rect(Fields2D &fields, CoeffsView coeffs, std::size_t i0,
+                                  std::size_t i1, std::size_t j0, std::size_t j1) noexcept
+    {
+        const Grid2D &grid = fields.grid();
+        const std::size_t pitch = grid.pitch();
+        const FloatType invDx = FloatType(1) / grid.dx();
+        const FloatType invDy = FloatType(1) / grid.dy();
+
+        FloatType *__restrict Ez = fields.ez().data();
+        FloatType *__restrict Ezx = fields.ezx().data();
+        FloatType *__restrict Ezy = fields.ezy().data();
+        const FloatType *__restrict Hx = fields.hx().data();
+        const FloatType *__restrict Hy = fields.hy().data();
+        const FloatType *__restrict Cex1 = coeffs.coeff_ez_x1;
+        const FloatType *__restrict Cex2 = coeffs.coeff_ez_x2;
+        const FloatType *__restrict Cey1 = coeffs.coeff_ez_y1;
+        const FloatType *__restrict Cey2 = coeffs.coeff_ez_y2;
+
+        for (std::size_t j = j0; j < j1; ++j) {
+            const std::size_t row = j * pitch;
+            for (std::size_t i = i0; i < i1; ++i) {
+                const std::size_t k = row + i;
+                Ezx[k] = Cex1[k] * Ezx[k] + Cex2[k] * invDx * (Hy[k] - Hy[k - 1]);
+                Ezy[k] = Cey1[k] * Ezy[k] - Cey2[k] * invDy * (Hx[k] - Hx[k - pitch]);
+                Ez[k] = Ezx[k] + Ezy[k];
+            }
+        }
+    }
+
+    // Run the split update over the bottom and top slabs across the width, then over the
+    // left and right slabs between them; a layer under two cells has no non-edge slab.
+    void serial_update_pml(Fields2D &fields, CoeffsView coeffs, std::size_t pml) noexcept
+    {
+        if (pml < 2) {
+            return;
+        }
+        const std::size_t nx = fields.grid().nx();
+        const std::size_t ny = fields.grid().ny();
+        split_update_rect(fields, coeffs, 1, nx - 1, 1, pml);
+        split_update_rect(fields, coeffs, 1, nx - 1, ny - pml, ny - 1);
+        split_update_rect(fields, coeffs, 1, pml, pml, ny - pml);
+        split_update_rect(fields, coeffs, nx - pml, nx - 1, pml, ny - pml);
     }
 
     // Visit the edge cells once each: the first and last rows whole, then the first and
@@ -138,15 +184,21 @@ namespace fdtd::TMz
         }
     }
 
-    // Zero the edge under PEC, or apply the Ez update with H outside the domain read as zero.
+    // Zero the edge Ez and its split parts under PEC, or apply the Ez update with H outside
+    // the domain read as zero.
     void serial_update_boundary(Fields2D &fields, CoeffsView coeffs, Boundary boundary) noexcept
     {
         const Grid2D &grid = fields.grid();
         FloatType *__restrict Ez = fields.ez().data();
 
         if (boundary != Boundary::Pmc) {
+            FloatType *__restrict Ezx = fields.ezx().data();
+            FloatType *__restrict Ezy = fields.ezy().data();
             for_each_edge(grid, [&](std::size_t i, std::size_t j) {
-                Ez[grid.index(i, j)] = 0;
+                const std::size_t k = grid.index(i, j);
+                Ez[k] = 0;
+                Ezx[k] = 0;
+                Ezy[k] = 0;
             });
             return;
         }
@@ -295,6 +347,7 @@ namespace fdtd::TMz
         copy_field(coeffs.coeff_hx_2(), {m_coeff_hx_2.data(), m_coeff_hx_2.size()});
         copy_field(coeffs.coeff_hy_1(), {m_coeff_hy_1.data(), m_coeff_hy_1.size()});
         copy_field(coeffs.coeff_hy_2(), {m_coeff_hy_2.data(), m_coeff_hy_2.size()});
+        m_pml_thickness = coeffs.pml_thickness();
         m_has_coeffs = true;
     }
 
@@ -335,8 +388,8 @@ namespace fdtd::TMz
         m_records.clear();
     }
 
-    // Run H, the H sources, the interior E, the edge E and the Ez sources once per step,
-    // then record the probes.
+    // Run H, the H sources, the interior E, the split E of an active PML, the edge E and the
+    // Ez sources once per step, then record the probes.
     void SerialBackend::advance(std::size_t nsteps, std::span<const PointInjection> points,
                                 std::span<const FloatType> values)
     {
@@ -346,12 +399,14 @@ namespace fdtd::TMz
         const CoeffsView coeffs(m_coeff_ez_x1.data(), m_coeff_ez_x2.data(), m_coeff_ez_y1.data(),
                                 m_coeff_ez_y2.data(), m_coeff_hx_1.data(), m_coeff_hx_2.data(),
                                 m_coeff_hy_1.data(), m_coeff_hy_2.data());
+        const std::size_t pml = m_boundary == Boundary::Pml ? m_pml_thickness : 0;
         m_records.reserve(m_records.size() + nsteps * m_probes.size());
         for (std::size_t n = 0; n < nsteps; ++n) {
             const FloatType *row = values.data() + n * points.size();
             serial_update_h(m_fields, coeffs);
             add_sources(m_fields, points, row, true);
-            serial_update_e(m_fields, coeffs);
+            serial_update_e(m_fields, coeffs, pml);
+            serial_update_pml(m_fields, coeffs, pml);
             serial_update_boundary(m_fields, coeffs, m_boundary);
             add_sources(m_fields, points, row, false);
             for (const PointProbe &probe : m_probes) {

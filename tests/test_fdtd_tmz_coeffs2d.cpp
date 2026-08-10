@@ -53,6 +53,7 @@ TEST_CASE("Coeffs2D in vacuum", "[unit][coeffs2d]")
     REQUIRE(coeffs.grid().nx() == 5);
     REQUIRE(coeffs.grid().ny() == 4);
     CHECK(coeffs.dt() == dt);
+    CHECK(coeffs.pml_thickness() == 0);
     for (const auto array :
          {coeffs.coeff_ez_x1(), coeffs.coeff_ez_x2(), coeffs.coeff_ez_y1(), coeffs.coeff_ez_y2(),
           coeffs.coeff_hx_1(), coeffs.coeff_hx_2(), coeffs.coeff_hy_1(), coeffs.coeff_hy_2()}) {
@@ -138,6 +139,7 @@ TEST_CASE("Coeffs2D follows the PML profiles by direction", "[unit][coeffs2d][pm
     material.set_pml(4, 3, 1e-6);
     const double dt = courant_dt(grid, 0.9);
     const Coeffs2D coeffs(material, dt);
+    CHECK(coeffs.pml_thickness() == 4);
 
     for (std::size_t k = 0; k < grid.size(); ++k) {
         const double ax = double(material.sigma_e_x()[k]) * dt / (2.0 * fdtd::EPS_0);

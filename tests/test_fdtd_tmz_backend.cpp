@@ -352,3 +352,45 @@ TEST_CASE("Serial backend rejects probes outside the grid", "[unit][backend][ser
     }
     CHECK(backend->probe_count() == 1);
 }
+
+// Verify that the split update runs only under Boundary::Pml: Ez is then the sum of its parts
+// across the PML, while under PEC the same coefficients leave the parts at zero.
+TEST_CASE("Serial backend splits Ez in the PML only under Boundary::Pml",
+          "[unit][backend][serial][pml]")
+{
+    const std::size_t pml = 4;
+    const Grid2D grid(16, 16);
+    Material2D material(grid);
+    material.set_pml(pml, 3, 1e-6);
+    const Boundary boundary = GENERATE(Boundary::Pml, Boundary::Pec);
+    auto backend = fdtd::TMz::make_backend(fdtd::TMz::BackendType::Serial, grid);
+    backend->upload(Coeffs2D(material, fdtd::TMz::courant_dt(grid, 0.9)));
+    backend->set_boundary(boundary);
+    Fields2D fields(grid);
+    fields.ez()[grid.index(8, 8)] = 1;
+    backend->upload(fields);
+    backend->step(20);
+    const Fields2D f = download(*backend);
+
+    const bool split = boundary == Boundary::Pml;
+    bool anyPart = false;
+    for (std::size_t j = 0; j < grid.ny(); ++j) {
+        for (std::size_t i = 0; i < grid.nx(); ++i) {
+            const std::size_t k = grid.index(i, j);
+            const bool edge = i == 0 || j == 0 || i + 1 == grid.nx() || j + 1 == grid.ny();
+            const bool slab = i < pml || j < pml || i + pml >= grid.nx() || j + pml >= grid.ny();
+            if (edge) {
+                CHECK(f.ez()[k] == FloatType(0));
+                CHECK(f.ezx()[k] == FloatType(0));
+                CHECK(f.ezy()[k] == FloatType(0));
+            } else if (slab && split) {
+                CHECK(f.ez()[k] == f.ezx()[k] + f.ezy()[k]);
+            } else {
+                CHECK(f.ezx()[k] == FloatType(0));
+                CHECK(f.ezy()[k] == FloatType(0));
+            }
+            anyPart = anyPart || f.ezx()[k] != FloatType(0);
+        }
+    }
+    CHECK(anyPart == split);
+}

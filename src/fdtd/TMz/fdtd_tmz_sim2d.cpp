@@ -136,7 +136,8 @@ namespace fdtd::TMz
         return *m_backend;
     }
 
-    // Check the cell and keep the source.
+    // Check the cell, outside the edge it may not drive and outside the PML, and keep the
+    // source.
     void Sim2D::add_source(std::size_t i, std::size_t j, Component component, Waveform waveform)
     {
         const std::size_t nx = m_grid.nx();
@@ -152,6 +153,10 @@ namespace fdtd::TMz
             (component == Component::Hx && j + 1 == ny) ||
             (component == Component::Hy && i + 1 == nx)) {
             throw std::invalid_argument("Sim2D: source on a cell that is never updated");
+        }
+        const std::size_t pml = pml_thickness();
+        if (i < pml || j < pml || i + pml >= nx || j + pml >= ny) {
+            throw std::invalid_argument("Sim2D: source inside the PML");
         }
         m_sources.push_back({{component, m_grid.index(i, j)}, std::move(waveform)});
     }

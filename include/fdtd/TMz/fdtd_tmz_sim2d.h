@@ -179,9 +179,10 @@ namespace fdtd
              * @param j Row of the cell.
              * @param component Field the waveform is added to.
              * @param waveform Value at a time in seconds.
-             * @throws std::invalid_argument When the cell is outside the grid or is never
+             * @throws std::invalid_argument When the cell is outside the grid, is never
              *         updated (Ez on the edge under PEC or PML, Hx in the last row, Hy in the last
-             *         column), or the waveform is empty.
+             *         column) or lies in the PML (within pml_thickness() cells of the edge, for
+             *         any component), or the waveform is empty.
              */
             void add_source(std::size_t i, std::size_t j, Component component, Waveform waveform);
 

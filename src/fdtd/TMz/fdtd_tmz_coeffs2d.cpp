@@ -50,6 +50,7 @@ namespace fdtd::TMz
     Coeffs2D::Coeffs2D(const Material2D &material, double dt)
         : m_grid(material.grid())
         , m_dt(dt)
+        , m_pml_thickness(material.pml_thickness())
         , m_coeff_ez_x1(m_grid.size())
         , m_coeff_ez_x2(m_grid.size())
         , m_coeff_ez_y1(m_grid.size())
@@ -96,6 +97,12 @@ namespace fdtd::TMz
     double Coeffs2D::dt() const noexcept
     {
         return m_dt;
+    }
+
+    // Return the PML thickness.
+    std::size_t Coeffs2D::pml_thickness() const noexcept
+    {
+        return m_pml_thickness;
     }
 
     // Return a read-only view of the Ez decay factor along x.

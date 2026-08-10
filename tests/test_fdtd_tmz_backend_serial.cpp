@@ -25,7 +25,9 @@
 #include "fdtd/TMz/backends/fdtd_tmz_backend_serial.h"
 #include "fdtd/TMz/fdtd_tmz_courant.h"
 
-// Standard library for sizes and buffers.
+// Standard library for math, sizes and buffers.
+#include <algorithm>
+#include <cmath>
 #include <cstddef>
 #include <vector>
 
@@ -58,7 +60,7 @@ static void run(Fields2D &fields, const Coeffs2D &coeffs, Boundary boundary, int
 {
     for (int n = 0; n < nsteps; ++n) {
         fdtd::TMz::serial_update_h(fields, coeffs);
-        fdtd::TMz::serial_update_e(fields, coeffs);
+        fdtd::TMz::serial_update_e(fields, coeffs, 0);
         fdtd::TMz::serial_update_boundary(fields, coeffs, boundary);
     }
 }
@@ -84,7 +86,7 @@ TEST_CASE("Serial update of an Ez impulse", "[unit][serial_update]")
     CHECK(fields.hx()[grid.index(2, 3)] == FloatType(0));
     CHECK(fields.hy()[grid.index(3, 2)] == FloatType(0));
 
-    fdtd::TMz::serial_update_e(fields, coeffs);
+    fdtd::TMz::serial_update_e(fields, coeffs, 0);
     CHECK_THAT(double(fields.ez()[c]), WithinRel(0.5, TOL));
     CHECK_THAT(double(fields.ez()[grid.index(2, 3)]), WithinRel(0.125, TOL));
     CHECK_THAT(double(fields.ez()[grid.index(4, 3)]), WithinRel(0.125, TOL));
@@ -114,7 +116,7 @@ TEST_CASE("Serial update reads the coefficients by field", "[unit][serial_update
     }
 
     fdtd::TMz::serial_update_h(fields, coeffs);
-    fdtd::TMz::serial_update_e(fields, coeffs);
+    fdtd::TMz::serial_update_e(fields, coeffs, 0);
 
     CHECK(fields.hx()[grid.index(1, 1)] == FloatType(0.25));
     CHECK(fields.hy()[grid.index(1, 1)] == FloatType(0.125));
@@ -139,7 +141,7 @@ TEST_CASE("Serial update leaves the edges alone", "[unit][serial_update]")
     const std::size_t lastCol = grid.nx() - 1;
 
     fdtd::TMz::serial_update_h(fields, coeffs);
-    fdtd::TMz::serial_update_e(fields, coeffs);
+    fdtd::TMz::serial_update_e(fields, coeffs, 0);
 
     for (std::size_t i = 0; i < grid.nx(); ++i) {
         CHECK(fields.hx()[grid.index(i, lastRow)] == FloatType(0));
@@ -163,7 +165,7 @@ TEST_CASE("Serial update on degenerate grids", "[unit][serial_update]")
         fields.ez()[0] = 1;
 
         fdtd::TMz::serial_update_h(fields, coeffs);
-        fdtd::TMz::serial_update_e(fields, coeffs);
+        fdtd::TMz::serial_update_e(fields, coeffs, 0);
 
         CHECK(fields.ez()[0] == FloatType(1));
     }
@@ -265,4 +267,95 @@ TEST_CASE("Boundary on degenerate grids", "[unit][boundary]")
             CHECK(v == FloatType(0));
         }
     }
+}
+
+// Verify that the interior and split updates cover every non-edge cell once: with lossless
+// coefficients, Ezx = Ez and Ezy = 0 they match the plain update, Ez is the sum of its
+// parts in the PML and the parts stay as they were elsewhere.
+TEST_CASE("Split update matches the plain update without loss", "[unit][serial_update][pml]")
+{
+    const std::size_t pml = 3;
+    const Grid2D grid(12, 10);
+    const Coeffs2D coeffs(Material2D(grid), courant_dt(grid, 0.9));
+    Fields2D plain(grid);
+    Fields2D split(grid);
+    fill_distinct(plain);
+    fill_distinct(split);
+    for (std::size_t k = 0; k < grid.size(); ++k) {
+        split.ezx()[k] = split.ez()[k];
+    }
+
+    fdtd::TMz::serial_update_e(plain, coeffs, 0);
+    fdtd::TMz::serial_update_e(split, coeffs, pml);
+    fdtd::TMz::serial_update_pml(split, coeffs, pml);
+
+    double scale = 0;
+    for (std::size_t k = 0; k < grid.size(); ++k) {
+        scale = std::max(scale, std::abs(double(plain.ez()[k])));
+    }
+    for (std::size_t j = 0; j < grid.ny(); ++j) {
+        for (std::size_t i = 0; i < grid.nx(); ++i) {
+            const std::size_t k = grid.index(i, j);
+            const bool edge = i == 0 || j == 0 || i + 1 == grid.nx() || j + 1 == grid.ny();
+            const bool inside = i >= pml && j >= pml && i + pml < grid.nx() && j + pml < grid.ny();
+            CHECK_THAT(double(split.ez()[k]), WithinAbs(double(plain.ez()[k]), TOL * scale));
+            if (edge || inside) {
+                CHECK(split.ezx()[k] == FloatType(1 + k));
+                CHECK(split.ezy()[k] == FloatType(0));
+            } else {
+                CHECK(split.ezx()[k] != FloatType(1 + k));
+                CHECK(split.ez()[k] == split.ezx()[k] + split.ezy()[k]);
+            }
+        }
+    }
+}
+
+// Verify that each split part decays with the conductivity along its own direction: Ezx in
+// the left and right slabs, Ezy in the bottom and top ones and both in a corner.
+TEST_CASE("Split update damps each part along its direction", "[unit][serial_update][pml]")
+{
+    const Grid2D grid(20, 16);
+    Material2D material(grid);
+    material.set_pml(4, 3, 1e-6);
+    const Coeffs2D coeffs(material, courant_dt(grid, 0.9));
+    Fields2D fields(grid);
+    for (std::size_t k = 0; k < grid.size(); ++k) {
+        fields.ezx()[k] = 1;
+        fields.ezy()[k] = 1;
+    }
+
+    fdtd::TMz::serial_update_pml(fields, coeffs, 4);
+
+    const Fields2D &f = fields;
+    for (const std::size_t i : {std::size_t(1), std::size_t(18)}) {
+        CHECK(f.ezx()[grid.index(i, 8)] < FloatType(1));
+        CHECK(f.ezy()[grid.index(i, 8)] == FloatType(1));
+    }
+    for (const std::size_t j : {std::size_t(1), std::size_t(14)}) {
+        CHECK(f.ezx()[grid.index(10, j)] == FloatType(1));
+        CHECK(f.ezy()[grid.index(10, j)] < FloatType(1));
+    }
+    CHECK(f.ezx()[grid.index(1, 1)] < FloatType(1));
+    CHECK(f.ezy()[grid.index(1, 1)] < FloatType(1));
+    CHECK(f.ezx()[grid.index(10, 8)] == FloatType(1));
+    CHECK(f.ezy()[grid.index(10, 8)] == FloatType(1));
+}
+
+// Verify that PEC zeroes the split parts on the edge along with Ez.
+TEST_CASE("PEC boundary zeroes the edge split fields", "[unit][boundary][pml]")
+{
+    const Grid2D grid(6, 5);
+    const Coeffs2D coeffs(Material2D(grid), courant_dt(grid, 0.9));
+    Fields2D fields(grid);
+    for (std::size_t k = 0; k < grid.size(); ++k) {
+        fields.ezx()[k] = 1;
+        fields.ezy()[k] = 2;
+    }
+
+    fdtd::TMz::serial_update_boundary(fields, coeffs, Boundary::Pml);
+
+    CHECK(fields.ezx()[grid.index(0, 2)] == FloatType(0));
+    CHECK(fields.ezy()[grid.index(5, 4)] == FloatType(0));
+    CHECK(fields.ezx()[grid.index(3, 0)] == FloatType(0));
+    CHECK(fields.ezy()[grid.index(2, 2)] == FloatType(2));
 }

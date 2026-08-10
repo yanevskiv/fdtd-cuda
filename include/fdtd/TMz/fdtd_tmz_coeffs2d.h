@@ -102,6 +102,13 @@ namespace fdtd
             double dt() const noexcept;
 
             /**
+             * Thickness of the PML the material carried.
+             *
+             * @return Material2D::pml_thickness() of the material, zero without a PML.
+             */
+            std::size_t pml_thickness() const noexcept;
+
+            /**
              * Ez decay factor along x.
              *
              * @return Read-only view of the array.
@@ -163,6 +170,9 @@ namespace fdtd
 
             /** Time step in seconds. */
             double m_dt;
+
+            /** PML thickness of the material in cells. */
+            std::size_t m_pml_thickness;
 
             /** Ez decay factor along x, per cell. */
             AlignedBuffer<FloatType> m_coeff_ez_x1;
