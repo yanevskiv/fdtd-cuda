@@ -21,18 +21,18 @@
 // Function declarations.
 #include "fdtd/fdtd_driver.h"
 
+// Shared argument parsing.
+#include "fdtd/fdtd_args.h"
+
 // The simulation, its output files and the source waveform.
 #include "fdtd/TMz/fdtd_tmz_output.h"
 #include "fdtd/TMz/fdtd_tmz_sim2d.h"
 #include "fdtd/TMz/fdtd_tmz_waveform.h"
 
-// Standard library for parsing, formatting, math and errors.
-#include <charconv>
-#include <cmath>
+// Standard library for formatting and errors.
 #include <cstdio>
 #include <stdexcept>
 #include <string>
-#include <system_error>
 
 // Namespace for the fdtd library.
 namespace fdtd
@@ -40,81 +40,25 @@ namespace fdtd
     // Helpers private to this file.
     namespace
     {
-        // Parse a whole non-negative integer.
-        std::size_t parse_size(std::string_view name, std::string_view text)
-        {
-            std::size_t value = 0;
-            const auto [end, ec] = std::from_chars(text.data(), text.data() + text.size(), value);
-            if (ec != std::errc() || end != text.data() + text.size()) {
-                throw std::invalid_argument(std::string(name) +
-                                            ": not a whole number: " + std::string(text));
-            }
-            return value;
-        }
-
-        // Parse a whole positive finite number.
-        double parse_positive(std::string_view name, std::string_view text)
-        {
-            double value = 0;
-            const auto [end, ec] = std::from_chars(text.data(), text.data() + text.size(), value);
-            if (ec != std::errc() || end != text.data() + text.size() || !(value > 0) ||
-                !std::isfinite(value)) {
-                throw std::invalid_argument(std::string(name) +
-                                            ": not a positive number: " + std::string(text));
-            }
-            return value;
-        }
-
-        // Split comma-separated fields.
-        std::vector<std::string_view> split(std::string_view text)
-        {
-            std::vector<std::string_view> fields;
-            std::size_t start = 0;
-            while (true) {
-                const std::size_t comma = text.find(',', start);
-                fields.push_back(text.substr(start, comma - start));
-                if (comma == std::string_view::npos) {
-                    return fields;
-                }
-                start = comma + 1;
-            }
-        }
-
         // Parse I,J[,WIDTH] for a pulse.
         DriverPulseSpec parse_pulse(std::string_view text)
         {
-            const auto fields = split(text);
+            const auto fields = split_list_arg(text);
             if (fields.size() < 2 || fields.size() > 3) {
                 throw std::invalid_argument("--pulse: expected I,J[,WIDTH]: " + std::string(text));
             }
-            return {parse_size("--pulse", fields[0]), parse_size("--pulse", fields[1]),
-                    fields.size() == 3 ? parse_positive("--pulse", fields[2]) : 30.0};
+            return {parse_size_arg("--pulse", fields[0]), parse_size_arg("--pulse", fields[1]),
+                    fields.size() == 3 ? parse_positive_arg("--pulse", fields[2]) : 30.0};
         }
 
         // Parse I,J for a probe.
         DriverProbeSpec parse_probe(std::string_view text)
         {
-            const auto fields = split(text);
+            const auto fields = split_list_arg(text);
             if (fields.size() != 2) {
                 throw std::invalid_argument("--probe: expected I,J: " + std::string(text));
             }
-            return {parse_size("--probe", fields[0]), parse_size("--probe", fields[1])};
-        }
-
-        // Parse a boundary name.
-        TMz::Boundary parse_boundary(std::string_view text)
-        {
-            if (text == "pec") {
-                return TMz::Boundary::Pec;
-            }
-            if (text == "pmc") {
-                return TMz::Boundary::Pmc;
-            }
-            if (text == "pml") {
-                return TMz::Boundary::Pml;
-            }
-            throw std::invalid_argument("--boundary: expected pec, pmc or pml: " +
-                                        std::string(text));
+            return {parse_size_arg("--probe", fields[0]), parse_size_arg("--probe", fields[1])};
         }
 
         // Describe the boundary for the log, with the PML thickness when it has one.
@@ -131,50 +75,37 @@ namespace fdtd
             return "unknown";
         }
 
-        // Parse a backend name against every backend type.
-        TMz::BackendType parse_backend(std::string_view text)
-        {
-            for (const auto type :
-                 {TMz::BackendType::Serial, TMz::BackendType::OpenMP, TMz::BackendType::Cuda}) {
-                if (text == TMz::backend_name(type)) {
-                    return type;
-                }
-            }
-            throw std::invalid_argument("--backend: expected serial, openmp or cuda: " +
-                                        std::string(text));
-        }
-
         // Apply one option and its value to the settings.
         void apply(DriverOptions &options, std::string_view name, std::string_view value)
         {
             if (name == "--nx") {
-                options.nx = parse_size(name, value);
+                options.nx = parse_size_arg(name, value);
             } else if (name == "--ny") {
-                options.ny = parse_size(name, value);
+                options.ny = parse_size_arg(name, value);
             } else if (name == "--dx") {
-                options.dx = parse_positive(name, value);
+                options.dx = parse_positive_arg(name, value);
             } else if (name == "--dy") {
-                options.dy = parse_positive(name, value);
+                options.dy = parse_positive_arg(name, value);
             } else if (name == "--courant") {
-                options.courant = parse_positive(name, value);
+                options.courant = parse_positive_arg(name, value);
             } else if (name == "--steps") {
-                options.steps = parse_size(name, value);
+                options.steps = parse_size_arg(name, value);
             } else if (name == "--pulse") {
                 options.pulses.push_back(parse_pulse(value));
             } else if (name == "--probe") {
                 options.probes.push_back(parse_probe(value));
             } else if (name == "--snapshot-every") {
-                options.snapshot_every = parse_size(name, value);
+                options.snapshot_every = parse_size_arg(name, value);
             } else if (name == "--boundary") {
-                options.boundary = parse_boundary(value);
+                options.boundary = parse_boundary_arg(name, value);
             } else if (name == "--pml-thickness") {
-                options.pml_thickness = parse_size(name, value);
+                options.pml_thickness = parse_size_arg(name, value);
             } else if (name == "--pml-order") {
-                options.pml_order = parse_positive(name, value);
+                options.pml_order = parse_positive_arg(name, value);
             } else if (name == "--pml-reflection") {
-                options.pml_reflection = parse_positive(name, value);
+                options.pml_reflection = parse_positive_arg(name, value);
             } else if (name == "--backend") {
-                options.backend = parse_backend(value);
+                options.backend = parse_backend_arg(name, value);
             } else if (name == "--output") {
                 if (value.empty()) {
                     throw std::invalid_argument("--output: empty directory");
@@ -204,32 +135,19 @@ namespace fdtd
         }
     }
 
-    // Walk the arguments, splitting "--name=value" or taking the next argument as the value.
+    // Split the arguments, then set the flags and apply each option with its value.
     DriverOptions parse_driver_options(std::span<const std::string_view> args)
     {
+        static constexpr std::string_view FLAGS[] = {"-h", "--help", "-v", "--version"};
         DriverOptions options;
-        for (std::size_t k = 0; k < args.size(); ++k) {
-            const std::string_view arg = args[k];
-            if (arg == "-h" || arg == "--help") {
+        for (const Argument &arg : split_arguments(args, FLAGS)) {
+            if (arg.name == "-h" || arg.name == "--help") {
                 options.help = true;
-                continue;
-            }
-            if (arg == "-v" || arg == "--version") {
+            } else if (arg.name == "-v" || arg.name == "--version") {
                 options.version = true;
-                continue;
+            } else {
+                apply(options, arg.name, arg.value);
             }
-            if (!arg.starts_with("--")) {
-                throw std::invalid_argument("unexpected argument: " + std::string(arg));
-            }
-            const std::size_t equals = arg.find('=');
-            if (equals != std::string_view::npos) {
-                apply(options, arg.substr(0, equals), arg.substr(equals + 1));
-                continue;
-            }
-            if (k + 1 == args.size()) {
-                throw std::invalid_argument(std::string(arg) + ": missing value");
-            }
-            apply(options, arg, args[++k]);
         }
         return options;
     }

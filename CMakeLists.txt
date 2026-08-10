@@ -46,9 +46,13 @@ target_compile_definitions(fdtd PUBLIC
     FDTD_WITH_CUDA=$<BOOL:${FDTD_WITH_CUDA}>)
 target_link_libraries(fdtd PRIVATE $<BUILD_INTERFACE:fdtd_warnings>)
 
+# Argument parsing shared by the programs.
+add_library(fdtd_args STATIC src/fdtd/fdtd_args.cpp)
+target_link_libraries(fdtd_args PUBLIC fdtd::fdtd PRIVATE fdtd_warnings)
+
 # The command-line driver: a static library the tests link, and the fdtd program.
 add_library(fdtd_driver STATIC src/fdtd/fdtd_driver.cpp)
-target_link_libraries(fdtd_driver PUBLIC fdtd::fdtd PRIVATE fdtd_warnings)
+target_link_libraries(fdtd_driver PUBLIC fdtd::fdtd PRIVATE fdtd_args fdtd_warnings)
 
 add_executable(fdtd_cli src/main.cpp)
 set_target_properties(fdtd_cli PROPERTIES OUTPUT_NAME fdtd)
@@ -69,6 +73,7 @@ endif()
 # Installation and package export.
 install(DIRECTORY include/ DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}
     PATTERN backends EXCLUDE
+    PATTERN fdtd_args.h EXCLUDE
     PATTERN fdtd_driver.h EXCLUDE)
 install(TARGETS fdtd EXPORT fdtdTargets)
 install(TARGETS fdtd_cli RUNTIME DESTINATION ${CMAKE_INSTALL_BINDIR})

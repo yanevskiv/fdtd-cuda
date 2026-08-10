@@ -1,0 +1,159 @@
+/*
+ * C++ file for command-line argument parsing shared by the programs.
+ *
+ *
+ * Copyright (C) 2026 Ivan Janevski
+ *
+ * fdtd-cuda  is free software; you can redistribute it and/or modify it
+ * under the terms of the GNU General Public License as published by the
+ * Free  Software  Foundation;  either  version 3 of the License, or (at
+ * your option) any later version.
+ *
+ * fdtd-cuda  is  distributed  in  the  hope that it will be useful, but
+ * WITHOUT   ANY   WARRANTY;   without  even  the  implied  warranty  of
+ * MERCHANTABILITY  or  FITNESS  FOR  A  PARTICULAR PURPOSE. See the GNU
+ * General Public License for more details.
+ *
+ * You  should  have  received  a copy of the GNU General Public License
+ * along with fdtd-cuda; if not, see <https://www.gnu.org/licenses/>.
+ */
+
+// Function declarations.
+#include "fdtd/fdtd_args.h"
+
+// Standard library for parsing, math and errors.
+#include <algorithm>
+#include <charconv>
+#include <cmath>
+#include <stdexcept>
+#include <string>
+#include <system_error>
+
+// Namespace for the fdtd library.
+namespace fdtd
+{
+    // Helpers private to this file.
+    namespace
+    {
+        // Parse a whole finite number, or return NaN when the text is not one.
+        double parse_number(std::string_view text)
+        {
+            double value = 0;
+            const auto [end, ec] = std::from_chars(text.data(), text.data() + text.size(), value);
+            if (ec != std::errc() || end != text.data() + text.size() || !std::isfinite(value)) {
+                return std::nan("");
+            }
+            return value;
+        }
+    }
+
+    // Walk the arguments, taking flags alone and splitting "--name=value" or taking the
+    // next argument as the value.
+    std::vector<Argument> split_arguments(std::span<const std::string_view> args,
+                                          std::span<const std::string_view> flags)
+    {
+        std::vector<Argument> options;
+        for (std::size_t k = 0; k < args.size(); ++k) {
+            const std::string_view arg = args[k];
+            if (std::find(flags.begin(), flags.end(), arg) != flags.end()) {
+                options.push_back({arg, {}});
+                continue;
+            }
+            if (!arg.starts_with("--")) {
+                throw std::invalid_argument("unexpected argument: " + std::string(arg));
+            }
+            const std::size_t equals = arg.find('=');
+            if (equals != std::string_view::npos) {
+                const std::string_view name = arg.substr(0, equals);
+                if (std::find(flags.begin(), flags.end(), name) != flags.end()) {
+                    throw std::invalid_argument(std::string(name) + ": takes no value");
+                }
+                options.push_back({name, arg.substr(equals + 1)});
+                continue;
+            }
+            if (k + 1 == args.size()) {
+                throw std::invalid_argument(std::string(arg) + ": missing value");
+            }
+            options.push_back({arg, args[++k]});
+        }
+        return options;
+    }
+
+    // Parse with from_chars and require the whole text to be used.
+    std::size_t parse_size_arg(std::string_view name, std::string_view text)
+    {
+        std::size_t value = 0;
+        const auto [end, ec] = std::from_chars(text.data(), text.data() + text.size(), value);
+        if (ec != std::errc() || end != text.data() + text.size()) {
+            throw std::invalid_argument(std::string(name) +
+                                        ": not a whole number: " + std::string(text));
+        }
+        return value;
+    }
+
+    // Parse a finite number and require it above zero.
+    double parse_positive_arg(std::string_view name, std::string_view text)
+    {
+        const double value = parse_number(text);
+        if (!(value > 0)) {
+            throw std::invalid_argument(std::string(name) +
+                                        ": not a positive number: " + std::string(text));
+        }
+        return value;
+    }
+
+    // Parse a finite number and require it at or above zero.
+    double parse_nonnegative_arg(std::string_view name, std::string_view text)
+    {
+        const double value = parse_number(text);
+        if (!(value >= 0)) {
+            throw std::invalid_argument(std::string(name) +
+                                        ": not a non-negative number: " + std::string(text));
+        }
+        return value;
+    }
+
+    // Cut the text at every comma.
+    std::vector<std::string_view> split_list_arg(std::string_view text)
+    {
+        std::vector<std::string_view> fields;
+        std::size_t start = 0;
+        while (true) {
+            const std::size_t comma = text.find(',', start);
+            fields.push_back(text.substr(start, comma - start));
+            if (comma == std::string_view::npos) {
+                return fields;
+            }
+            start = comma + 1;
+        }
+    }
+
+    // Match the three boundary names.
+    TMz::Boundary parse_boundary_arg(std::string_view name, std::string_view text)
+    {
+        if (text == "pec") {
+            return TMz::Boundary::Pec;
+        }
+        if (text == "pmc") {
+            return TMz::Boundary::Pmc;
+        }
+        if (text == "pml") {
+            return TMz::Boundary::Pml;
+        }
+        throw std::invalid_argument(std::string(name) +
+                                    ": expected pec, pmc or pml: " + std::string(text));
+    }
+
+    // Match the name of every backend type.
+    TMz::BackendType parse_backend_arg(std::string_view name, std::string_view text)
+    {
+        for (const auto type :
+             {TMz::BackendType::Serial, TMz::BackendType::OpenMP, TMz::BackendType::Cuda}) {
+            if (text == TMz::backend_name(type)) {
+                return type;
+            }
+        }
+        throw std::invalid_argument(std::string(name) +
+                                    ": expected serial, openmp or cuda: " + std::string(text));
+    }
+}
