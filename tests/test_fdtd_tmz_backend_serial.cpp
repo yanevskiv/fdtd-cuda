@@ -25,8 +25,9 @@
 #include "fdtd/TMz/backends/fdtd_tmz_backend_serial.h"
 #include "fdtd/TMz/fdtd_tmz_courant.h"
 
-// Standard library for sizes.
+// Standard library for sizes and buffers.
 #include <cstddef>
+#include <vector>
 
 // Shorthand for the types under test.
 using Catch::Matchers::WithinAbs;
@@ -75,7 +76,7 @@ TEST_CASE("Serial update of an Ez impulse", "[unit][serial_update]")
     fields.ez()[c] = 1;
 
     fdtd::TMz::serial_update_h(fields, coeffs);
-    const double h = double(coeffs.ch2()[c]) / double(grid.dx());
+    const double h = double(coeffs.coeff_hy_2()[c]) / double(grid.dx());
     CHECK_THAT(double(fields.hy()[grid.index(2, 3)]), WithinRel(h, TOL));
     CHECK_THAT(double(fields.hy()[grid.index(3, 3)]), WithinRel(-h, TOL));
     CHECK_THAT(double(fields.hx()[grid.index(3, 2)]), WithinRel(-h, TOL));
@@ -90,6 +91,35 @@ TEST_CASE("Serial update of an Ez impulse", "[unit][serial_update]")
     CHECK_THAT(double(fields.ez()[grid.index(3, 2)]), WithinRel(0.125, TOL));
     CHECK_THAT(double(fields.ez()[grid.index(3, 4)]), WithinRel(0.125, TOL));
     CHECK_THAT(double(fields.ez()[grid.index(2, 2)]), WithinAbs(0.0, 1e-12));
+}
+
+// Verify that each update reads its own coefficient arrays: Hx the Hx pair, Hy the Hy
+// pair and the interior Ez the pair along x, with every curl factor zero so only the
+// decay factors act.
+TEST_CASE("Serial update reads the coefficients by field", "[unit][serial_update]")
+{
+    const Grid2D grid(4, 4);
+    const std::vector<FloatType> zero(grid.size(), FloatType(0));
+    const std::vector<FloatType> ezX(grid.size(), FloatType(0.5));
+    const std::vector<FloatType> ezY(grid.size(), FloatType(8));
+    const std::vector<FloatType> hx(grid.size(), FloatType(0.25));
+    const std::vector<FloatType> hy(grid.size(), FloatType(0.125));
+    const fdtd::TMz::CoeffsView coeffs(ezX.data(), zero.data(), ezY.data(), zero.data(), hx.data(),
+                                       zero.data(), hy.data(), zero.data());
+    Fields2D fields(grid);
+    for (std::size_t k = 0; k < grid.size(); ++k) {
+        fields.ez()[k] = 1;
+        fields.hx()[k] = 1;
+        fields.hy()[k] = 1;
+    }
+
+    fdtd::TMz::serial_update_h(fields, coeffs);
+    fdtd::TMz::serial_update_e(fields, coeffs);
+
+    CHECK(fields.hx()[grid.index(1, 1)] == FloatType(0.25));
+    CHECK(fields.hy()[grid.index(1, 1)] == FloatType(0.125));
+    CHECK(fields.ez()[grid.index(1, 1)] == FloatType(0.5));
+    CHECK(fields.ez()[grid.index(2, 2)] == FloatType(0.5));
 }
 
 // Verify that the update leaves the edge Ez, the last-row Hx and the last-column
@@ -175,8 +205,8 @@ TEST_CASE("PMC boundary reads H outside as zero", "[unit][boundary]")
     const auto hy = [&](std::size_t i, std::size_t j) {
         return double(fields.hy()[grid.index(i, j)]);
     };
-    const double ce1 = double(coeffs.ce1()[0]);
-    const double ce2 = double(coeffs.ce2()[0]);
+    const double ce1 = double(coeffs.coeff_ez_x1()[0]);
+    const double ce2 = double(coeffs.coeff_ez_x2()[0]);
     const double dx = double(grid.dx());
     const double dy = double(grid.dy());
 

@@ -34,17 +34,23 @@ namespace fdtd
     namespace TMz
     {
         /**
-         * Per-cell update coefficients of a material for a time step, as four aligned arrays.
+         * Per-cell update coefficients of a material for a time step, by field and direction.
          *
-         * With the semi-implicit loss terms a = sigma_e dt / (2 eps) and
-         * b = sigma_m dt / (2 mu), where eps = eps_r EPS_0 and mu = mu_r MU_0:
+         * Each pair is a decay factor and a curl factor for one loss term,
          *
-         *     Ce1 = (1 - a) / (1 + a),  Ce2 = (dt / eps) / (1 + a),
-         *     Ch1 = (1 - b) / (1 + b),  Ch2 = (dt / mu) / (1 + b).
+         *     C1 = (1 - a) / (1 + a),  C2 = (dt / eps) / (1 + a),  a = sigma dt / (2 eps),
          *
-         * Unlike fdtd-openmp, Ce2 and Ch2 leave out the cell size: the update applies
-         * 1/dx and 1/dy to the differences, so one Ch2 serves both Hx and Hy. Each array
-         * has grid().size() elements, indexed with Grid2D::index. Computed in double.
+         * with eps = eps_r EPS_0 for Ez and mu_r MU_0 in its place for Hx and Hy. The
+         * conductivity is the isotropic one of the material plus its PML profile along
+         * one direction, scaled by eps_r or mu_r:
+         *
+         *     Ez along x: sigma_e + eps_r sigma_e_x,  Ez along y: sigma_e + eps_r sigma_e_y,
+         *     Hx:         sigma_m + mu_r sigma_m_y,   Hy:         sigma_m + mu_r sigma_m_x.
+         *
+         * Without a PML the x and y pairs of Ez are equal, and Hx and Hy are equal. The curl
+         * factors leave out the cell size: the update applies 1/dx and 1/dy to the
+         * differences. Each array has grid().size() elements, indexed with Grid2D::index.
+         * Computed in double.
          */
         class Coeffs2D
         {
@@ -96,32 +102,60 @@ namespace fdtd
             double dt() const noexcept;
 
             /**
-             * Ez decay factor.
+             * Ez decay factor along x.
              *
-             * @return Read-only view of the Ce1 array.
+             * @return Read-only view of the array.
              */
-            std::span<const FloatType> ce1() const noexcept;
+            std::span<const FloatType> coeff_ez_x1() const noexcept;
 
             /**
-             * Ez curl factor, before 1/dx or 1/dy.
+             * Ez curl factor along x, before 1/dx.
              *
-             * @return Read-only view of the Ce2 array.
+             * @return Read-only view of the array.
              */
-            std::span<const FloatType> ce2() const noexcept;
+            std::span<const FloatType> coeff_ez_x2() const noexcept;
 
             /**
-             * Hx and Hy decay factor.
+             * Ez decay factor along y.
              *
-             * @return Read-only view of the Ch1 array.
+             * @return Read-only view of the array.
              */
-            std::span<const FloatType> ch1() const noexcept;
+            std::span<const FloatType> coeff_ez_y1() const noexcept;
 
             /**
-             * Hx and Hy curl factor, before 1/dx or 1/dy.
+             * Ez curl factor along y, before 1/dy.
              *
-             * @return Read-only view of the Ch2 array.
+             * @return Read-only view of the array.
              */
-            std::span<const FloatType> ch2() const noexcept;
+            std::span<const FloatType> coeff_ez_y2() const noexcept;
+
+            /**
+             * Hx decay factor.
+             *
+             * @return Read-only view of the array.
+             */
+            std::span<const FloatType> coeff_hx_1() const noexcept;
+
+            /**
+             * Hx curl factor, before 1/dy.
+             *
+             * @return Read-only view of the array.
+             */
+            std::span<const FloatType> coeff_hx_2() const noexcept;
+
+            /**
+             * Hy decay factor.
+             *
+             * @return Read-only view of the array.
+             */
+            std::span<const FloatType> coeff_hy_1() const noexcept;
+
+            /**
+             * Hy curl factor, before 1/dx.
+             *
+             * @return Read-only view of the array.
+             */
+            std::span<const FloatType> coeff_hy_2() const noexcept;
 
         private:
             /** Grid the coefficients live on. */
@@ -130,17 +164,29 @@ namespace fdtd
             /** Time step in seconds. */
             double m_dt;
 
-            /** Ez decay factor per cell. */
-            AlignedBuffer<FloatType> m_ce1;
+            /** Ez decay factor along x, per cell. */
+            AlignedBuffer<FloatType> m_coeff_ez_x1;
 
-            /** Ez curl factor per cell. */
-            AlignedBuffer<FloatType> m_ce2;
+            /** Ez curl factor along x, before 1/dx, per cell. */
+            AlignedBuffer<FloatType> m_coeff_ez_x2;
 
-            /** H decay factor per cell. */
-            AlignedBuffer<FloatType> m_ch1;
+            /** Ez decay factor along y, per cell. */
+            AlignedBuffer<FloatType> m_coeff_ez_y1;
 
-            /** H curl factor per cell. */
-            AlignedBuffer<FloatType> m_ch2;
+            /** Ez curl factor along y, before 1/dy, per cell. */
+            AlignedBuffer<FloatType> m_coeff_ez_y2;
+
+            /** Hx decay factor, per cell. */
+            AlignedBuffer<FloatType> m_coeff_hx_1;
+
+            /** Hx curl factor, before 1/dy, per cell. */
+            AlignedBuffer<FloatType> m_coeff_hx_2;
+
+            /** Hy decay factor, per cell. */
+            AlignedBuffer<FloatType> m_coeff_hy_1;
+
+            /** Hy curl factor, before 1/dx, per cell. */
+            AlignedBuffer<FloatType> m_coeff_hy_2;
         };
     }
 }

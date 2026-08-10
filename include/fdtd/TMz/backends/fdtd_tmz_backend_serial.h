@@ -37,7 +37,7 @@ namespace fdtd
     namespace TMz
     {
         /**
-         * Pointers to the four coefficient arrays the serial routines read.
+         * Pointers to the eight coefficient arrays the serial routines read.
          *
          * The routines take these rather than a Coeffs2D so the backend can keep its own
          * arrays, as a GPU backend keeps device arrays. A Coeffs2D converts implicitly.
@@ -52,27 +52,44 @@ namespace fdtd
             CoeffsView(const Coeffs2D &coeffs) noexcept; // NOLINT(google-explicit-constructor)
 
             /**
-             * View four arrays over the same grid.
+             * View eight arrays over the same grid, laid out as in Coeffs2D.
              *
-             * @param ce1Data Ez decay factors.
-             * @param ce2Data Ez curl factors.
-             * @param ch1Data H decay factors.
-             * @param ch2Data H curl factors.
+             * @param ezX1 Ez decay factors along x.
+             * @param ezX2 Ez curl factors along x.
+             * @param ezY1 Ez decay factors along y.
+             * @param ezY2 Ez curl factors along y.
+             * @param hx1 Hx decay factors.
+             * @param hx2 Hx curl factors.
+             * @param hy1 Hy decay factors.
+             * @param hy2 Hy curl factors.
              */
-            CoeffsView(const FloatType *ce1Data, const FloatType *ce2Data, const FloatType *ch1Data,
-                       const FloatType *ch2Data) noexcept;
+            CoeffsView(const FloatType *ezX1, const FloatType *ezX2, const FloatType *ezY1,
+                       const FloatType *ezY2, const FloatType *hx1, const FloatType *hx2,
+                       const FloatType *hy1, const FloatType *hy2) noexcept;
 
-            /** Ez decay factors. */
-            const FloatType *ce1;
+            /** Ez decay factors along x. */
+            const FloatType *coeff_ez_x1;
 
-            /** Ez curl factors, before 1/dx or 1/dy. */
-            const FloatType *ce2;
+            /** Ez curl factors along x, before 1/dx. */
+            const FloatType *coeff_ez_x2;
 
-            /** H decay factors. */
-            const FloatType *ch1;
+            /** Ez decay factors along y. */
+            const FloatType *coeff_ez_y1;
 
-            /** H curl factors, before 1/dx or 1/dy. */
-            const FloatType *ch2;
+            /** Ez curl factors along y, before 1/dy. */
+            const FloatType *coeff_ez_y2;
+
+            /** Hx decay factors. */
+            const FloatType *coeff_hx_1;
+
+            /** Hx curl factors, before 1/dy. */
+            const FloatType *coeff_hx_2;
+
+            /** Hy decay factors. */
+            const FloatType *coeff_hy_1;
+
+            /** Hy curl factors, before 1/dx. */
+            const FloatType *coeff_hy_2;
         };
 
         /**
@@ -80,8 +97,8 @@ namespace fdtd
          *
          * With Hx(i, j) at (i, j + 1/2) and Hy(i, j) at (i + 1/2, j):
          *
-         *     Hx(i, j) = Ch1 Hx(i, j) - Ch2 / dy (Ez(i, j + 1) - Ez(i, j)),  j < ny - 1,
-         *     Hy(i, j) = Ch1 Hy(i, j) + Ch2 / dx (Ez(i + 1, j) - Ez(i, j)),  i < nx - 1,
+         *     Hx(i, j) = Chx1 Hx(i, j) - Chx2 / dy (Ez(i, j + 1) - Ez(i, j)),  j < ny - 1,
+         *     Hy(i, j) = Chy1 Hy(i, j) + Chy2 / dx (Ez(i + 1, j) - Ez(i, j)),  i < nx - 1,
          *
          * with the coefficients of cell (i, j). Hx on the last row and Hy on the last
          * column lie outside the domain and are left untouched. Inner loop along x.
@@ -94,11 +111,12 @@ namespace fdtd
         /**
          * Advance Ez by one step from the curl of H.
          *
-         *     Ez(i, j) = Ce1 Ez(i, j) + Ce2 ((Hy(i, j) - Hy(i - 1, j)) / dx
-         *                                  - (Hx(i, j) - Hx(i, j - 1)) / dy)
+         *     Ez(i, j) = Cex1 Ez(i, j) + Cex2 ((Hy(i, j) - Hy(i - 1, j)) / dx
+         *                                    - (Hx(i, j) - Hx(i, j - 1)) / dy)
          *
-         * over the interior 0 < i < nx - 1, 0 < j < ny - 1. The edge Ez is left to the
-         * outer boundary. Inner loop along x.
+         * over the interior 0 < i < nx - 1, 0 < j < ny - 1, with the x coefficients, which
+         * equal the y ones outside a PML. The edge Ez is left to the outer boundary. Inner
+         * loop along x.
          *
          * @param fields Fields to update.
          * @param coeffs Coefficient arrays on the same grid as the fields.
@@ -108,9 +126,9 @@ namespace fdtd
         /**
          * Update the edge Ez, which serial_update_e leaves alone; call it right after.
          *
-         * Under PEC and PML the edge Ez is set to zero. Under PMC it takes the interior update
-         * with every H outside the domain read as zero: Hy(-1, j) and Hy(nx - 1, j),
-         * Hx(i, -1) and Hx(i, ny - 1). Corners combine both.
+         * Under PEC and PML the edge Ez is set to zero. Under PMC it takes the interior update,
+         * with the x coefficients, and every H outside the domain read as zero: Hy(-1, j) and Hy(nx
+         * - 1, j), Hx(i, -1) and Hx(i, ny - 1). Corners combine both.
          *
          * @param fields Fields to update.
          * @param coeffs Coefficient arrays on the same grid as the fields.
@@ -232,17 +250,29 @@ namespace fdtd
             /** Whether coefficients were uploaded. */
             bool m_has_coeffs = false;
 
-            /** The backend's copy of Ce1. */
-            AlignedBuffer<FloatType> m_ce1;
+            /** The backend's copy of the Ez decay factors along x. */
+            AlignedBuffer<FloatType> m_coeff_ez_x1;
 
-            /** The backend's copy of Ce2. */
-            AlignedBuffer<FloatType> m_ce2;
+            /** The backend's copy of the Ez curl factors along x. */
+            AlignedBuffer<FloatType> m_coeff_ez_x2;
 
-            /** The backend's copy of Ch1. */
-            AlignedBuffer<FloatType> m_ch1;
+            /** The backend's copy of the Ez decay factors along y. */
+            AlignedBuffer<FloatType> m_coeff_ez_y1;
 
-            /** The backend's copy of Ch2. */
-            AlignedBuffer<FloatType> m_ch2;
+            /** The backend's copy of the Ez curl factors along y. */
+            AlignedBuffer<FloatType> m_coeff_ez_y2;
+
+            /** The backend's copy of the Hx decay factors. */
+            AlignedBuffer<FloatType> m_coeff_hx_1;
+
+            /** The backend's copy of the Hx curl factors. */
+            AlignedBuffer<FloatType> m_coeff_hx_2;
+
+            /** The backend's copy of the Hy decay factors. */
+            AlignedBuffer<FloatType> m_coeff_hy_1;
+
+            /** The backend's copy of the Hy curl factors. */
+            AlignedBuffer<FloatType> m_coeff_hy_2;
 
             /** Outer boundary condition. */
             Boundary m_boundary = Boundary::Pec;

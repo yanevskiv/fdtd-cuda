@@ -32,19 +32,26 @@ namespace fdtd::TMz
 {
     // Take the arrays of a coefficient set.
     CoeffsView::CoeffsView(const Coeffs2D &coeffs) noexcept
-        : CoeffsView(coeffs.ce1().data(), coeffs.ce2().data(), coeffs.ch1().data(),
-                     coeffs.ch2().data())
+        : CoeffsView(coeffs.coeff_ez_x1().data(), coeffs.coeff_ez_x2().data(),
+                     coeffs.coeff_ez_y1().data(), coeffs.coeff_ez_y2().data(),
+                     coeffs.coeff_hx_1().data(), coeffs.coeff_hx_2().data(),
+                     coeffs.coeff_hy_1().data(), coeffs.coeff_hy_2().data())
     {
         // Empty.
     }
 
-    // Take four arrays.
-    CoeffsView::CoeffsView(const FloatType *ce1Data, const FloatType *ce2Data,
-                           const FloatType *ch1Data, const FloatType *ch2Data) noexcept
-        : ce1(ce1Data)
-        , ce2(ce2Data)
-        , ch1(ch1Data)
-        , ch2(ch2Data)
+    // Take eight arrays.
+    CoeffsView::CoeffsView(const FloatType *ezX1, const FloatType *ezX2, const FloatType *ezY1,
+                           const FloatType *ezY2, const FloatType *hx1, const FloatType *hx2,
+                           const FloatType *hy1, const FloatType *hy2) noexcept
+        : coeff_ez_x1(ezX1)
+        , coeff_ez_x2(ezX2)
+        , coeff_ez_y1(ezY1)
+        , coeff_ez_y2(ezY2)
+        , coeff_hx_1(hx1)
+        , coeff_hx_2(hx2)
+        , coeff_hy_1(hy1)
+        , coeff_hy_2(hy2)
     {
         // Empty.
     }
@@ -62,14 +69,16 @@ namespace fdtd::TMz
         const FloatType *__restrict Ez = fields.ez().data();
         FloatType *__restrict Hx = fields.hx().data();
         FloatType *__restrict Hy = fields.hy().data();
-        const FloatType *__restrict Ch1 = coeffs.ch1;
-        const FloatType *__restrict Ch2 = coeffs.ch2;
+        const FloatType *__restrict Chx1 = coeffs.coeff_hx_1;
+        const FloatType *__restrict Chx2 = coeffs.coeff_hx_2;
+        const FloatType *__restrict Chy1 = coeffs.coeff_hy_1;
+        const FloatType *__restrict Chy2 = coeffs.coeff_hy_2;
 
         for (std::size_t j = 0; j + 1 < ny; ++j) {
             const std::size_t row = j * pitch;
             for (std::size_t i = 0; i < nx; ++i) {
                 const std::size_t k = row + i;
-                Hx[k] = Ch1[k] * Hx[k] - Ch2[k] * invDy * (Ez[k + pitch] - Ez[k]);
+                Hx[k] = Chx1[k] * Hx[k] - Chx2[k] * invDy * (Ez[k + pitch] - Ez[k]);
             }
         }
 
@@ -77,7 +86,7 @@ namespace fdtd::TMz
             const std::size_t row = j * pitch;
             for (std::size_t i = 0; i + 1 < nx; ++i) {
                 const std::size_t k = row + i;
-                Hy[k] = Ch1[k] * Hy[k] + Ch2[k] * invDx * (Ez[k + 1] - Ez[k]);
+                Hy[k] = Chy1[k] * Hy[k] + Chy2[k] * invDx * (Ez[k + 1] - Ez[k]);
             }
         }
     }
@@ -95,8 +104,8 @@ namespace fdtd::TMz
         FloatType *__restrict Ez = fields.ez().data();
         const FloatType *__restrict Hx = fields.hx().data();
         const FloatType *__restrict Hy = fields.hy().data();
-        const FloatType *__restrict Ce1 = coeffs.ce1;
-        const FloatType *__restrict Ce2 = coeffs.ce2;
+        const FloatType *__restrict Cex1 = coeffs.coeff_ez_x1;
+        const FloatType *__restrict Cex2 = coeffs.coeff_ez_x2;
 
         for (std::size_t j = 1; j + 1 < ny; ++j) {
             const std::size_t row = j * pitch;
@@ -104,7 +113,7 @@ namespace fdtd::TMz
                 const std::size_t k = row + i;
                 const FloatType curl =
                     (Hy[k] - Hy[k - 1]) * invDx - (Hx[k] - Hx[k - pitch]) * invDy;
-                Ez[k] = Ce1[k] * Ez[k] + Ce2[k] * curl;
+                Ez[k] = Cex1[k] * Ez[k] + Cex2[k] * curl;
             }
         }
     }
@@ -149,8 +158,8 @@ namespace fdtd::TMz
         const FloatType invDy = FloatType(1) / grid.dy();
         const FloatType *__restrict Hx = fields.hx().data();
         const FloatType *__restrict Hy = fields.hy().data();
-        const FloatType *__restrict Ce1 = coeffs.ce1;
-        const FloatType *__restrict Ce2 = coeffs.ce2;
+        const FloatType *__restrict Cex1 = coeffs.coeff_ez_x1;
+        const FloatType *__restrict Cex2 = coeffs.coeff_ez_x2;
 
         for_each_edge(grid, [&](std::size_t i, std::size_t j) {
             const std::size_t k = grid.index(i, j);
@@ -159,7 +168,7 @@ namespace fdtd::TMz
             const FloatType hxTop = j + 1 < ny ? Hx[k] : FloatType(0);
             const FloatType hxBottom = j > 0 ? Hx[k - pitch] : FloatType(0);
             const FloatType curl = (hyRight - hyLeft) * invDx - (hxTop - hxBottom) * invDy;
-            Ez[k] = Ce1[k] * Ez[k] + Ce2[k] * curl;
+            Ez[k] = Cex1[k] * Ez[k] + Cex2[k] * curl;
         });
     }
 
@@ -222,10 +231,14 @@ namespace fdtd::TMz
     // Allocate the backend's fields and coefficient arrays.
     SerialBackend::SerialBackend(const Grid2D &grid)
         : m_fields(grid)
-        , m_ce1(grid.size())
-        , m_ce2(grid.size())
-        , m_ch1(grid.size())
-        , m_ch2(grid.size())
+        , m_coeff_ez_x1(grid.size())
+        , m_coeff_ez_x2(grid.size())
+        , m_coeff_ez_y1(grid.size())
+        , m_coeff_ez_y2(grid.size())
+        , m_coeff_hx_1(grid.size())
+        , m_coeff_hx_2(grid.size())
+        , m_coeff_hy_1(grid.size())
+        , m_coeff_hy_2(grid.size())
     {
         // Empty.
     }
@@ -270,10 +283,14 @@ namespace fdtd::TMz
     void SerialBackend::upload(const Coeffs2D &coeffs)
     {
         require_same_grid(grid(), coeffs.grid());
-        copy_field(coeffs.ce1(), {m_ce1.data(), m_ce1.size()});
-        copy_field(coeffs.ce2(), {m_ce2.data(), m_ce2.size()});
-        copy_field(coeffs.ch1(), {m_ch1.data(), m_ch1.size()});
-        copy_field(coeffs.ch2(), {m_ch2.data(), m_ch2.size()});
+        copy_field(coeffs.coeff_ez_x1(), {m_coeff_ez_x1.data(), m_coeff_ez_x1.size()});
+        copy_field(coeffs.coeff_ez_x2(), {m_coeff_ez_x2.data(), m_coeff_ez_x2.size()});
+        copy_field(coeffs.coeff_ez_y1(), {m_coeff_ez_y1.data(), m_coeff_ez_y1.size()});
+        copy_field(coeffs.coeff_ez_y2(), {m_coeff_ez_y2.data(), m_coeff_ez_y2.size()});
+        copy_field(coeffs.coeff_hx_1(), {m_coeff_hx_1.data(), m_coeff_hx_1.size()});
+        copy_field(coeffs.coeff_hx_2(), {m_coeff_hx_2.data(), m_coeff_hx_2.size()});
+        copy_field(coeffs.coeff_hy_1(), {m_coeff_hy_1.data(), m_coeff_hy_1.size()});
+        copy_field(coeffs.coeff_hy_2(), {m_coeff_hy_2.data(), m_coeff_hy_2.size()});
         m_has_coeffs = true;
     }
 
@@ -322,7 +339,9 @@ namespace fdtd::TMz
         if (!m_has_coeffs) {
             throw std::logic_error("SerialBackend: step before the coefficients were uploaded");
         }
-        const CoeffsView coeffs(m_ce1.data(), m_ce2.data(), m_ch1.data(), m_ch2.data());
+        const CoeffsView coeffs(m_coeff_ez_x1.data(), m_coeff_ez_x2.data(), m_coeff_ez_y1.data(),
+                                m_coeff_ez_y2.data(), m_coeff_hx_1.data(), m_coeff_hx_2.data(),
+                                m_coeff_hy_1.data(), m_coeff_hy_2.data());
         m_records.reserve(m_records.size() + nsteps * m_probes.size());
         for (std::size_t n = 0; n < nsteps; ++n) {
             const FloatType *row = values.data() + n * points.size();

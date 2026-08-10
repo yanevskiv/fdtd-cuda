@@ -53,16 +53,17 @@ TEST_CASE("Coeffs2D in vacuum", "[unit][coeffs2d]")
     REQUIRE(coeffs.grid().nx() == 5);
     REQUIRE(coeffs.grid().ny() == 4);
     CHECK(coeffs.dt() == dt);
-    REQUIRE(coeffs.ce1().size() == grid.size());
-    REQUIRE(coeffs.ce2().size() == grid.size());
-    REQUIRE(coeffs.ch1().size() == grid.size());
-    REQUIRE(coeffs.ch2().size() == grid.size());
+    for (const auto array :
+         {coeffs.coeff_ez_x1(), coeffs.coeff_ez_x2(), coeffs.coeff_ez_y1(), coeffs.coeff_ez_y2(),
+          coeffs.coeff_hx_1(), coeffs.coeff_hx_2(), coeffs.coeff_hy_1(), coeffs.coeff_hy_2()}) {
+        REQUIRE(array.size() == grid.size());
+    }
 
     for (std::size_t k = 0; k < grid.size(); ++k) {
-        CHECK(coeffs.ce1()[k] == fdtd::FloatType(1));
-        CHECK(coeffs.ch1()[k] == fdtd::FloatType(1));
-        CHECK_THAT(double(coeffs.ce2()[k]), WithinRel(dt / fdtd::EPS_0, TOL));
-        CHECK_THAT(double(coeffs.ch2()[k]), WithinRel(dt / fdtd::MU_0, TOL));
+        CHECK(coeffs.coeff_ez_x1()[k] == fdtd::FloatType(1));
+        CHECK(coeffs.coeff_hx_1()[k] == fdtd::FloatType(1));
+        CHECK_THAT(double(coeffs.coeff_ez_x2()[k]), WithinRel(dt / fdtd::EPS_0, TOL));
+        CHECK_THAT(double(coeffs.coeff_hx_2()[k]), WithinRel(dt / fdtd::MU_0, TOL));
     }
 }
 
@@ -83,19 +84,135 @@ TEST_CASE("Coeffs2D in a lossy medium", "[unit][coeffs2d]")
     const double b = 300 * dt / (2 * mu);
     const std::size_t k = grid.index(1, 1);
 
-    CHECK_THAT(double(coeffs.ce1()[k]), WithinRel((1 - a) / (1 + a), TOL));
-    CHECK_THAT(double(coeffs.ce2()[k]), WithinRel(dt / eps / (1 + a), TOL));
-    CHECK_THAT(double(coeffs.ch1()[k]), WithinRel((1 - b) / (1 + b), TOL));
-    CHECK_THAT(double(coeffs.ch2()[k]), WithinRel(dt / mu / (1 + b), TOL));
-    CHECK(coeffs.ce1()[k] < fdtd::FloatType(1));
-    CHECK(coeffs.ch1()[k] < fdtd::FloatType(1));
+    CHECK_THAT(double(coeffs.coeff_ez_x1()[k]), WithinRel((1 - a) / (1 + a), TOL));
+    CHECK_THAT(double(coeffs.coeff_ez_x2()[k]), WithinRel(dt / eps / (1 + a), TOL));
+    CHECK_THAT(double(coeffs.coeff_hx_1()[k]), WithinRel((1 - b) / (1 + b), TOL));
+    CHECK_THAT(double(coeffs.coeff_hx_2()[k]), WithinRel(dt / mu / (1 + b), TOL));
+    CHECK(coeffs.coeff_ez_x1()[k] < fdtd::FloatType(1));
+    CHECK(coeffs.coeff_hx_1()[k] < fdtd::FloatType(1));
 
     const std::size_t v = grid.index(0, 0);
-    CHECK(coeffs.ce1()[v] == fdtd::FloatType(1));
-    CHECK_THAT(double(coeffs.ce2()[v]), WithinRel(dt / fdtd::EPS_0, TOL));
+    CHECK(coeffs.coeff_ez_x1()[v] == fdtd::FloatType(1));
+    CHECK_THAT(double(coeffs.coeff_ez_x2()[v]), WithinRel(dt / fdtd::EPS_0, TOL));
 }
 
-// Verify that a perfect-conductor limit drives Ce1 to -1 and Ce2 far below vacuum.
+// Verify that without a PML the x and y copies are equal, and equal bit for bit to the
+// single pair per field computed before the split.
+TEST_CASE("Coeffs2D without a PML matches the isotropic coefficients", "[unit][coeffs2d]")
+{
+    const Grid2D grid(6, 5);
+    Material2D material(grid);
+    material.fill_rect(1, 1, 4, 3, {4, 2, 0.5F, 300});
+    material.fill_circle(3, 2, 1.5, {2.5F, 1, 0.01F, 0});
+    const double dt = courant_dt(grid, 0.9);
+    const Coeffs2D coeffs(material, dt);
+
+    for (std::size_t k = 0; k < grid.size(); ++k) {
+        const double eps = double(material.eps_r()[k]) * fdtd::EPS_0;
+        const double mu = double(material.mu_r()[k]) * fdtd::MU_0;
+        const double a = double(material.sigma_e()[k]) * dt / (2.0 * eps);
+        const double b = double(material.sigma_m()[k]) * dt / (2.0 * mu);
+        const auto ce1 = fdtd::FloatType((1.0 - a) / (1.0 + a));
+        const auto ce2 = fdtd::FloatType((dt / eps) / (1.0 + a));
+        const auto ch1 = fdtd::FloatType((1.0 - b) / (1.0 + b));
+        const auto ch2 = fdtd::FloatType((dt / mu) / (1.0 + b));
+
+        CHECK(coeffs.coeff_ez_x1()[k] == ce1);
+        CHECK(coeffs.coeff_ez_x2()[k] == ce2);
+        CHECK(coeffs.coeff_ez_y1()[k] == ce1);
+        CHECK(coeffs.coeff_ez_y2()[k] == ce2);
+        CHECK(coeffs.coeff_hx_1()[k] == ch1);
+        CHECK(coeffs.coeff_hx_2()[k] == ch2);
+        CHECK(coeffs.coeff_hy_1()[k] == ch1);
+        CHECK(coeffs.coeff_hy_2()[k] == ch2);
+    }
+}
+
+// Verify that each pair takes the PML profile of its own direction: Ez along x and Hy
+// decay only in the left and right layers, Ez along y and Hx only in the bottom and top
+// ones, and the interior keeps vacuum.
+TEST_CASE("Coeffs2D follows the PML profiles by direction", "[unit][coeffs2d][pml]")
+{
+    const Grid2D grid(20, 16);
+    Material2D material(grid);
+    material.set_pml(4, 3, 1e-6);
+    const double dt = courant_dt(grid, 0.9);
+    const Coeffs2D coeffs(material, dt);
+
+    for (std::size_t k = 0; k < grid.size(); ++k) {
+        const double ax = double(material.sigma_e_x()[k]) * dt / (2.0 * fdtd::EPS_0);
+        const double ay = double(material.sigma_e_y()[k]) * dt / (2.0 * fdtd::EPS_0);
+        const double bx = double(material.sigma_m_x()[k]) * dt / (2.0 * fdtd::MU_0);
+        const double by = double(material.sigma_m_y()[k]) * dt / (2.0 * fdtd::MU_0);
+        CHECK_THAT(double(coeffs.coeff_ez_x1()[k]), WithinRel((1 - ax) / (1 + ax), TOL));
+        CHECK_THAT(double(coeffs.coeff_ez_x2()[k]), WithinRel(dt / fdtd::EPS_0 / (1 + ax), TOL));
+        CHECK_THAT(double(coeffs.coeff_ez_y1()[k]), WithinRel((1 - ay) / (1 + ay), TOL));
+        CHECK_THAT(double(coeffs.coeff_ez_y2()[k]), WithinRel(dt / fdtd::EPS_0 / (1 + ay), TOL));
+        CHECK_THAT(double(coeffs.coeff_hx_1()[k]), WithinRel((1 - by) / (1 + by), TOL));
+        CHECK_THAT(double(coeffs.coeff_hx_2()[k]), WithinRel(dt / fdtd::MU_0 / (1 + by), TOL));
+        CHECK_THAT(double(coeffs.coeff_hy_1()[k]), WithinRel((1 - bx) / (1 + bx), TOL));
+        CHECK_THAT(double(coeffs.coeff_hy_2()[k]), WithinRel(dt / fdtd::MU_0 / (1 + bx), TOL));
+    }
+
+    const std::size_t left = grid.index(0, 8);
+    CHECK(coeffs.coeff_ez_x1()[left] < fdtd::FloatType(1));
+    CHECK(coeffs.coeff_hy_1()[left] < fdtd::FloatType(1));
+    CHECK(coeffs.coeff_ez_y1()[left] == fdtd::FloatType(1));
+    CHECK(coeffs.coeff_hx_1()[left] == fdtd::FloatType(1));
+
+    const std::size_t bottom = grid.index(10, 0);
+    CHECK(coeffs.coeff_ez_y1()[bottom] < fdtd::FloatType(1));
+    CHECK(coeffs.coeff_hx_1()[bottom] < fdtd::FloatType(1));
+    CHECK(coeffs.coeff_ez_x1()[bottom] == fdtd::FloatType(1));
+    CHECK(coeffs.coeff_hy_1()[bottom] == fdtd::FloatType(1));
+
+    const std::size_t corner = grid.index(0, 0);
+    CHECK(coeffs.coeff_ez_x1()[corner] < fdtd::FloatType(1));
+    CHECK(coeffs.coeff_ez_y1()[corner] < fdtd::FloatType(1));
+
+    const std::size_t centre = grid.index(10, 8);
+    CHECK(coeffs.coeff_ez_x1()[centre] == fdtd::FloatType(1));
+    CHECK(coeffs.coeff_ez_y1()[centre] == fdtd::FloatType(1));
+    CHECK(coeffs.coeff_hx_1()[centre] == fdtd::FloatType(1));
+    CHECK(coeffs.coeff_hy_1()[centre] == fdtd::FloatType(1));
+}
+
+// Verify that the PML conductivities scale with eps_r and mu_r, so that in a medium the
+// decay factors match those of vacuum and only the curl factors change, by 1/eps_r and
+// 1/mu_r.
+TEST_CASE("Coeffs2D scales the PML by the medium", "[unit][coeffs2d][pml]")
+{
+    const Grid2D grid(20, 16);
+    Material2D vacuum(grid);
+    vacuum.set_pml(4, 3, 1e-6);
+    Material2D medium = vacuum;
+    medium.fill({4, 2, 0, 0});
+    const double dt = courant_dt(grid, 0.5);
+    const Coeffs2D inVacuum(vacuum, dt);
+    const Coeffs2D inMedium(medium, dt);
+
+    for (const std::size_t k : {grid.index(0, 8), grid.index(10, 0), grid.index(1, 1)}) {
+        CHECK_THAT(double(inMedium.coeff_ez_x1()[k]),
+                   WithinRel(double(inVacuum.coeff_ez_x1()[k]), TOL));
+        CHECK_THAT(double(inMedium.coeff_ez_y1()[k]),
+                   WithinRel(double(inVacuum.coeff_ez_y1()[k]), TOL));
+        CHECK_THAT(double(inMedium.coeff_hx_1()[k]),
+                   WithinRel(double(inVacuum.coeff_hx_1()[k]), TOL));
+        CHECK_THAT(double(inMedium.coeff_hy_1()[k]),
+                   WithinRel(double(inVacuum.coeff_hy_1()[k]), TOL));
+        CHECK_THAT(double(inMedium.coeff_ez_x2()[k]),
+                   WithinRel(double(inVacuum.coeff_ez_x2()[k]) / 4, TOL));
+        CHECK_THAT(double(inMedium.coeff_ez_y2()[k]),
+                   WithinRel(double(inVacuum.coeff_ez_y2()[k]) / 4, TOL));
+        CHECK_THAT(double(inMedium.coeff_hx_2()[k]),
+                   WithinRel(double(inVacuum.coeff_hx_2()[k]) / 2, TOL));
+        CHECK_THAT(double(inMedium.coeff_hy_2()[k]),
+                   WithinRel(double(inVacuum.coeff_hy_2()[k]) / 2, TOL));
+    }
+}
+
+// Verify that a perfect-conductor limit drives the Ez decay to -1 and its curl factor
+// far below vacuum.
 TEST_CASE("Coeffs2D approaches a conductor", "[unit][coeffs2d]")
 {
     const Grid2D grid(1, 1);
@@ -103,8 +220,8 @@ TEST_CASE("Coeffs2D approaches a conductor", "[unit][coeffs2d]")
     material.fill({1, 1, 1e12F, 0});
     const Coeffs2D coeffs(material, 1e-12);
 
-    CHECK_THAT(double(coeffs.ce1()[0]), WithinAbs(-1.0, 1e-6));
-    CHECK(double(coeffs.ce2()[0]) < 1e-9 * (1e-12 / fdtd::EPS_0));
+    CHECK_THAT(double(coeffs.coeff_ez_x1()[0]), WithinAbs(-1.0, 1e-6));
+    CHECK(double(coeffs.coeff_ez_x2()[0]) < 1e-9 * (1e-12 / fdtd::EPS_0));
 }
 
 // Verify that time steps that are not positive and finite are rejected.
