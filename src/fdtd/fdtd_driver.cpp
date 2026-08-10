@@ -110,7 +110,25 @@ namespace fdtd
             if (text == "pmc") {
                 return TMz::Boundary::Pmc;
             }
-            throw std::invalid_argument("--boundary: expected pec or pmc: " + std::string(text));
+            if (text == "pml") {
+                return TMz::Boundary::Pml;
+            }
+            throw std::invalid_argument("--boundary: expected pec, pmc or pml: " +
+                                        std::string(text));
+        }
+
+        // Describe the boundary for the log, with the PML thickness when it has one.
+        std::string describe_boundary(const DriverOptions &options)
+        {
+            switch (options.boundary) {
+                case TMz::Boundary::Pec:
+                    return "pec";
+                case TMz::Boundary::Pmc:
+                    return "pmc";
+                case TMz::Boundary::Pml:
+                    return "pml (" + std::to_string(options.pml_thickness) + " cells)";
+            }
+            return "unknown";
         }
 
         // Parse a backend name against every backend type.
@@ -149,6 +167,12 @@ namespace fdtd
                 options.snapshot_every = parse_size(name, value);
             } else if (name == "--boundary") {
                 options.boundary = parse_boundary(value);
+            } else if (name == "--pml-thickness") {
+                options.pml_thickness = parse_size(name, value);
+            } else if (name == "--pml-order") {
+                options.pml_order = parse_positive(name, value);
+            } else if (name == "--pml-reflection") {
+                options.pml_reflection = parse_positive(name, value);
             } else if (name == "--backend") {
                 options.backend = parse_backend(value);
             } else if (name == "--output") {
@@ -231,7 +255,11 @@ namespace fdtd
                "  --probe I,J           Record Ez at a cell into probe_<k>.csv; repeatable\n"
                "  --snapshot-every N    Write snapshot_<step>.bin every N steps (default: 0,\n"
                "                        none)\n"
-               "  --boundary B          Outer boundary, pec or pmc (default: pec)\n"
+               "  --boundary B          Outer boundary, pec, pmc or pml (default: pec)\n"
+               "  --pml-thickness N     PML thickness in cells, 0 for none (default: 20)\n"
+               "  --pml-order M         Grading exponent of the PML (default: 3)\n"
+               "  --pml-reflection R    Target PML reflection at normal incidence, in\n"
+               "                        (0, 1) (default: 1e-6)\n"
                "  --backend B           Backend, serial, openmp or cuda (default: serial)\n"
                "  --output DIR          Directory for the files (default: out)\n"
                "  -h, --help            Show this message and exit\n"
@@ -251,6 +279,9 @@ namespace fdtd
         simOptions.dy = FloatType(options.dy > 0 ? options.dy : options.dx);
         simOptions.courant = options.courant;
         simOptions.boundary = options.boundary;
+        simOptions.pml_thickness = options.pml_thickness;
+        simOptions.pml_order = options.pml_order;
+        simOptions.pml_reflection = options.pml_reflection;
         simOptions.backend = options.backend;
         const std::size_t ny = options.ny > 0 ? options.ny : options.nx;
         TMz::Sim2D sim(options.nx, ny, simOptions);
@@ -269,7 +300,8 @@ namespace fdtd
 
         std::filesystem::create_directories(options.output);
         log << "grid " << options.nx << " x " << ny << ", dt " << sim.dt() << " s, "
-            << options.steps << " steps on " << TMz::backend_name(options.backend) << '\n';
+            << options.steps << " steps on " << TMz::backend_name(options.backend) << ", boundary "
+            << describe_boundary(options) << '\n';
 
         const std::size_t every = options.snapshot_every;
         if (every > 0) {

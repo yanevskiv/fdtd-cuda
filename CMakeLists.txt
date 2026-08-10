@@ -57,6 +57,8 @@ target_link_libraries(fdtd_cli PRIVATE fdtd_driver fdtd_warnings)
 if(FDTD_BUILD_SAMPLES)
     add_executable(sample_point_source samples/sample_point_source.cpp)
     target_link_libraries(sample_point_source PRIVATE fdtd::fdtd fdtd_warnings)
+    add_executable(sample_pml samples/sample_pml.cpp)
+    target_link_libraries(sample_pml PRIVATE fdtd::fdtd fdtd_warnings)
 endif()
 
 if(FDTD_BUILD_TESTS)

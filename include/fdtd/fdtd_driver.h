@@ -91,6 +91,15 @@ namespace fdtd
         /** Outer boundary condition. */
         TMz::Boundary boundary = TMz::Boundary::Pec;
 
+        /** PML thickness in cells, used with the PML boundary; zero turns the PML off. */
+        std::size_t pml_thickness = 20;
+
+        /** Grading exponent of the PML conductivity. */
+        double pml_order = 3;
+
+        /** Target reflection of the PML at normal incidence, in (0, 1). */
+        double pml_reflection = 1e-6;
+
         /** Backend to run on. */
         TMz::BackendType backend = TMz::BackendType::Serial;
 
