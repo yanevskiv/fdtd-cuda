@@ -26,7 +26,7 @@
 #include "fdtd/TMz/fdtd_tmz_sim2d.h"
 #include "fdtd/TMz/fdtd_tmz_waveform.h"
 #include "fdtd/fdtd_constants.h"
-#include "fdtd/test/fdtd_test_support.h"
+#include "support/fdtd_support_physics.h"
 
 #include <algorithm>
 #include <cmath>
@@ -35,7 +35,7 @@
 #include <vector>
 
 using fdtd::FloatType;
-using fdtd::test::Cell;
+using fdtd::support::Cell;
 using fdtd::TMz::Boundary;
 using fdtd::TMz::courant_dt;
 using fdtd::TMz::Grid2D;
@@ -57,7 +57,7 @@ namespace
             const auto now = sim.snapshot();
             sim.run(1);
             const auto next = sim.snapshot();
-            history.push_back(fdtd::test::field_energy(now.fields, next.fields, sim.material()));
+            history.push_back(fdtd::support::field_energy(now.fields, next.fields, sim.material()));
         }
         return history;
     }
@@ -66,7 +66,7 @@ namespace
     // largest sample and its neighbours.
     double peak_step(const std::vector<FloatType> &trace)
     {
-        const std::size_t k = fdtd::test::find_peak(trace).index;
+        const std::size_t k = fdtd::support::find_peak(trace).index;
         if (k == 0 || k + 1 == trace.size()) {
             return double(k);
         }
@@ -112,7 +112,7 @@ TEST_CASE("Pulses travel at the speed of light", "[physics][speed]")
 {
     Sim2D sim(256, 256);
     const std::vector<Cell> probes{{168, 128}, {218, 128}, {156, 156}, {191, 191}};
-    const auto traces = fdtd::test::point_source_traces(
+    const auto traces = fdtd::support::point_source_traces(
         sim, {128, 128}, fdtd::TMz::Gaussian::from_steps(sim.dt(), 8), probes, 220);
     const double cellSteps = double(sim.grid().dx()) / (fdtd::C_0 * sim.dt());
 
@@ -136,13 +136,13 @@ TEST_CASE("Far-field peak follows 1 / sqrt(r)", "[physics][falloff]")
     for (const std::size_t r : distances) {
         probes.push_back({128 + r, 128});
     }
-    const auto traces = fdtd::test::point_source_traces(
+    const auto traces = fdtd::support::point_source_traces(
         sim, {128, 128}, fdtd::TMz::Gaussian::from_steps(sim.dt(), 8), probes, 240);
 
-    const double reference = fdtd::test::find_peak(traces[0]).value * std::sqrt(30.0);
+    const double reference = fdtd::support::find_peak(traces[0]).value * std::sqrt(30.0);
     for (std::size_t k = 1; k < probes.size(); ++k) {
         const double ratio =
-            fdtd::test::find_peak(traces[k]).value * std::sqrt(double(distances[k])) / reference;
+            fdtd::support::find_peak(traces[k]).value * std::sqrt(double(distances[k])) / reference;
         CAPTURE(distances[k], ratio);
         CHECK(std::abs(ratio - 1) < 0.03);
     }
@@ -167,7 +167,7 @@ TEST_CASE("Closed box conserves energy", "[physics][energy]")
         const auto now = sim.snapshot();
         sim.run(1);
         const auto next = sim.snapshot();
-        history.push_back(fdtd::test::field_energy(now.fields, next.fields, sim.material()));
+        history.push_back(fdtd::support::field_energy(now.fields, next.fields, sim.material()));
     }
     const double bound = 1000 * double(std::numeric_limits<FloatType>::epsilon());
     double drift = 0;

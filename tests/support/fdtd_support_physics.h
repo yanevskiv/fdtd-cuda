@@ -1,5 +1,5 @@
 /*
- * C++ header for physics test support.
+ * C++ header for the physics test support.
  *
  *
  * Copyright (C) 2026 Ivan Janevski
@@ -18,8 +18,8 @@
  * along with fdtd-cuda; if not, see <https://www.gnu.org/licenses/>.
  */
 
-#ifndef FDTD_TEST_SUPPORT_H
-#define FDTD_TEST_SUPPORT_H
+#ifndef FDTD_SUPPORT_PHYSICS_H
+#define FDTD_SUPPORT_PHYSICS_H
 
 #include "fdtd/TMz/fdtd_tmz_fields2d.h"
 #include "fdtd/TMz/fdtd_tmz_material2d.h"
@@ -35,7 +35,7 @@
 namespace fdtd
 {
     /** Namespace for test support, built on the public API only. */
-    namespace test
+    namespace support
     {
         /** A cell of the grid by column and row. */
         struct Cell

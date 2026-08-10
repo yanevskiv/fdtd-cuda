@@ -24,7 +24,7 @@ install: build
 workflow:
 	cmake --workflow --preset $(PRESET)
 
-TIDY = clang-tidy -p build/$(PRESET) --quiet --header-filter='^.*/include/fdtd/.*' \
+TIDY = clang-tidy -p build/$(PRESET) --quiet --header-filter='^.*/(include/fdtd|tests/support)/.*' \
 	--warnings-as-errors=readability-identifier-naming
 JOBS ?= $(shell nproc)
 CHANGED = $(shell { git diff --name-only HEAD; git ls-files --others --exclude-standard; } | sort -u | \

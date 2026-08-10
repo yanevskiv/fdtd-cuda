@@ -1,5 +1,5 @@
 /*
- * C++ file for physics test support.
+ * C++ file for the physics test support.
  *
  *
  * Copyright (C) 2026 Ivan Janevski
@@ -19,7 +19,7 @@
  */
 
 // Function declarations.
-#include "fdtd/test/fdtd_test_support.h"
+#include "support/fdtd_support_physics.h"
 
 // Physical constants.
 #include "fdtd/fdtd_constants.h"
@@ -30,7 +30,7 @@
 #include <utility>
 
 // Namespace for test support.
-namespace fdtd::test
+namespace fdtd::support
 {
     // Helpers private to this file.
     namespace
