@@ -32,10 +32,12 @@
 #include <cmath>
 #include <cstddef>
 #include <limits>
+#include <span>
 #include <vector>
 
 using fdtd::FloatType;
 using fdtd::TMz::Boundary;
+using fdtd::TMz::Component;
 using fdtd::TMz::courant_dt;
 using fdtd::TMz::Grid2D;
 using fdtd::TMz::Material2D;
@@ -44,22 +46,77 @@ using test::support::Cell;
 
 namespace
 {
+    // Return the conserved energy of the fields as they are now, running one extra step for
+    // H half a step later.
+    double conserved_energy(Sim2D &sim)
+    {
+        const auto now = sim.snapshot();
+        sim.run(1);
+        const auto next = sim.snapshot();
+        return test::support::field_energy(now.fields, next.fields, sim.material());
+    }
+
     // Run a centred Gaussian source and return the conserved energy after every block of
-    // steps; each measurement runs one extra step for H half a step later.
+    // steps; each measurement runs one extra step.
     std::vector<double> energy_history(Sim2D &sim, std::size_t blocks, std::size_t blockSteps)
     {
         const std::size_t n = sim.grid().nx();
-        sim.add_source(n / 2, n / 2, fdtd::TMz::Component::Ez,
-                       fdtd::TMz::Gaussian::from_steps(sim.dt(), 10));
+        sim.add_source(n / 2, n / 2, Component::Ez, fdtd::TMz::Gaussian::from_steps(sim.dt(), 10));
         std::vector<double> history;
         for (std::size_t b = 0; b < blocks; ++b) {
             sim.run(blockSteps);
-            const auto now = sim.snapshot();
-            sim.run(1);
-            const auto next = sim.snapshot();
-            history.push_back(test::support::field_energy(now.fields, next.fields, sim.material()));
+            history.push_back(conserved_energy(sim));
         }
         return history;
+    }
+
+    // Square interior, in cells, of the PML reflection runs.
+    constexpr std::size_t REFLECTION_INTERIOR = 60;
+
+    // Margin around the interior of the reference run, wide enough that its PEC wall
+    // reflects nothing back to the probe within the window.
+    constexpr std::size_t REFLECTION_MARGIN = 100;
+
+    // Steps of a reflection run.
+    constexpr std::size_t REFLECTION_STEPS = 250;
+
+    // Record Ez at a probe from a Gaussian source on a square grid of the interior plus a
+    // border of some cells on each side, with the cells given from the interior's corner.
+    std::vector<FloatType> interior_trace(const Sim2D::Options &opts, std::size_t border,
+                                          Cell source, Cell probe)
+    {
+        const std::size_t n = REFLECTION_INTERIOR + 2 * border;
+        Sim2D sim(n, n, opts);
+        const std::vector<Cell> probes{{border + probe.i, border + probe.j}};
+        return test::support::point_source_traces(sim, {border + source.i, border + source.j},
+                                                  fdtd::TMz::Gaussian::from_steps(sim.dt(), 8),
+                                                  probes, REFLECTION_STEPS)[0];
+    }
+
+    // Return the reflection of a PML of some thickness in dB: the largest difference
+    // between the trace in front of it and the trace of a PEC domain too large to reflect
+    // in time, over the largest value of the latter.
+    double pml_reflection_db(std::size_t thickness, Cell source, Cell probe)
+    {
+        Sim2D::Options opts;
+        opts.boundary = Boundary::Pml;
+        opts.pml_thickness = thickness;
+        const auto trace = interior_trace(opts, thickness, source, probe);
+        const auto reference = interior_trace(Sim2D::Options(), REFLECTION_MARGIN, source, probe);
+        double error = 0;
+        for (std::size_t k = 0; k < trace.size(); ++k) {
+            error = std::max(error, std::abs(double(trace[k]) - double(reference[k])));
+        }
+        return 20 * std::log10(error / test::support::find_peak(reference).value);
+    }
+
+    // Check that two runs left the same Ez, Hx and Hy, bit for bit.
+    bool same_fields(const fdtd::TMz::Fields2D &a, const fdtd::TMz::Fields2D &b)
+    {
+        const auto same = [](std::span<const FloatType> x, std::span<const FloatType> y) {
+            return std::ranges::equal(x, y);
+        };
+        return same(a.ez(), b.ez()) && same(a.hx(), b.hx()) && same(a.hy(), b.hy());
     }
 
     // Return the step of a trace's peak, refined between steps by a parabola through the
@@ -159,7 +216,7 @@ TEST_CASE("Closed box conserves energy", "[physics][energy]")
     Material2D material(sim.grid());
     material.fill_circle(80, 70, 15, {FloatType(4), FloatType(1), FloatType(0), FloatType(0)});
     sim.set_material(material);
-    sim.add_source(40, 50, fdtd::TMz::Component::Ez, fdtd::TMz::Gaussian::from_steps(sim.dt(), 8));
+    sim.add_source(40, 50, Component::Ez, fdtd::TMz::Gaussian::from_steps(sim.dt(), 8));
 
     std::vector<double> history;
     for (std::size_t b = 0; b < 20; ++b) {
@@ -177,4 +234,88 @@ TEST_CASE("Closed box conserves energy", "[physics][energy]")
     CAPTURE(boundary == Boundary::Pec, drift, bound);
     CHECK(history.front() > 0);
     CHECK(drift < bound);
+}
+
+// Verify that the PML settings change nothing when the PML is off: Boundary::Pml with
+// thickness 0 steps as PEC, and PEC and PMC ignore the PML settings, bit for bit.
+TEST_CASE("PML off reproduces the closed box bit for bit", "[physics][pml]")
+{
+    const Boundary boundary = GENERATE(Boundary::Pml, Boundary::Pec, Boundary::Pmc);
+    Sim2D::Options opts;
+    opts.boundary = boundary;
+    opts.pml_thickness = boundary == Boundary::Pml ? 0 : 12;
+    opts.pml_order = 2;
+    opts.pml_reflection = 1e-3;
+    Sim2D::Options plain;
+    plain.boundary = boundary == Boundary::Pmc ? Boundary::Pmc : Boundary::Pec;
+
+    const auto run = [](const Sim2D::Options &options) {
+        Sim2D sim(48, 40, options);
+        Material2D material(sim.grid());
+        material.fill_circle(30, 22, 8, {FloatType(3), FloatType(1), FloatType(2), FloatType(0)});
+        sim.set_material(material);
+        sim.add_source(10, 12, Component::Ez, fdtd::TMz::Gaussian::from_steps(sim.dt(), 8));
+        sim.run(150);
+        return sim.snapshot().fields;
+    };
+    CAPTURE(int(boundary));
+    CHECK(same_fields(run(opts), run(plain)));
+}
+
+// Verify that a PML of 10 and 20 cells reflects less than thresholds set from measurement,
+// about 10 dB above it, at normal, 45 degree and grazing incidence and from a corner.
+TEST_CASE("PML reflects below the threshold", "[physics][pml]")
+{
+    struct Case
+    {
+        const char *name;
+        Cell source;
+        Cell probe;
+        std::size_t thickness;
+        double threshold;
+    };
+    const Case c = GENERATE(
+        Case{"normal", {20, 30}, {5, 30}, 10, -80}, Case{"normal", {20, 30}, {5, 30}, 20, -90},
+        Case{"45 degrees", {10, 15}, {10, 35}, 10, -80},
+        Case{"45 degrees", {10, 15}, {10, 35}, 20, -90}, Case{"grazing", {10, 3}, {50, 3}, 10, -60},
+        Case{"grazing", {10, 3}, {50, 3}, 20, -80}, Case{"corner", {15, 15}, {5, 5}, 10, -75},
+        Case{"corner", {15, 15}, {5, 5}, 20, -85});
+    const double reflection = pml_reflection_db(c.thickness, c.source, c.probe);
+    CAPTURE(c.name, c.thickness, reflection, c.threshold);
+    CHECK(reflection < c.threshold);
+}
+
+// Verify that the energy of a PML box falls by five orders of magnitude between the end of
+// the source and a thousand steps.
+TEST_CASE("PML box loses its energy", "[physics][pml]")
+{
+    Sim2D::Options opts;
+    opts.boundary = Boundary::Pml;
+    opts.pml_thickness = 10;
+    Sim2D sim(64, 64, opts);
+    sim.add_source(32, 32, Component::Ez, fdtd::TMz::Gaussian::from_steps(sim.dt(), 10));
+    sim.run(60);
+    const double start = conserved_energy(sim);
+    sim.run(939);
+    const double ratio = conserved_energy(sim) / start;
+    CAPTURE(start, ratio);
+    CHECK(start > 0);
+    CHECK(ratio < 1e-5);
+}
+
+// Verify that the energy of a PML box keeps falling over three thousand steps, without
+// the late growth an unstable PML would show.
+TEST_CASE("PML box does not grow", "[physics][pml][stability]")
+{
+    Sim2D::Options opts;
+    opts.boundary = Boundary::Pml;
+    opts.pml_thickness = 10;
+    Sim2D sim(64, 64, opts);
+    const auto history = energy_history(sim, 30, 99);
+    for (std::size_t b = 1; b < history.size(); ++b) {
+        const double ratio = history[b] / history[b - 1];
+        CAPTURE(b, ratio);
+        REQUIRE(std::isfinite(ratio));
+        CHECK(ratio < 1);
+    }
 }
