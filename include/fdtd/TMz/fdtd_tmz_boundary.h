@@ -32,7 +32,13 @@ namespace fdtd
             Pec,
 
             /** Perfect magnetic conductor: the edge Ez is updated with zero H outside. */
-            Pmc
+            Pmc,
+
+            /**
+             * Split-field PML in front of a PEC wall, set by the pml_* options of Sim2D.
+             * With a thickness of zero it is the same as Pec.
+             */
+            Pml
         };
     }
 }

@@ -76,6 +76,15 @@ namespace fdtd
                 /** Outer boundary condition. */
                 Boundary boundary = Boundary::Pec;
 
+                /** PML thickness in cells, used with Boundary::Pml; zero turns the PML off. */
+                std::size_t pml_thickness = 20;
+
+                /** Grading exponent m of the PML conductivity, positive. */
+                double pml_order = 3;
+
+                /** Target PML reflection R0 at normal incidence, in (0, 1). */
+                double pml_reflection = 1e-6;
+
                 /** Backend to run on. */
                 BackendType backend = BackendType::Serial;
 
@@ -100,7 +109,8 @@ namespace fdtd
              * @param options Settings of the simulation.
              * @throws std::invalid_argument On a bad grid, a Courant number outside (0, 1],
              *         a negative or non-finite dt, or, with check_stability, an explicit
-             *         dt above the Courant limit.
+             *         dt above the Courant limit, or, with an active PML, PML settings that
+             *         check_pml() rejects.
              * @throws std::runtime_error When the backend is not compiled in.
              */
             Sim2D(std::size_t nx, std::size_t ny, const Options &options);
@@ -142,6 +152,13 @@ namespace fdtd
             void set_material(const Material2D &material);
 
             /**
+             * Thickness of the active PML.
+             *
+             * @return pml_thickness with Boundary::Pml, zero with any other boundary.
+             */
+            std::size_t pml_thickness() const noexcept;
+
+            /**
              * Backend the simulation runs on.
              *
              * @return The backend.
@@ -160,7 +177,7 @@ namespace fdtd
              * @param component Field the waveform is added to.
              * @param waveform Value at a time in seconds.
              * @throws std::invalid_argument When the cell is outside the grid or is never
-             *         updated (Ez on the edge under PEC, Hx in the last row, Hy in the last
+             *         updated (Ez on the edge under PEC or PML, Hx in the last row, Hy in the last
              *         column), or the waveform is empty.
              */
             void add_source(std::size_t i, std::size_t j, Component component, Waveform waveform);
@@ -296,6 +313,9 @@ namespace fdtd
 
             /** Time step in seconds. */
             double m_dt;
+
+            /** Thickness of the active PML in cells, zero when there is none. */
+            std::size_t m_pml_thickness;
 
             /** Per-cell material. */
             Material2D m_material;

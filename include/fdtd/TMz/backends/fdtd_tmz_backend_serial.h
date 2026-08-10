@@ -108,7 +108,7 @@ namespace fdtd
         /**
          * Update the edge Ez, which serial_update_e leaves alone; call it right after.
          *
-         * Under PEC the edge Ez is set to zero. Under PMC it takes the interior update
+         * Under PEC and PML the edge Ez is set to zero. Under PMC it takes the interior update
          * with every H outside the domain read as zero: Hy(-1, j) and Hy(nx - 1, j),
          * Hx(i, -1) and Hx(i, ny - 1). Corners combine both.
          *

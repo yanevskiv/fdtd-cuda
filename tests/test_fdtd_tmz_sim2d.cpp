@@ -65,6 +65,10 @@ TEST_CASE("Sim2D defaults", "[unit][sim2d]")
     CHECK(sim.backend().type() == BackendType::Serial);
     CHECK(sim.backend().boundary() == Boundary::Pec);
     CHECK(sim.material().grid().nx() == 16);
+    CHECK(opts.pml_thickness == 20);
+    CHECK(opts.pml_order == 3);
+    CHECK(opts.pml_reflection == 1e-6);
+    CHECK(sim.pml_thickness() == 0);
 }
 
 // Verify that the options reach the grid, the time step and the backend.
@@ -130,6 +134,66 @@ TEST_CASE("Sim2D accepts an unstable dt without the check", "[unit][sim2d]")
     Sim2D sim(8, 8, opts);
     CHECK(sim.dt() == 1e-9);
     CHECK(sim.dt() > courant_dt(sim.grid(), 1.0));
+}
+
+// Verify that the PML is active only with Boundary::Pml and a nonzero thickness.
+TEST_CASE("Sim2D activates the PML only with Boundary::Pml", "[unit][sim2d][pml]")
+{
+    Sim2D::Options opts;
+    opts.boundary = Boundary::Pml;
+    opts.pml_thickness = 5;
+    CHECK(Sim2D(16, 12, opts).pml_thickness() == 5);
+    CHECK(Sim2D(16, 12, opts).backend().boundary() == Boundary::Pml);
+
+    opts.pml_thickness = 0;
+    CHECK(Sim2D(16, 12, opts).pml_thickness() == 0);
+
+    opts.boundary = Boundary::Pec;
+    opts.pml_thickness = 5;
+    CHECK(Sim2D(16, 12, opts).pml_thickness() == 0);
+
+    opts.boundary = Boundary::Pmc;
+    CHECK(Sim2D(16, 12, opts).pml_thickness() == 0);
+}
+
+// Verify that bad PML settings throw only when the PML is active.
+TEST_CASE("Sim2D checks the PML settings when active", "[unit][sim2d][pml]")
+{
+    Sim2D::Options opts;
+    opts.pml_thickness = 6;
+    opts.pml_order = -1;
+    opts.pml_reflection = 2;
+    CHECK_NOTHROW(Sim2D(12, 12, opts));
+
+    opts.boundary = Boundary::Pml;
+    opts.pml_thickness = 0;
+    CHECK_NOTHROW(Sim2D(12, 12, opts));
+
+    opts = {};
+    opts.boundary = Boundary::Pml;
+    opts.pml_thickness = 6;
+    CHECK_THROWS_AS(Sim2D(12, 20, opts), std::invalid_argument);
+    CHECK_THROWS_AS(Sim2D(20, 12, opts), std::invalid_argument);
+    CHECK_NOTHROW(Sim2D(13, 13, opts));
+
+    opts.pml_order = 0;
+    CHECK_THROWS_AS(Sim2D(16, 16, opts), std::invalid_argument);
+
+    opts = {};
+    opts.boundary = Boundary::Pml;
+    opts.pml_thickness = 4;
+    opts.pml_reflection = 1;
+    CHECK_THROWS_AS(Sim2D(16, 16, opts), std::invalid_argument);
+}
+
+// Verify that the edge Ez takes no source with the PML, as under PEC.
+TEST_CASE("Sim2D rejects an edge Ez source with the PML", "[unit][sim2d][pml]")
+{
+    Sim2D::Options opts;
+    opts.boundary = Boundary::Pml;
+    opts.pml_thickness = 2;
+    Sim2D sim(8, 8, opts);
+    CHECK_THROWS_AS(sim.add_source(0, 3, Component::Ez, ramp), std::invalid_argument);
 }
 
 // Verify that run() counts steps and time, and that download() fills the host fields.

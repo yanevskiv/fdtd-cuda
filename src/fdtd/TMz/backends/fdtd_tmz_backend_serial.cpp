@@ -135,7 +135,7 @@ namespace fdtd::TMz
         const Grid2D &grid = fields.grid();
         FloatType *__restrict Ez = fields.ez().data();
 
-        if (boundary == Boundary::Pec) {
+        if (boundary != Boundary::Pmc) {
             for_each_edge(grid, [&](std::size_t i, std::size_t j) {
                 Ez[grid.index(i, j)] = 0;
             });

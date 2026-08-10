@@ -20,9 +20,10 @@
 // Class declaration.
 #include "fdtd/TMz/fdtd_tmz_sim2d.h"
 
-// Coefficients and the Courant limit.
+// Coefficients, the Courant limit and the PML settings.
 #include "fdtd/TMz/fdtd_tmz_coeffs2d.h"
 #include "fdtd/TMz/fdtd_tmz_courant.h"
+#include "fdtd/TMz/fdtd_tmz_pml2d.h"
 
 // Standard library for algorithms, math, errors and moves.
 #include <algorithm>
@@ -51,6 +52,17 @@ namespace fdtd::TMz
             }
             return options.dt;
         }
+
+        // Check the PML settings when the PML is active and return its thickness, else zero.
+        std::size_t options_pml_thickness(const Grid2D &grid, const Sim2D::Options &options)
+        {
+            if (options.boundary != Boundary::Pml || options.pml_thickness == 0) {
+                return 0;
+            }
+            check_pml(grid.nx(), grid.ny(), options.pml_thickness, options.pml_order,
+                      options.pml_reflection);
+            return options.pml_thickness;
+        }
     }
 
     // Delegate to the full constructor with the default options.
@@ -65,6 +77,7 @@ namespace fdtd::TMz
         : m_options(options)
         , m_grid(nx, ny, options.dx, options.dy)
         , m_dt(options_dt(m_grid, options))
+        , m_pml_thickness(options_pml_thickness(m_grid, options))
         , m_material(m_grid)
         , m_fields(m_grid)
         , m_backend(make_backend(options.backend, m_grid))
@@ -72,6 +85,12 @@ namespace fdtd::TMz
         m_backend->upload(Coeffs2D(m_material, m_dt));
         m_backend->set_boundary(options.boundary);
         m_backend->upload(m_fields);
+    }
+
+    // Return the active PML thickness.
+    std::size_t Sim2D::pml_thickness() const noexcept
+    {
+        return m_pml_thickness;
     }
 
     // Return the options.
@@ -128,7 +147,7 @@ namespace fdtd::TMz
             throw std::invalid_argument("Sim2D: empty source waveform");
         }
         const bool edge = i == 0 || j == 0 || i + 1 == nx || j + 1 == ny;
-        if ((component == Component::Ez && edge && m_options.boundary == Boundary::Pec) ||
+        if ((component == Component::Ez && edge && m_options.boundary != Boundary::Pmc) ||
             (component == Component::Hx && j + 1 == ny) ||
             (component == Component::Hy && i + 1 == nx)) {
             throw std::invalid_argument("Sim2D: source on a cell that is never updated");

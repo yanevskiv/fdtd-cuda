@@ -27,6 +27,7 @@ add_executable(fdtd_tests
     test_fdtd_tmz_grid2d.cpp
     test_fdtd_tmz_material2d.cpp
     test_fdtd_tmz_output.cpp
+    test_fdtd_tmz_pml2d.cpp
     test_fdtd_tmz_sim2d.cpp
     test_fdtd_version.cpp
     test_physics.cpp
