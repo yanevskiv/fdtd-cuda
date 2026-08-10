@@ -19,7 +19,7 @@
  */
 
 // Function declarations.
-#include "support/fdtd_support_physics.h"
+#include "support/test_support_physics.h"
 
 // Physical constants.
 #include "fdtd/fdtd_constants.h"
@@ -30,13 +30,13 @@
 #include <utility>
 
 // Namespace for test support.
-namespace fdtd::support
+namespace test::support
 {
     // Helpers private to this file.
     namespace
     {
         // Check that two grids have the same size.
-        void require_same_size(const TMz::Grid2D &a, const TMz::Grid2D &b)
+        void require_same_size(const fdtd::TMz::Grid2D &a, const fdtd::TMz::Grid2D &b)
         {
             if (a.nx() != b.nx() || a.ny() != b.ny()) {
                 throw std::invalid_argument("field_energy: grids differ in size");
@@ -44,10 +44,10 @@ namespace fdtd::support
         }
 
         // Sum the energy with Ez from one set of fields and the product of H from two.
-        double energy(std::span<const FloatType> ez, const TMz::Fields2D &h0,
-                      const TMz::Fields2D &h1, const TMz::Material2D &material)
+        double energy(std::span<const fdtd::FloatType> ez, const fdtd::TMz::Fields2D &h0,
+                      const fdtd::TMz::Fields2D &h1, const fdtd::TMz::Material2D &material)
         {
-            const TMz::Grid2D &grid = material.grid();
+            const fdtd::TMz::Grid2D &grid = material.grid();
             const auto epsR = material.eps_r();
             const auto muR = material.mu_r();
             double sum = 0;
@@ -57,7 +57,7 @@ namespace fdtd::support
                     const double e = double(ez[k]);
                     const double hh = double(h0.hx()[k]) * double(h1.hx()[k]) +
                                       double(h0.hy()[k]) * double(h1.hy()[k]);
-                    sum += EPS_0 * double(epsR[k]) * e * e + MU_0 * double(muR[k]) * hh;
+                    sum += fdtd::EPS_0 * double(epsR[k]) * e * e + fdtd::MU_0 * double(muR[k]) * hh;
                 }
             }
             return 0.5 * sum * double(grid.dx()) * double(grid.dy());
@@ -65,15 +65,15 @@ namespace fdtd::support
     }
 
     // Sum the energy of one set of fields.
-    double field_energy(const TMz::Fields2D &fields, const TMz::Material2D &material)
+    double field_energy(const fdtd::TMz::Fields2D &fields, const fdtd::TMz::Material2D &material)
     {
         require_same_size(fields.grid(), material.grid());
         return energy(fields.ez(), fields, fields, material);
     }
 
     // Sum the energy with Ez from the first fields and H from the half steps around it.
-    double field_energy(const TMz::Fields2D &fields, const TMz::Fields2D &next,
-                        const TMz::Material2D &material)
+    double field_energy(const fdtd::TMz::Fields2D &fields, const fdtd::TMz::Fields2D &next,
+                        const fdtd::TMz::Material2D &material)
     {
         require_same_size(fields.grid(), material.grid());
         require_same_size(next.grid(), material.grid());
@@ -81,7 +81,7 @@ namespace fdtd::support
     }
 
     // Scan for the largest magnitude.
-    Peak find_peak(std::span<const FloatType> values)
+    Peak find_peak(std::span<const fdtd::FloatType> values)
     {
         if (values.empty()) {
             throw std::invalid_argument("find_peak: no values");
@@ -97,19 +97,18 @@ namespace fdtd::support
     }
 
     // Add the source and the probes, run, and collect every probe's trace.
-    std::vector<std::vector<FloatType>> point_source_traces(TMz::Sim2D &sim, Cell source,
-                                                            TMz::Waveform waveform,
-                                                            std::span<const Cell> probes,
-                                                            std::size_t nsteps)
+    std::vector<std::vector<fdtd::FloatType>>
+    point_source_traces(fdtd::TMz::Sim2D &sim, Cell source, fdtd::TMz::Waveform waveform,
+                        std::span<const Cell> probes, std::size_t nsteps)
     {
-        sim.add_source(source.i, source.j, TMz::Component::Ez, std::move(waveform));
+        sim.add_source(source.i, source.j, fdtd::TMz::Component::Ez, std::move(waveform));
         std::vector<std::size_t> ids;
         ids.reserve(probes.size());
         for (const Cell &cell : probes) {
-            ids.push_back(sim.add_probe(cell.i, cell.j, TMz::Component::Ez));
+            ids.push_back(sim.add_probe(cell.i, cell.j, fdtd::TMz::Component::Ez));
         }
         sim.run(nsteps);
-        std::vector<std::vector<FloatType>> traces;
+        std::vector<std::vector<fdtd::FloatType>> traces;
         traces.reserve(ids.size());
         for (const std::size_t id : ids) {
             traces.push_back(sim.probe_data(id));

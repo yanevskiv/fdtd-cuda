@@ -18,8 +18,8 @@
  * along with fdtd-cuda; if not, see <https://www.gnu.org/licenses/>.
  */
 
-#ifndef FDTD_SUPPORT_PHYSICS_H
-#define FDTD_SUPPORT_PHYSICS_H
+#ifndef TEST_SUPPORT_PHYSICS_H
+#define TEST_SUPPORT_PHYSICS_H
 
 #include "fdtd/TMz/fdtd_tmz_fields2d.h"
 #include "fdtd/TMz/fdtd_tmz_material2d.h"
@@ -31,8 +31,8 @@
 #include <span>
 #include <vector>
 
-/** Namespace for the fdtd library. */
-namespace fdtd
+/** Namespace for the tests. */
+namespace test
 {
     /** Namespace for test support, built on the public API only. */
     namespace support
@@ -67,7 +67,8 @@ namespace fdtd
          * @return The energy.
          * @throws std::invalid_argument When the grids differ in size.
          */
-        double field_energy(const TMz::Fields2D &fields, const TMz::Material2D &material);
+        double field_energy(const fdtd::TMz::Fields2D &fields,
+                            const fdtd::TMz::Material2D &material);
 
         /**
          * Energy per unit length in z that the Yee scheme conserves, in J/m.
@@ -84,8 +85,8 @@ namespace fdtd
          * @return The energy.
          * @throws std::invalid_argument When the grids differ in size.
          */
-        double field_energy(const TMz::Fields2D &fields, const TMz::Fields2D &next,
-                            const TMz::Material2D &material);
+        double field_energy(const fdtd::TMz::Fields2D &fields, const fdtd::TMz::Fields2D &next,
+                            const fdtd::TMz::Material2D &material);
 
         /**
          * Find the largest magnitude, the first one on a tie.
@@ -94,7 +95,7 @@ namespace fdtd
          * @return The peak.
          * @throws std::invalid_argument When the sequence is empty.
          */
-        Peak find_peak(std::span<const FloatType> values);
+        Peak find_peak(std::span<const fdtd::FloatType> values);
 
         /**
          * Run a soft Ez point source and record Ez at some cells.
@@ -108,10 +109,9 @@ namespace fdtd
          * @param nsteps Steps to run.
          * @return One trace per probe cell, one value per step.
          */
-        std::vector<std::vector<FloatType>> point_source_traces(TMz::Sim2D &sim, Cell source,
-                                                                TMz::Waveform waveform,
-                                                                std::span<const Cell> probes,
-                                                                std::size_t nsteps);
+        std::vector<std::vector<fdtd::FloatType>>
+        point_source_traces(fdtd::TMz::Sim2D &sim, Cell source, fdtd::TMz::Waveform waveform,
+                            std::span<const Cell> probes, std::size_t nsteps);
     }
 }
 

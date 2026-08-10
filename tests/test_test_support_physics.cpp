@@ -25,18 +25,18 @@
 #include "fdtd/TMz/fdtd_tmz_material2d.h"
 #include "fdtd/TMz/fdtd_tmz_sim2d.h"
 #include "fdtd/fdtd_constants.h"
-#include "support/fdtd_support_physics.h"
+#include "support/test_support_physics.h"
 
 #include <stdexcept>
 #include <vector>
 
 using Catch::Matchers::WithinRel;
 using fdtd::FloatType;
-using fdtd::support::Cell;
 using fdtd::TMz::Fields2D;
 using fdtd::TMz::Grid2D;
 using fdtd::TMz::Material2D;
 using fdtd::TMz::Sim2D;
+using test::support::Cell;
 
 // Verify the energy of hand-set fields in a medium with eps_r and mu_r.
 TEST_CASE("field_energy sums the cell energies", "[unit][support]")
@@ -51,7 +51,7 @@ TEST_CASE("field_energy sums the cell energies", "[unit][support]")
 
     const double area = 0.5 * 0.25;
     const double expected = 0.5 * area * (fdtd::EPS_0 * 2 * 4 + fdtd::MU_0 * 3 * (1 + 1));
-    CHECK_THAT(fdtd::support::field_energy(fields, material), WithinRel(expected, 1e-6));
+    CHECK_THAT(test::support::field_energy(fields, material), WithinRel(expected, 1e-6));
 }
 
 // Verify that the two-step energy takes Ez from the first fields and multiplies H.
@@ -69,8 +69,8 @@ TEST_CASE("field_energy multiplies H over two half steps", "[unit][support]")
     next.hy()[grid.index(2, 1)] = FloatType(-1);
 
     const double expected = 0.5 * (fdtd::EPS_0 * 1 + fdtd::MU_0 * (3 - 2));
-    CHECK_THAT(fdtd::support::field_energy(fields, next, material), WithinRel(expected, 1e-6));
-    CHECK_THROWS_AS(fdtd::support::field_energy(Fields2D(Grid2D(2, 3)), material),
+    CHECK_THAT(test::support::field_energy(fields, next, material), WithinRel(expected, 1e-6));
+    CHECK_THROWS_AS(test::support::field_energy(Fields2D(Grid2D(2, 3)), material),
                     std::invalid_argument);
 }
 
@@ -78,10 +78,10 @@ TEST_CASE("field_energy multiplies H over two half steps", "[unit][support]")
 TEST_CASE("find_peak finds the largest magnitude", "[unit][support]")
 {
     const std::vector<FloatType> values{FloatType(1), FloatType(-4), FloatType(3), FloatType(4)};
-    const auto peak = fdtd::support::find_peak(values);
+    const auto peak = test::support::find_peak(values);
     CHECK(peak.index == 1);
     CHECK(peak.value == 4);
-    CHECK_THROWS_AS(fdtd::support::find_peak({}), std::invalid_argument);
+    CHECK_THROWS_AS(test::support::find_peak({}), std::invalid_argument);
 }
 
 // Verify that point_source_traces returns one full trace per probe.
@@ -89,11 +89,11 @@ TEST_CASE("point_source_traces records every probe", "[unit][support]")
 {
     Sim2D sim(16, 16);
     const std::vector<Cell> probes{{8, 8}, {12, 8}};
-    const auto traces = fdtd::support::point_source_traces(
+    const auto traces = test::support::point_source_traces(
         sim, {8, 8}, fdtd::TMz::Gaussian::from_steps(sim.dt(), 4), probes, 20);
     REQUIRE(traces.size() == 2);
     CHECK(traces[0].size() == 20);
     CHECK(traces[1].size() == 20);
     CHECK(sim.step_count() == 20);
-    CHECK(fdtd::support::find_peak(traces[0]).value > fdtd::support::find_peak(traces[1]).value);
+    CHECK(test::support::find_peak(traces[0]).value > test::support::find_peak(traces[1]).value);
 }

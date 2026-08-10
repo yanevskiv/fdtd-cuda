@@ -11,14 +11,13 @@ FetchContent_MakeAvailable(Catch2)
 include(Catch)
 
 # Physics test helpers, on the public API only; linked by the tests, never installed.
-add_library(fdtd_support STATIC support/fdtd_support_physics.cpp)
-target_include_directories(fdtd_support PUBLIC ${CMAKE_CURRENT_SOURCE_DIR})
-target_link_libraries(fdtd_support PUBLIC fdtd::fdtd PRIVATE fdtd_warnings)
+add_library(test_support STATIC support/test_support_physics.cpp)
+target_include_directories(test_support PUBLIC ${CMAKE_CURRENT_SOURCE_DIR})
+target_link_libraries(test_support PUBLIC fdtd::fdtd PRIVATE fdtd_warnings)
 
 add_executable(fdtd_tests
     test_fdtd_constants.cpp
     test_fdtd_driver.cpp
-    test_fdtd_support_physics.cpp
     test_fdtd_tmz_backend.cpp
     test_fdtd_tmz_backend_serial.cpp
     test_fdtd_tmz_coeffs2d.cpp
@@ -29,11 +28,12 @@ add_executable(fdtd_tests
     test_fdtd_tmz_output.cpp
     test_fdtd_tmz_pml2d.cpp
     test_fdtd_tmz_sim2d.cpp
+    test_fdtd_tmz_waveform.cpp
     test_fdtd_version.cpp
     test_physics.cpp
     test_smoke.cpp
-    test_fdtd_tmz_waveform.cpp)
-target_link_libraries(fdtd_tests PRIVATE fdtd::fdtd fdtd_driver fdtd_support fdtd_warnings Catch2::Catch2WithMain)
+    test_test_support_physics.cpp)
+target_link_libraries(fdtd_tests PRIVATE fdtd::fdtd fdtd_driver test_support fdtd_warnings Catch2::Catch2WithMain)
 target_compile_definitions(fdtd_tests PRIVATE
     FDTD_TEST_PROJECT_VERSION="${PROJECT_VERSION}"
     FDTD_TEST_PROJECT_VERSION_MAJOR=${PROJECT_VERSION_MAJOR}
