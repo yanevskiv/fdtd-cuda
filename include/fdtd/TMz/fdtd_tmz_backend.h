@@ -107,7 +107,7 @@ namespace fdtd
             virtual const Grid2D &grid() const noexcept = 0;
 
             /**
-             * Copy fields into the backend.
+             * Copy fields into the backend, Ezx and Ezy included.
              *
              * @param fields Fields on the backend's grid.
              * @throws std::invalid_argument When the grids differ.
@@ -115,7 +115,7 @@ namespace fdtd
             virtual void upload(const Fields2D &fields) = 0;
 
             /**
-             * Copy the backend's fields out.
+             * Copy the backend's fields out, Ezx and Ezy included.
              *
              * @param fields Destination on the backend's grid.
              * @throws std::invalid_argument When the grids differ.

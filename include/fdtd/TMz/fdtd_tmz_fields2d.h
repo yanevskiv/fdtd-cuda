@@ -33,10 +33,13 @@ namespace fdtd
     namespace TMz
     {
         /**
-         * The TMz fields Ez, Hx and Hy over a grid, as three aligned arrays.
+         * The TMz fields Ez, Hx and Hy over a grid, with the split parts Ezx and Ezy of
+         * Ez, as five aligned arrays.
          *
          * Each array has grid().size() elements, indexed with Grid2D::index, and starts
-         * zeroed. The Yee staggering is in the update, not the storage.
+         * zeroed. The Yee staggering is in the update, not the storage. Ezx and Ezy span
+         * the whole grid but are only kept inside a PML, where Ez = Ezx + Ezy; elsewhere
+         * they stay zero.
          */
         class Fields2D
         {
@@ -97,7 +100,35 @@ namespace fdtd
              */
             std::span<const FloatType> hy() const noexcept;
 
-            /** Set every field to zero. */
+            /**
+             * Part of Ez driven by the x derivative of Hy, kept inside a PML.
+             *
+             * @return View of the Ezx array.
+             */
+            std::span<FloatType> ezx() noexcept;
+
+            /**
+             * Part of Ez driven by the x derivative of Hy, kept inside a PML.
+             *
+             * @return Read-only view of the Ezx array.
+             */
+            std::span<const FloatType> ezx() const noexcept;
+
+            /**
+             * Part of Ez driven by the y derivative of Hx, kept inside a PML.
+             *
+             * @return View of the Ezy array.
+             */
+            std::span<FloatType> ezy() noexcept;
+
+            /**
+             * Part of Ez driven by the y derivative of Hx, kept inside a PML.
+             *
+             * @return Read-only view of the Ezy array.
+             */
+            std::span<const FloatType> ezy() const noexcept;
+
+            /** Set every field to zero, the split parts included. */
             void zero() noexcept;
 
         private:
@@ -112,6 +143,12 @@ namespace fdtd
 
             /** Magnetic field along y. */
             AlignedBuffer<FloatType> m_hy;
+
+            /** Part of Ez driven by the x derivative of Hy. */
+            AlignedBuffer<FloatType> m_ezx;
+
+            /** Part of Ez driven by the y derivative of Hx. */
+            AlignedBuffer<FloatType> m_ezy;
         };
     }
 }

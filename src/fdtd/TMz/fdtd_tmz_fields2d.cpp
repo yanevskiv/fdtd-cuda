@@ -23,12 +23,14 @@
 // Namespace for the 2D TMz module.
 namespace fdtd::TMz
 {
-    // Allocate the three arrays for the grid.
+    // Allocate the five arrays for the grid.
     Fields2D::Fields2D(const Grid2D &grid)
         : m_grid(grid)
         , m_ez(grid.size())
         , m_hx(grid.size())
         , m_hy(grid.size())
+        , m_ezx(grid.size())
+        , m_ezy(grid.size())
     {
         // Empty.
     }
@@ -75,11 +77,37 @@ namespace fdtd::TMz
         return {m_hy.data(), m_hy.size()};
     }
 
-    // Zero the three arrays.
+    // Return a view of Ezx.
+    std::span<FloatType> Fields2D::ezx() noexcept
+    {
+        return {m_ezx.data(), m_ezx.size()};
+    }
+
+    // Return a read-only view of Ezx.
+    std::span<const FloatType> Fields2D::ezx() const noexcept
+    {
+        return {m_ezx.data(), m_ezx.size()};
+    }
+
+    // Return a view of Ezy.
+    std::span<FloatType> Fields2D::ezy() noexcept
+    {
+        return {m_ezy.data(), m_ezy.size()};
+    }
+
+    // Return a read-only view of Ezy.
+    std::span<const FloatType> Fields2D::ezy() const noexcept
+    {
+        return {m_ezy.data(), m_ezy.size()};
+    }
+
+    // Zero the five arrays.
     void Fields2D::zero() noexcept
     {
         m_ez.fill(0);
         m_hx.fill(0);
         m_hy.fill(0);
+        m_ezx.fill(0);
+        m_ezy.fill(0);
     }
 }

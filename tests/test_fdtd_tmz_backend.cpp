@@ -99,7 +99,7 @@ TEST_CASE("Backend types have lowercase names", "[unit][backend]")
     CHECK(fdtd::TMz::backend_name(BackendType::Cuda) == "cuda");
 }
 
-// Verify that the serial backend round-trips fields.
+// Verify that the serial backend round-trips fields, the split parts of Ez included.
 TEST_CASE("Serial backend round-trips fields", "[unit][backend][serial]")
 {
     const fdtd::TMz::Grid2D grid(7, 5);
@@ -113,6 +113,8 @@ TEST_CASE("Serial backend round-trips fields", "[unit][backend][serial]")
     input.ez()[grid.index(2, 3)] = 1;
     input.hx()[grid.index(6, 0)] = 2;
     input.hy()[grid.index(0, 4)] = 3;
+    input.ezx()[grid.index(1, 1)] = 4;
+    input.ezy()[grid.index(5, 2)] = 5;
     backend->upload(input);
 
     fdtd::TMz::Fields2D output(grid);
@@ -120,6 +122,8 @@ TEST_CASE("Serial backend round-trips fields", "[unit][backend][serial]")
     CHECK(std::equal(input.ez().begin(), input.ez().end(), output.ez().begin()));
     CHECK(std::equal(input.hx().begin(), input.hx().end(), output.hx().begin()));
     CHECK(std::equal(input.hy().begin(), input.hy().end(), output.hy().begin()));
+    CHECK(std::equal(input.ezx().begin(), input.ezx().end(), output.ezx().begin()));
+    CHECK(std::equal(input.ezy().begin(), input.ezy().end(), output.ezy().begin()));
 }
 
 // Verify that fields on another grid are rejected.

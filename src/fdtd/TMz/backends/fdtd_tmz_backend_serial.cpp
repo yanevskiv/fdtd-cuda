@@ -268,6 +268,8 @@ namespace fdtd::TMz
         copy_field(fields.ez(), m_fields.ez());
         copy_field(fields.hx(), m_fields.hx());
         copy_field(fields.hy(), m_fields.hy());
+        copy_field(fields.ezx(), m_fields.ezx());
+        copy_field(fields.ezy(), m_fields.ezy());
     }
 
     // Copy the fields out.
@@ -277,6 +279,8 @@ namespace fdtd::TMz
         copy_field(m_fields.ez(), fields.ez());
         copy_field(m_fields.hx(), fields.hx());
         copy_field(m_fields.hy(), fields.hy());
+        copy_field(m_fields.ezx(), fields.ezx());
+        copy_field(m_fields.ezy(), fields.ezy());
     }
 
     // Copy the coefficient arrays in.

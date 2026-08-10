@@ -55,13 +55,15 @@ TEST_CASE("Fields2D allocates aligned zeroed arrays", "[unit][fields2d]")
 
     CHECK(fields.grid().nx() == nx);
     CHECK(fields.grid().ny() == ny);
-    for (auto view : {fields.ez(), fields.hx(), fields.hy()}) {
+    for (auto view : {fields.ez(), fields.hx(), fields.hy(), fields.ezx(), fields.ezy()}) {
         CHECK(view.size() == fields.grid().size());
         CHECK(is_aligned(view.data()));
         CHECK(all_zero(view));
     }
     CHECK(fields.ez().data() != fields.hx().data());
     CHECK(fields.hx().data() != fields.hy().data());
+    CHECK(fields.hy().data() != fields.ezx().data());
+    CHECK(fields.ezx().data() != fields.ezy().data());
 }
 
 // Verify that zero() clears values written through the views.
@@ -73,11 +75,17 @@ TEST_CASE("Fields2D zero clears every field", "[unit][fields2d]")
     fields.ez()[grid.index(3, 2)] = 1;
     fields.hx()[grid.index(0, 0)] = 2;
     fields.hy()[grid.index(8, 3)] = 3;
+    fields.ezx()[grid.index(1, 1)] = 4;
+    fields.ezy()[grid.index(7, 2)] = 5;
     CHECK_FALSE(all_zero(fields.ez()));
+    CHECK_FALSE(all_zero(fields.ezx()));
+    CHECK_FALSE(all_zero(fields.ezy()));
     fields.zero();
     CHECK(all_zero(fields.ez()));
     CHECK(all_zero(fields.hx()));
     CHECK(all_zero(fields.hy()));
+    CHECK(all_zero(fields.ezx()));
+    CHECK(all_zero(fields.ezy()));
 }
 
 // Verify that moving a buffer transfers its memory and leaves the source empty.
