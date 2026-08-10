@@ -19,7 +19,7 @@
  */
 
 // The driver and the version.
-#include "fdtd/driver/fdtd_driver.h"
+#include "fdtd/fdtd_driver.h"
 #include "fdtd/fdtd_version.h"
 
 // Standard library for streams and errors.
@@ -33,15 +33,15 @@
 int main(int argc, char **argv)
 {
     const std::vector<std::string_view> args(argv + 1, argv + argc);
-    fdtd::driver::DriverOptions options;
+    fdtd::DriverOptions options;
     try {
-        options = fdtd::driver::parse_options(args);
+        options = fdtd::parse_driver_options(args);
     } catch (const std::exception &error) {
         std::cerr << "fdtd: " << error.what() << "\nTry 'fdtd --help'.\n";
         return 2;
     }
     if (options.help) {
-        std::cout << fdtd::driver::usage("fdtd");
+        std::cout << fdtd::driver_usage("fdtd");
         return 0;
     }
     if (options.version) {
@@ -49,7 +49,7 @@ int main(int argc, char **argv)
         return 0;
     }
     try {
-        fdtd::driver::run(options, std::cout);
+        fdtd::run_driver(options, std::cout);
     } catch (const std::exception &error) {
         std::cerr << "fdtd: " << error.what() << '\n';
         return 1;

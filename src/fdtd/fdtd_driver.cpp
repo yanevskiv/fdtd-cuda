@@ -19,7 +19,7 @@
  */
 
 // Function declarations.
-#include "fdtd/driver/fdtd_driver.h"
+#include "fdtd/fdtd_driver.h"
 
 // The simulation, its output files and the source waveform.
 #include "fdtd/TMz/fdtd_tmz_output.h"
@@ -34,8 +34,8 @@
 #include <string>
 #include <system_error>
 
-// Namespace for the command-line driver.
-namespace fdtd::driver
+// Namespace for the fdtd library.
+namespace fdtd
 {
     // Helpers private to this file.
     namespace
@@ -81,7 +81,7 @@ namespace fdtd::driver
         }
 
         // Parse I,J[,WIDTH] for a pulse.
-        PulseSpec parse_pulse(std::string_view text)
+        DriverPulseSpec parse_pulse(std::string_view text)
         {
             const auto fields = split(text);
             if (fields.size() < 2 || fields.size() > 3) {
@@ -92,7 +92,7 @@ namespace fdtd::driver
         }
 
         // Parse I,J for a probe.
-        ProbeSpec parse_probe(std::string_view text)
+        DriverProbeSpec parse_probe(std::string_view text)
         {
             const auto fields = split(text);
             if (fields.size() != 2) {
@@ -181,7 +181,7 @@ namespace fdtd::driver
     }
 
     // Walk the arguments, splitting "--name=value" or taking the next argument as the value.
-    DriverOptions parse_options(std::span<const std::string_view> args)
+    DriverOptions parse_driver_options(std::span<const std::string_view> args)
     {
         DriverOptions options;
         for (std::size_t k = 0; k < args.size(); ++k) {
@@ -211,7 +211,7 @@ namespace fdtd::driver
     }
 
     // Build the usage text.
-    std::string usage(std::string_view program)
+    std::string driver_usage(std::string_view program)
     {
         return "Usage: " + std::string(program) +
                " [options]\n"
@@ -244,7 +244,7 @@ namespace fdtd::driver
     }
 
     // Build the simulation, run it in pieces between snapshots, then write the probes.
-    void run(const DriverOptions &options, std::ostream &log)
+    void run_driver(const DriverOptions &options, std::ostream &log)
     {
         TMz::Sim2D::Options simOptions;
         simOptions.dx = FloatType(options.dx);
@@ -259,11 +259,11 @@ namespace fdtd::driver
             sim.add_source(options.nx / 2, ny / 2, TMz::Component::Ez,
                            TMz::Gaussian::from_steps(sim.dt(), 30));
         }
-        for (const PulseSpec &pulse : options.pulses) {
+        for (const DriverPulseSpec &pulse : options.pulses) {
             sim.add_source(pulse.i, pulse.j, TMz::Component::Ez,
                            TMz::Gaussian::from_steps(sim.dt(), pulse.width));
         }
-        for (const ProbeSpec &probe : options.probes) {
+        for (const DriverProbeSpec &probe : options.probes) {
             sim.add_probe(probe.i, probe.j, TMz::Component::Ez);
         }
 
@@ -284,7 +284,7 @@ namespace fdtd::driver
         }
 
         for (std::size_t k = 0; k < options.probes.size(); ++k) {
-            const ProbeSpec &probe = options.probes[k];
+            const DriverProbeSpec &probe = options.probes[k];
             const auto path = options.output / ("probe_" + std::to_string(k) + ".csv");
             const std::string comment = "probe " + std::to_string(k) +
                                         " at i=" + std::to_string(probe.i) +

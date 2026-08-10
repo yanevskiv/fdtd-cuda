@@ -21,7 +21,7 @@
 #include <catch2/catch_test_macros.hpp>
 
 #include "fdtd/TMz/fdtd_tmz_output.h"
-#include "fdtd/driver/fdtd_driver.h"
+#include "fdtd/fdtd_driver.h"
 
 #include <filesystem>
 #include <fstream>
@@ -31,8 +31,8 @@
 #include <string_view>
 #include <vector>
 
-using fdtd::driver::DriverOptions;
-using fdtd::driver::parse_options;
+using fdtd::DriverOptions;
+using fdtd::parse_driver_options;
 using fdtd::TMz::BackendType;
 using fdtd::TMz::Boundary;
 
@@ -41,7 +41,7 @@ namespace
     // Parse a list of arguments.
     DriverOptions parse(std::vector<std::string_view> args)
     {
-        return parse_options(args);
+        return parse_driver_options(args);
     }
 }
 
@@ -125,7 +125,7 @@ TEST_CASE("Driver smoke run", "[unit][driver]")
                           "--snapshot-every", "10", "--boundary", "pmc"});
     options.output = dir;
     std::ostringstream log;
-    fdtd::driver::run(options, log);
+    fdtd::run_driver(options, log);
 
     for (const char *name : {"snapshot_000000.bin", "snapshot_000010.bin", "snapshot_000020.bin",
                              "snapshot_000025.bin", "probe_0.csv"}) {
