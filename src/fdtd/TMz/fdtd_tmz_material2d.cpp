@@ -20,6 +20,9 @@
 // Class declaration.
 #include "fdtd/TMz/fdtd_tmz_material2d.h"
 
+// Project constants for the vacuum impedance.
+#include "fdtd/fdtd_constants.h"
+
 // Standard library for math, limits and errors.
 #include <algorithm>
 #include <cmath>
@@ -42,6 +45,40 @@ namespace fdtd::TMz
                 throw std::invalid_argument("Material2D: medium is not physical");
             }
         }
+
+        // Throw unless the layer fits twice on each axis and the order and reflection
+        // are in range.
+        void check_pml(const Grid2D &grid, std::size_t thickness, double order, double reflection)
+        {
+            if (2 * thickness >= grid.nx() || 2 * thickness >= grid.ny()) {
+                throw std::invalid_argument(
+                    "Material2D: 2 * PML thickness must be below nx and ny");
+            }
+            if (!(order > 0) || !std::isfinite(order)) {
+                throw std::invalid_argument("Material2D: PML order must be positive and finite");
+            }
+            if (!(reflection > 0) || !(reflection < 1)) {
+                throw std::invalid_argument("Material2D: PML reflection must be in (0, 1)");
+            }
+        }
+
+        // Size sigma_max for a round trip through the layer damped to the target reflection.
+        double pml_sigma_max(std::size_t thickness, double cellSize, double order,
+                             double reflection) noexcept
+        {
+            return -(order + 1) * std::log(reflection) / (2 * ETA_0 * double(thickness) * cellSize);
+        }
+
+        // Grade sigma_max by the depth past the inner edge of the nearer layer, relative to
+        // the thickness and capped at the wall, raised to the order.
+        double pml_sigma(double position, std::size_t n, std::size_t thickness, double order,
+                         double sigmaMax) noexcept
+        {
+            const double low = double(thickness) - position;
+            const double high = position - double(n - 1 - thickness);
+            const double depth = std::min(std::max({low, high, 0.0}), double(thickness));
+            return sigmaMax * std::pow(depth / double(thickness), order);
+        }
     }
 
     // Allocate the arrays and fill them with vacuum.
@@ -51,6 +88,10 @@ namespace fdtd::TMz
         , m_mu_r(grid.size(), FloatType(1))
         , m_sigma_e(grid.size(), FloatType(0))
         , m_sigma_m(grid.size(), FloatType(0))
+        , m_sigma_e_x(grid.size(), FloatType(0))
+        , m_sigma_e_y(grid.size(), FloatType(0))
+        , m_sigma_m_x(grid.size(), FloatType(0))
+        , m_sigma_m_y(grid.size(), FloatType(0))
     {}
 
     // Return the grid.
@@ -143,6 +184,70 @@ namespace fdtd::TMz
     std::span<const FloatType> Material2D::sigma_m() const noexcept
     {
         return m_sigma_m;
+    }
+
+    // Check the settings, then grade the four profiles cell by cell, or zero them.
+    void Material2D::set_pml(std::size_t thickness, double order, double reflection)
+    {
+        if (thickness == 0) {
+            m_pml_thickness = 0;
+            std::fill(m_sigma_e_x.begin(), m_sigma_e_x.end(), FloatType(0));
+            std::fill(m_sigma_e_y.begin(), m_sigma_e_y.end(), FloatType(0));
+            std::fill(m_sigma_m_x.begin(), m_sigma_m_x.end(), FloatType(0));
+            std::fill(m_sigma_m_y.begin(), m_sigma_m_y.end(), FloatType(0));
+            return;
+        }
+        check_pml(m_grid, thickness, order, reflection);
+
+        const std::size_t nx = m_grid.nx();
+        const std::size_t ny = m_grid.ny();
+        const double maxX = pml_sigma_max(thickness, double(m_grid.dx()), order, reflection);
+        const double maxY = pml_sigma_max(thickness, double(m_grid.dy()), order, reflection);
+        const double magnetic = MU_0 / EPS_0;
+        for (std::size_t j = 0; j < ny; ++j) {
+            const double y = double(j);
+            for (std::size_t i = 0; i < nx; ++i) {
+                const double x = double(i);
+                const std::size_t k = m_grid.index(i, j);
+                m_sigma_e_x[k] = FloatType(pml_sigma(x, nx, thickness, order, maxX));
+                m_sigma_e_y[k] = FloatType(pml_sigma(y, ny, thickness, order, maxY));
+                m_sigma_m_x[k] =
+                    FloatType(magnetic * pml_sigma(x + 0.5, nx, thickness, order, maxX));
+                m_sigma_m_y[k] =
+                    FloatType(magnetic * pml_sigma(y + 0.5, ny, thickness, order, maxY));
+            }
+        }
+        m_pml_thickness = thickness;
+    }
+
+    // Return the PML thickness.
+    std::size_t Material2D::pml_thickness() const noexcept
+    {
+        return m_pml_thickness;
+    }
+
+    // Return the PML electric conductivity along x.
+    std::span<const FloatType> Material2D::sigma_e_x() const noexcept
+    {
+        return m_sigma_e_x;
+    }
+
+    // Return the PML electric conductivity along y.
+    std::span<const FloatType> Material2D::sigma_e_y() const noexcept
+    {
+        return m_sigma_e_y;
+    }
+
+    // Return the PML magnetic conductivity along x.
+    std::span<const FloatType> Material2D::sigma_m_x() const noexcept
+    {
+        return m_sigma_m_x;
+    }
+
+    // Return the PML magnetic conductivity along y.
+    std::span<const FloatType> Material2D::sigma_m_y() const noexcept
+    {
+        return m_sigma_m_y;
     }
 
     // Write the four parameters of one cell.

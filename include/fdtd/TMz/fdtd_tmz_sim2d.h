@@ -110,7 +110,7 @@ namespace fdtd
              * @throws std::invalid_argument On a bad grid, a Courant number outside (0, 1],
              *         a negative or non-finite dt, or, with check_stability, an explicit
              *         dt above the Courant limit, or, with an active PML, PML settings that
-             *         check_pml() rejects.
+             *         Material2D::set_pml() rejects.
              * @throws std::runtime_error When the backend is not compiled in.
              */
             Sim2D(std::size_t nx, std::size_t ny, const Options &options);
@@ -137,7 +137,7 @@ namespace fdtd
             double dt() const noexcept;
 
             /**
-             * Material of the simulation.
+             * Material of the simulation, with the PML of the options graded in.
              *
              * @return The material.
              */
@@ -145,6 +145,9 @@ namespace fdtd
 
             /**
              * Replace the material and upload the coefficients rebuilt from it.
+             *
+             * The PML of the options replaces any the material carries, so the PML always
+             * follows the boundary.
              *
              * @param material New material, on a grid with the same size and cells.
              * @throws std::invalid_argument When the material's grid does not match.
@@ -314,10 +317,7 @@ namespace fdtd
             /** Time step in seconds. */
             double m_dt;
 
-            /** Thickness of the active PML in cells, zero when there is none. */
-            std::size_t m_pml_thickness;
-
-            /** Per-cell material. */
+            /** Per-cell material, holding the PML profiles. */
             Material2D m_material;
 
             /** Host copy of the fields. */

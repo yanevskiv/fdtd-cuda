@@ -144,6 +144,7 @@ TEST_CASE("Sim2D activates the PML only with Boundary::Pml", "[unit][sim2d][pml]
     opts.pml_thickness = 5;
     CHECK(Sim2D(16, 12, opts).pml_thickness() == 5);
     CHECK(Sim2D(16, 12, opts).backend().boundary() == Boundary::Pml);
+    CHECK(Sim2D(16, 12, opts).material().pml_thickness() == 5);
 
     opts.pml_thickness = 0;
     CHECK(Sim2D(16, 12, opts).pml_thickness() == 0);
@@ -184,6 +185,27 @@ TEST_CASE("Sim2D checks the PML settings when active", "[unit][sim2d][pml]")
     opts.pml_thickness = 4;
     opts.pml_reflection = 1;
     CHECK_THROWS_AS(Sim2D(16, 16, opts), std::invalid_argument);
+}
+
+// Verify that set_material grades the PML of the options into the new material, and
+// clears a PML the material carries when the boundary has none.
+TEST_CASE("Sim2D set_material keeps the PML of the options", "[unit][sim2d][pml]")
+{
+    Sim2D::Options opts;
+    opts.boundary = Boundary::Pml;
+    opts.pml_thickness = 3;
+    Sim2D sim(12, 12, opts);
+    const Material2D vacuum(sim.grid());
+    sim.set_material(vacuum);
+    CHECK(sim.material().pml_thickness() == 3);
+    CHECK(sim.material().sigma_e_x()[sim.grid().index(0, 6)] > FloatType(0));
+
+    Sim2D pec(12, 12);
+    Material2D graded(pec.grid());
+    graded.set_pml(3, 3, 1e-6);
+    pec.set_material(graded);
+    CHECK(pec.pml_thickness() == 0);
+    CHECK(pec.material().sigma_e_x()[pec.grid().index(0, 6)] == FloatType(0));
 }
 
 // Verify that the edge Ez takes no source with the PML, as under PEC.

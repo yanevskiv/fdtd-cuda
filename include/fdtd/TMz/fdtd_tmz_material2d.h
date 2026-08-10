@@ -38,6 +38,11 @@ namespace fdtd
          *
          * Each array has grid().size() elements, indexed with Grid2D::index. Permittivity
          * and permeability are relative; the conductivities are in SI units.
+         *
+         * Besides the isotropic media, the material holds the directional conductivities of
+         * a split-field PML along the edges, zero until set_pml() grades them. They are the
+         * vacuum profiles: the coefficients scale them by eps_r and mu_r, so the media and
+         * the PML can be set in any order, and the fill functions leave them alone.
          */
         class Material2D
         {
@@ -146,6 +151,64 @@ namespace fdtd
              */
             std::span<const FloatType> sigma_m() const noexcept;
 
+            /**
+             * Grade the PML conductivities along the edges, or clear them.
+             *
+             * The axis along x has nx Ez nodes 0 .. nx - 1, with the PML walls behind nodes
+             * 0 and nx - 1; the layers end at nodes thickness and nx - 1 - thickness. At a
+             * depth d into a layer, in cells,
+             *
+             *     sigma(d) = sigma_max (d / thickness)^order,
+             *     sigma_max = -(order + 1) ln reflection / (2 eta0 thickness dx),
+             *
+             * so a wave crossing the layer and back at normal incidence is damped to the
+             * reflection. The magnetic profiles are matched, sigma* = sigma mu0 / eps0, and
+             * sampled half a cell further, where Hy and Hx sit. Likewise along y, with dy.
+             *
+             * @param thickness Layer thickness in cells, with 2 * thickness < nx and ny;
+             *        zero clears the profiles and ignores order and reflection.
+             * @param order Grading exponent, positive and finite.
+             * @param reflection Target reflection at normal incidence, in (0, 1).
+             * @throws std::invalid_argument When a setting is out of range; the material is
+             *         then unchanged.
+             */
+            void set_pml(std::size_t thickness, double order, double reflection);
+
+            /**
+             * Thickness of the PML.
+             *
+             * @return Layer thickness in cells, zero without a PML.
+             */
+            std::size_t pml_thickness() const noexcept;
+
+            /**
+             * PML electric conductivity along x in S/m, at the Ez node of each cell (i).
+             *
+             * @return Read-only view of the array.
+             */
+            std::span<const FloatType> sigma_e_x() const noexcept;
+
+            /**
+             * PML electric conductivity along y in S/m, at the Ez node of each cell (j).
+             *
+             * @return Read-only view of the array.
+             */
+            std::span<const FloatType> sigma_e_y() const noexcept;
+
+            /**
+             * PML magnetic conductivity along x in ohm/m, at the Hy node of each cell (i + 1/2).
+             *
+             * @return Read-only view of the array.
+             */
+            std::span<const FloatType> sigma_m_x() const noexcept;
+
+            /**
+             * PML magnetic conductivity along y in ohm/m, at the Hx node of each cell (j + 1/2).
+             *
+             * @return Read-only view of the array.
+             */
+            std::span<const FloatType> sigma_m_y() const noexcept;
+
         private:
             /**
              * Set one cell to a medium, unchecked.
@@ -169,6 +232,21 @@ namespace fdtd
 
             /** Magnetic conductivity per cell in ohm/m. */
             std::vector<FloatType> m_sigma_m;
+
+            /** PML thickness in cells, zero without a PML. */
+            std::size_t m_pml_thickness = 0;
+
+            /** PML electric conductivity along x per cell in S/m. */
+            std::vector<FloatType> m_sigma_e_x;
+
+            /** PML electric conductivity along y per cell in S/m. */
+            std::vector<FloatType> m_sigma_e_y;
+
+            /** PML magnetic conductivity along x per cell in ohm/m. */
+            std::vector<FloatType> m_sigma_m_x;
+
+            /** PML magnetic conductivity along y per cell in ohm/m. */
+            std::vector<FloatType> m_sigma_m_y;
         };
     }
 }

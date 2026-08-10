@@ -20,10 +20,9 @@
 // Class declaration.
 #include "fdtd/TMz/fdtd_tmz_sim2d.h"
 
-// Coefficients, the Courant limit and the PML settings.
+// Coefficients and the Courant limit.
 #include "fdtd/TMz/fdtd_tmz_coeffs2d.h"
 #include "fdtd/TMz/fdtd_tmz_courant.h"
-#include "fdtd/TMz/fdtd_tmz_pml2d.h"
 
 // Standard library for algorithms, math, errors and moves.
 #include <algorithm>
@@ -53,15 +52,13 @@ namespace fdtd::TMz
             return options.dt;
         }
 
-        // Check the PML settings when the PML is active and return its thickness, else zero.
-        std::size_t options_pml_thickness(const Grid2D &grid, const Sim2D::Options &options)
+        // Grade the PML of a material from the options, or clear it unless the boundary is
+        // Boundary::Pml.
+        void apply_pml(Material2D &material, const Sim2D::Options &options)
         {
-            if (options.boundary != Boundary::Pml || options.pml_thickness == 0) {
-                return 0;
-            }
-            check_pml(grid.nx(), grid.ny(), options.pml_thickness, options.pml_order,
-                      options.pml_reflection);
-            return options.pml_thickness;
+            const std::size_t thickness =
+                options.boundary == Boundary::Pml ? options.pml_thickness : 0;
+            material.set_pml(thickness, options.pml_order, options.pml_reflection);
         }
     }
 
@@ -72,16 +69,17 @@ namespace fdtd::TMz
         // Empty.
     }
 
-    // Build the grid, the vacuum material and the backend, and upload the coefficients.
+    // Build the grid, the vacuum material with its PML and the backend, and upload the
+    // coefficients.
     Sim2D::Sim2D(std::size_t nx, std::size_t ny, const Options &options)
         : m_options(options)
         , m_grid(nx, ny, options.dx, options.dy)
         , m_dt(options_dt(m_grid, options))
-        , m_pml_thickness(options_pml_thickness(m_grid, options))
         , m_material(m_grid)
         , m_fields(m_grid)
         , m_backend(make_backend(options.backend, m_grid))
     {
+        apply_pml(m_material, m_options);
         m_backend->upload(Coeffs2D(m_material, m_dt));
         m_backend->set_boundary(options.boundary);
         m_backend->upload(m_fields);
@@ -90,7 +88,7 @@ namespace fdtd::TMz
     // Return the active PML thickness.
     std::size_t Sim2D::pml_thickness() const noexcept
     {
-        return m_pml_thickness;
+        return m_material.pml_thickness();
     }
 
     // Return the options.
@@ -117,7 +115,8 @@ namespace fdtd::TMz
         return m_material;
     }
 
-    // Check the grid, keep the material and upload its coefficients.
+    // Check the grid, keep the material with the PML of the options and upload its
+    // coefficients.
     void Sim2D::set_material(const Material2D &material)
     {
         const Grid2D &grid = material.grid();
@@ -125,7 +124,9 @@ namespace fdtd::TMz
             grid.dy() != m_grid.dy()) {
             throw std::invalid_argument("Sim2D: material grid does not match");
         }
-        m_material = material;
+        Material2D next = material;
+        apply_pml(next, m_options);
+        m_material = std::move(next);
         m_backend->upload(Coeffs2D(m_material, m_dt));
     }
 
