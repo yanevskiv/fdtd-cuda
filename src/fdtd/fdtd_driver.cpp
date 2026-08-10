@@ -29,8 +29,9 @@
 #include "fdtd/TMz/fdtd_tmz_sim2d.h"
 #include "fdtd/TMz/fdtd_tmz_waveform.h"
 
-// Standard library for formatting and errors.
-#include <cstdio>
+// Standard library for string building and errors.
+#include <iomanip>
+#include <sstream>
 #include <stdexcept>
 #include <string>
 
@@ -45,7 +46,10 @@ namespace fdtd
         {
             const auto fields = split_list_arg(text);
             if (fields.size() < 2 || fields.size() > 3) {
-                throw std::invalid_argument("--pulse: expected I,J[,WIDTH]: " + std::string(text));
+                std::ostringstream message;
+                message << "--pulse: expected I,J[,WIDTH]: ";
+                message << text;
+                throw std::invalid_argument(message.str());
             }
             return {parse_size_arg("--pulse", fields[0]), parse_size_arg("--pulse", fields[1]),
                     fields.size() == 3 ? parse_positive_arg("--pulse", fields[2]) : 30.0};
@@ -56,7 +60,10 @@ namespace fdtd
         {
             const auto fields = split_list_arg(text);
             if (fields.size() != 2) {
-                throw std::invalid_argument("--probe: expected I,J: " + std::string(text));
+                std::ostringstream message;
+                message << "--probe: expected I,J: ";
+                message << text;
+                throw std::invalid_argument(message.str());
             }
             return {parse_size_arg("--probe", fields[0]), parse_size_arg("--probe", fields[1])};
         }
@@ -69,8 +76,13 @@ namespace fdtd
                     return "pec";
                 case TMz::Boundary::Pmc:
                     return "pmc";
-                case TMz::Boundary::Pml:
-                    return "pml (" + std::to_string(options.pml_thickness) + " cells)";
+                case TMz::Boundary::Pml: {
+                    std::ostringstream text;
+                    text << "pml (";
+                    text << options.pml_thickness;
+                    text << " cells)";
+                    return text.str();
+                }
             }
             return "unknown";
         }
@@ -112,16 +124,23 @@ namespace fdtd
                 }
                 options.output = std::string(value);
             } else {
-                throw std::invalid_argument("unknown option: " + std::string(name));
+                std::ostringstream message;
+                message << "unknown option: ";
+                message << name;
+                throw std::invalid_argument(message.str());
             }
         }
 
-        // Format a step as a fixed-width file name part.
-        std::string step_name(std::size_t step)
+        // Name the snapshot file of a step, the step zero-padded to six digits.
+        std::string snapshot_name(std::size_t step)
         {
-            char buffer[32];
-            std::snprintf(buffer, sizeof(buffer), "%06zu", step);
-            return buffer;
+            std::ostringstream name;
+            name << "snapshot_";
+            name << std::setw(6);
+            name << std::setfill('0');
+            name << step;
+            name << ".bin";
+            return name.str();
         }
 
         // Write a snapshot of the current fields and log it.
@@ -129,9 +148,11 @@ namespace fdtd
                            std::ostream &log)
         {
             const auto snap = sim.snapshot();
-            const auto path = dir / ("snapshot_" + step_name(snap.step) + ".bin");
+            const auto path = dir / snapshot_name(snap.step);
             TMz::write_snapshot(path, snap.fields, snap.step, sim.dt());
-            log << "wrote " << path.string() << '\n';
+            log << "wrote ";
+            log << path.string();
+            log << '\n';
         }
     }
 
@@ -155,38 +176,41 @@ namespace fdtd
     // Build the usage text.
     std::string driver_usage(std::string_view program)
     {
-        return "Usage: " + std::string(program) +
-               " [options]\n"
-               "\n"
-               "2D TMz FDTD simulation. Runs soft Gaussian Ez sources on a grid and writes\n"
-               "probe traces as CSV and Ez snapshots as binary files.\n"
-               "\n"
-               "Options:\n"
-               "  --nx N                Cells along x (default: 200)\n"
-               "  --ny N                Cells along y (default: nx)\n"
-               "  --dx M                Cell size along x in meters (default: 1e-3)\n"
-               "  --dy M                Cell size along y in meters (default: dx)\n"
-               "  --courant S           Courant number in (0, 1] (default: 0.99)\n"
-               "  --steps N             Time steps to run (default: 300)\n"
-               "  --pulse I,J[,W]       Gaussian Ez source W steps wide (default W: 30);\n"
-               "                        repeatable; none means one at the centre\n"
-               "  --probe I,J           Record Ez at a cell into probe_<k>.csv; repeatable\n"
-               "  --snapshot-every N    Write snapshot_<step>.bin every N steps (default: 0,\n"
-               "                        none)\n"
-               "  --boundary B          Outer boundary, pec, pmc or pml (default: pec)\n"
-               "  --pml-thickness N     PML thickness in cells, 0 for none (default: 20)\n"
-               "  --pml-order M         Grading exponent of the PML (default: 3)\n"
-               "  --pml-reflection R    Target PML reflection at normal incidence, in\n"
-               "                        (0, 1) (default: 1e-6)\n"
-               "  --backend B           Backend, serial, openmp or cuda (default: serial)\n"
-               "  --output DIR          Directory for the files (default: out)\n"
-               "  -h, --help            Show this message and exit\n"
-               "  -v, --version         Show the version and exit\n"
-               "\n"
-               "Example:\n"
-               "  " +
-               std::string(program) +
-               " --nx 256 --steps 400 --probe 160,128 --snapshot-every 50 --output out\n";
+        std::ostringstream usage;
+        usage << "Usage: ";
+        usage << program;
+        usage << " [options]\n";
+        usage << "\n";
+        usage << "2D TMz FDTD simulation. Runs soft Gaussian Ez sources on a grid and writes\n";
+        usage << "probe traces as CSV and Ez snapshots as binary files.\n";
+        usage << "\n";
+        usage << "Options:\n";
+        usage << "  --nx N                Cells along x (default: 200)\n";
+        usage << "  --ny N                Cells along y (default: nx)\n";
+        usage << "  --dx M                Cell size along x in meters (default: 1e-3)\n";
+        usage << "  --dy M                Cell size along y in meters (default: dx)\n";
+        usage << "  --courant S           Courant number in (0, 1] (default: 0.99)\n";
+        usage << "  --steps N             Time steps to run (default: 300)\n";
+        usage << "  --pulse I,J[,W]       Gaussian Ez source W steps wide (default W: 30);\n";
+        usage << "                        repeatable; none means one at the centre\n";
+        usage << "  --probe I,J           Record Ez at a cell into probe_<k>.csv; repeatable\n";
+        usage << "  --snapshot-every N    Write snapshot_<step>.bin every N steps (default: 0,\n";
+        usage << "                        none)\n";
+        usage << "  --boundary B          Outer boundary, pec, pmc or pml (default: pec)\n";
+        usage << "  --pml-thickness N     PML thickness in cells, 0 for none (default: 20)\n";
+        usage << "  --pml-order M         Grading exponent of the PML (default: 3)\n";
+        usage << "  --pml-reflection R    Target PML reflection at normal incidence, in\n";
+        usage << "                        (0, 1) (default: 1e-6)\n";
+        usage << "  --backend B           Backend, serial, openmp or cuda (default: serial)\n";
+        usage << "  --output DIR          Directory for the files (default: out)\n";
+        usage << "  -h, --help            Show this message and exit\n";
+        usage << "  -v, --version         Show the version and exit\n";
+        usage << "\n";
+        usage << "Example:\n";
+        usage << "  ";
+        usage << program;
+        usage << " --nx 256 --steps 400 --probe 160,128 --snapshot-every 50 --output out\n";
+        return usage.str();
     }
 
     // Build the simulation, run it in pieces between snapshots, then write the probes.
@@ -217,9 +241,19 @@ namespace fdtd
         }
 
         std::filesystem::create_directories(options.output);
-        log << "grid " << options.nx << " x " << ny << ", dt " << sim.dt() << " s, "
-            << options.steps << " steps on " << TMz::backend_name(options.backend) << ", boundary "
-            << describe_boundary(options) << '\n';
+        log << "grid ";
+        log << options.nx;
+        log << " x ";
+        log << ny;
+        log << ", dt ";
+        log << sim.dt();
+        log << " s, ";
+        log << options.steps;
+        log << " steps on ";
+        log << TMz::backend_name(options.backend);
+        log << ", boundary ";
+        log << describe_boundary(options);
+        log << '\n';
 
         const std::size_t every = options.snapshot_every;
         if (every > 0) {
@@ -235,12 +269,23 @@ namespace fdtd
 
         for (std::size_t k = 0; k < options.probes.size(); ++k) {
             const DriverProbeSpec &probe = options.probes[k];
-            const auto path = options.output / ("probe_" + std::to_string(k) + ".csv");
-            const std::string comment = "probe " + std::to_string(k) +
-                                        " at i=" + std::to_string(probe.i) +
-                                        ", j=" + std::to_string(probe.j) + ", component Ez";
-            TMz::write_probe_csv(path, comment, sim.probe_times(k), sim.probe_data(k));
-            log << "wrote " << path.string() << '\n';
+            std::ostringstream name;
+            name << "probe_";
+            name << k;
+            name << ".csv";
+            const auto path = options.output / name.str();
+            std::ostringstream comment;
+            comment << "probe ";
+            comment << k;
+            comment << " at i=";
+            comment << probe.i;
+            comment << ", j=";
+            comment << probe.j;
+            comment << ", component Ez";
+            TMz::write_probe_csv(path, comment.str(), sim.probe_times(k), sim.probe_data(k));
+            log << "wrote ";
+            log << path.string();
+            log << '\n';
         }
     }
 }

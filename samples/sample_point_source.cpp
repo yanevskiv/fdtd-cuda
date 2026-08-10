@@ -28,6 +28,27 @@
 #include <cmath>
 #include <cstddef>
 #include <iostream>
+#include <string_view>
+
+// Helpers private to this file.
+namespace
+{
+    // Print a padded label, a value and its unit on one line.
+    void print_line(std::string_view label, double value, std::string_view unit)
+    {
+        // Print the label, padded so the values line up.
+        std::cout << label;
+
+        // Print the value.
+        std::cout << value;
+
+        // Print the unit after a space.
+        std::cout << unit;
+
+        // End the line.
+        std::cout << '\n';
+    }
+}
 
 // Send a Gaussian pulse across a PEC box and time its arrival at a probe.
 int main()
@@ -71,10 +92,17 @@ int main()
     // Measure the distance from the source to the probe.
     const double distance = 50 * double(sim.grid().dx());
 
-    // Print the peak against pulse peak plus travel; a 2D soft source peaks a few % early.
-    std::cout << "dt               " << sim.dt() << " s\n"
-              << "peak at probe    " << times[peak] << " s, Ez " << values[peak] << " V/m\n"
-              << "t0 + d / C_0     " << pulse.t0() + distance / C_0 << " s\n";
+    // Print the time step.
+    print_line("dt               ", sim.dt(), " s");
+
+    // Print when the pulse peaked at the probe.
+    print_line("peak at probe    ", times[peak], " s");
+
+    // Print how high it peaked.
+    print_line("Ez at the peak   ", double(values[peak]), " V/m");
+
+    // Print the pulse peak plus travel at C_0; a 2D soft source peaks a few % early.
+    print_line("t0 + d / C_0     ", pulse.t0() + distance / C_0, " s");
 
     // Copy the fields back from the backend.
     sim.download();

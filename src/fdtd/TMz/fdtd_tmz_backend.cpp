@@ -23,9 +23,10 @@
 // Backend implementations.
 #include "fdtd/TMz/backends/fdtd_tmz_backend_serial.h"
 
-// Standard library for algorithms, limits, errors and strings.
+// Standard library for algorithms, limits, errors and string building.
 #include <algorithm>
 #include <limits>
+#include <sstream>
 #include <stdexcept>
 #include <string>
 #include <utility>
@@ -125,7 +126,10 @@ namespace fdtd::TMz
             case BackendType::Cuda:
                 break;
         }
-        throw std::runtime_error("make_backend: the " + std::string(backend_name(type)) +
-                                 " backend is not compiled into this build");
+        std::ostringstream message;
+        message << "make_backend: the ";
+        message << backend_name(type);
+        message << " backend is not compiled into this build";
+        throw std::runtime_error(message.str());
     }
 }

@@ -37,7 +37,9 @@ int main(int argc, char **argv)
     try {
         options = fdtd::parse_driver_options(args);
     } catch (const std::exception &error) {
-        std::cerr << "fdtd: " << error.what() << "\nTry 'fdtd --help'.\n";
+        std::cerr << "fdtd: ";
+        std::cerr << error.what();
+        std::cerr << "\nTry 'fdtd --help'.\n";
         return 2;
     }
     if (options.help) {
@@ -45,13 +47,16 @@ int main(int argc, char **argv)
         return 0;
     }
     if (options.version) {
-        std::cout << FDTD_VERSION_STRING << '\n';
+        std::cout << FDTD_VERSION_STRING;
+        std::cout << '\n';
         return 0;
     }
     try {
         fdtd::run_driver(options, std::cout);
     } catch (const std::exception &error) {
-        std::cerr << "fdtd: " << error.what() << '\n';
+        std::cerr << "fdtd: ";
+        std::cerr << error.what();
+        std::cerr << '\n';
         return 1;
     }
     return 0;

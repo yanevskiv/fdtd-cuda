@@ -28,8 +28,10 @@
 #include <ios>
 #include <iterator>
 #include <limits>
+#include <sstream>
 #include <stdexcept>
 #include <string>
+#include <string_view>
 #include <vector>
 
 // Namespace for the 2D TMz module.
@@ -70,12 +72,25 @@ namespace fdtd::TMz
             return values;
         }
 
+        // Build the error for a snapshot file that cannot be read back.
+        std::runtime_error snapshot_error(const std::string &name, std::string_view problem)
+        {
+            std::ostringstream message;
+            message << name;
+            message << ": ";
+            message << problem;
+            return std::runtime_error(message.str());
+        }
+
         // Open a file for writing or throw.
         std::ofstream open_output(const std::filesystem::path &path, std::ios::openmode mode)
         {
             std::ofstream out(path, mode | std::ios::trunc);
             if (!out) {
-                throw std::runtime_error("cannot write " + path.string());
+                std::ostringstream message;
+                message << "cannot write ";
+                message << path.string();
+                throw std::runtime_error(message.str());
             }
             return out;
         }
@@ -84,7 +99,10 @@ namespace fdtd::TMz
         void require_written(const std::ofstream &out, const std::filesystem::path &path)
         {
             if (!out) {
-                throw std::runtime_error("cannot write " + path.string());
+                std::ostringstream message;
+                message << "cannot write ";
+                message << path.string();
+                throw std::runtime_error(message.str());
             }
         }
     }
@@ -121,21 +139,24 @@ namespace fdtd::TMz
     {
         std::ifstream in(path, std::ios::binary);
         if (!in) {
-            throw std::runtime_error("cannot read " + path.string());
+            std::ostringstream message;
+            message << "cannot read ";
+            message << path.string();
+            throw std::runtime_error(message.str());
         }
         const std::vector<char> buffer((std::istreambuf_iterator<char>(in)),
                                        std::istreambuf_iterator<char>());
         const std::string name = path.string();
         if (buffer.size() < SNAPSHOT_HEADER_SIZE ||
             !std::equal(std::begin(SNAPSHOT_MAGIC), std::end(SNAPSHOT_MAGIC), buffer.begin())) {
-            throw std::runtime_error(name + ": not a snapshot file");
+            throw snapshot_error(name, "not a snapshot file");
         }
         if (get<std::uint32_t>(buffer, 8) != SNAPSHOT_VERSION) {
-            throw std::runtime_error(name + ": unsupported snapshot version");
+            throw snapshot_error(name, "unsupported snapshot version");
         }
         const auto size = get<std::uint32_t>(buffer, 12);
         if (size != 4 && size != 8) {
-            throw std::runtime_error(name + ": unsupported value size");
+            throw snapshot_error(name, "unsupported value size");
         }
         SnapshotData data{get<std::uint64_t>(buffer, 16),
                           get<std::uint64_t>(buffer, 24),
@@ -146,11 +167,11 @@ namespace fdtd::TMz
                           {}};
         const std::size_t count = data.nx * data.ny;
         if (data.ny != 0 && count / data.ny != data.nx) {
-            throw std::runtime_error(name + ": length does not match the header");
+            throw snapshot_error(name, "length does not match the header");
         }
         if ((buffer.size() - SNAPSHOT_HEADER_SIZE) / size != count ||
             (buffer.size() - SNAPSHOT_HEADER_SIZE) % size != 0) {
-            throw std::runtime_error(name + ": length does not match the header");
+            throw snapshot_error(name, "length does not match the header");
         }
         data.ez = size == 4 ? widen<float>(buffer, SNAPSHOT_HEADER_SIZE, count)
                             : widen<double>(buffer, SNAPSHOT_HEADER_SIZE, count);
@@ -167,11 +188,18 @@ namespace fdtd::TMz
         std::ofstream out = open_output(path, std::ios::out);
         out.precision(std::numeric_limits<double>::max_digits10);
         if (!comment.empty()) {
-            out << "# " << comment << '\n';
+            out << "# ";
+            out << comment;
+            out << '\n';
         }
         out << "step,time,ez\n";
         for (std::size_t n = 0; n < values.size(); ++n) {
-            out << n + 1 << ',' << times[n] << ',' << static_cast<double>(values[n]) << '\n';
+            out << n + 1;
+            out << ',';
+            out << times[n];
+            out << ',';
+            out << static_cast<double>(values[n]);
+            out << '\n';
         }
         require_written(out, path);
     }

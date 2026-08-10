@@ -21,12 +21,13 @@
 // Function declarations.
 #include "fdtd/fdtd_args.h"
 
-// Standard library for parsing, math and errors.
+// Standard library for parsing, math, string building and errors.
 #include <algorithm>
 #include <charconv>
 #include <cmath>
+#include <limits>
+#include <sstream>
 #include <stdexcept>
-#include <string>
 #include <system_error>
 
 // Namespace for the fdtd library.
@@ -41,7 +42,7 @@ namespace fdtd
             double value = 0;
             const auto [end, ec] = std::from_chars(text.data(), text.data() + text.size(), value);
             if (ec != std::errc() || end != text.data() + text.size() || !std::isfinite(value)) {
-                return std::nan("");
+                return std::numeric_limits<double>::quiet_NaN();
             }
             return value;
         }
@@ -60,19 +61,28 @@ namespace fdtd
                 continue;
             }
             if (!arg.starts_with("--")) {
-                throw std::invalid_argument("unexpected argument: " + std::string(arg));
+                std::ostringstream message;
+                message << "unexpected argument: ";
+                message << arg;
+                throw std::invalid_argument(message.str());
             }
             const std::size_t equals = arg.find('=');
             if (equals != std::string_view::npos) {
                 const std::string_view name = arg.substr(0, equals);
                 if (std::find(flags.begin(), flags.end(), name) != flags.end()) {
-                    throw std::invalid_argument(std::string(name) + ": takes no value");
+                    std::ostringstream message;
+                    message << name;
+                    message << ": takes no value";
+                    throw std::invalid_argument(message.str());
                 }
                 options.push_back({name, arg.substr(equals + 1)});
                 continue;
             }
             if (k + 1 == args.size()) {
-                throw std::invalid_argument(std::string(arg) + ": missing value");
+                std::ostringstream message;
+                message << arg;
+                message << ": missing value";
+                throw std::invalid_argument(message.str());
             }
             options.push_back({arg, args[++k]});
         }
@@ -85,8 +95,11 @@ namespace fdtd
         std::size_t value = 0;
         const auto [end, ec] = std::from_chars(text.data(), text.data() + text.size(), value);
         if (ec != std::errc() || end != text.data() + text.size()) {
-            throw std::invalid_argument(std::string(name) +
-                                        ": not a whole number: " + std::string(text));
+            std::ostringstream message;
+            message << name;
+            message << ": not a whole number: ";
+            message << text;
+            throw std::invalid_argument(message.str());
         }
         return value;
     }
@@ -96,8 +109,11 @@ namespace fdtd
     {
         const double value = parse_number(text);
         if (!(value > 0)) {
-            throw std::invalid_argument(std::string(name) +
-                                        ": not a positive number: " + std::string(text));
+            std::ostringstream message;
+            message << name;
+            message << ": not a positive number: ";
+            message << text;
+            throw std::invalid_argument(message.str());
         }
         return value;
     }
@@ -107,8 +123,11 @@ namespace fdtd
     {
         const double value = parse_number(text);
         if (!(value >= 0)) {
-            throw std::invalid_argument(std::string(name) +
-                                        ": not a non-negative number: " + std::string(text));
+            std::ostringstream message;
+            message << name;
+            message << ": not a non-negative number: ";
+            message << text;
+            throw std::invalid_argument(message.str());
         }
         return value;
     }
@@ -140,8 +159,11 @@ namespace fdtd
         if (text == "pml") {
             return TMz::Boundary::Pml;
         }
-        throw std::invalid_argument(std::string(name) +
-                                    ": expected pec, pmc or pml: " + std::string(text));
+        std::ostringstream message;
+        message << name;
+        message << ": expected pec, pmc or pml: ";
+        message << text;
+        throw std::invalid_argument(message.str());
     }
 
     // Match the name of every backend type.
@@ -153,7 +175,10 @@ namespace fdtd
                 return type;
             }
         }
-        throw std::invalid_argument(std::string(name) +
-                                    ": expected serial, openmp or cuda: " + std::string(text));
+        std::ostringstream message;
+        message << name;
+        message << ": expected serial, openmp or cuda: ";
+        message << text;
+        throw std::invalid_argument(message.str());
     }
 }

@@ -28,11 +28,28 @@
 #include <cmath>
 #include <cstddef>
 #include <iostream>
+#include <string_view>
 #include <vector>
 
 // Helpers private to this file.
 namespace
 {
+    // Print a padded label, a value and its unit on one line.
+    void print_line(std::string_view label, double value, std::string_view unit)
+    {
+        // Print the label, padded so the values line up.
+        std::cout << label;
+
+        // Print the value.
+        std::cout << value;
+
+        // Print the unit after a space.
+        std::cout << unit;
+
+        // End the line.
+        std::cout << '\n';
+    }
+
     // Run a 60 x 60 interior inside a border of some cells, with a pulse 20 cells from the left
     // of the interior, and return Ez 5 cells from the left; write the final Ez when asked.
     std::vector<fdtd::FloatType> run_trace(const fdtd::TMz::Sim2D::Options &options,
@@ -101,12 +118,20 @@ int main()
         error = std::max(error, std::abs(double(trace[n]) - double(reference[n])));
     }
 
-    // Print the measurement against the target, which the discrete grading falls short of.
-    std::cout << "incident peak    " << peak << " V/m\n"
-              << "largest echo     " << error << " V/m\n"
-              << "reflection       " << 20 * std::log10(error / peak) << " dB\n"
-              << "target R0        " << 20 * std::log10(pml.pml_reflection) << " dB\n"
-              << "wrote pml.bin\n";
+    // Print the incident peak.
+    print_line("incident peak    ", peak, " V/m");
+
+    // Print the largest echo the PML let back.
+    print_line("largest echo     ", error, " V/m");
+
+    // Print the echo against the peak in decibels.
+    print_line("reflection       ", 20 * std::log10(error / peak), " dB");
+
+    // Print the target, which the discrete grading falls short of.
+    print_line("target R0        ", 20 * std::log10(pml.pml_reflection), " dB");
+
+    // Say where the final field went.
+    std::cout << "wrote pml.bin\n";
 
     // Report success.
     return 0;

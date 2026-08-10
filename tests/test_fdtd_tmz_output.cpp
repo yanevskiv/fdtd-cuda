@@ -42,7 +42,7 @@ namespace
     public:
         // Create a fresh directory named after a test.
         explicit TempDir(const std::string &name)
-            : m_path(std::filesystem::temp_directory_path() / ("fdtd_test_" + name))
+            : m_path(std::filesystem::temp_directory_path() / "fdtd_test" / name)
         {
             std::filesystem::remove_all(m_path);
             std::filesystem::create_directories(m_path);
@@ -128,11 +128,15 @@ TEST_CASE("Snapshot reader rejects bad files", "[unit][output]")
     const std::string bytes = read_text(good);
 
     const auto bad = dir.path() / "bad.bin";
-    write_text(bad, "FDTDSNAX" + bytes.substr(8));
+    std::string magic = bytes;
+    magic.replace(0, 8, "FDTDSNAX");
+    write_text(bad, magic);
     CHECK_THROWS_AS(fdtd::TMz::read_snapshot(bad), std::runtime_error);
     write_text(bad, bytes.substr(0, bytes.size() - 1));
     CHECK_THROWS_AS(fdtd::TMz::read_snapshot(bad), std::runtime_error);
-    write_text(bad, bytes + std::string(sizeof(FloatType), '\0'));
+    std::string padded = bytes;
+    padded.append(sizeof(FloatType), '\0');
+    write_text(bad, padded);
     CHECK_THROWS_AS(fdtd::TMz::read_snapshot(bad), std::runtime_error);
     std::string version = bytes;
     version[8] = 2;
