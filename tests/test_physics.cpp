@@ -50,6 +50,15 @@ using fdtd::TMz::Sim2D;
 
 namespace
 {
+    // Square interior, in cells, of the PML reflection runs.
+    constexpr std::size_t REFLECTION_INTERIOR = 60;
+
+    // Margin around the reference interior, wide enough that its wall echoes nothing in time.
+    constexpr std::size_t REFLECTION_MARGIN = 100;
+
+    // Steps of a reflection run.
+    constexpr std::size_t REFLECTION_STEPS = 250;
+
     // A cell of the grid by column and row.
     struct Cell
     {
@@ -165,15 +174,6 @@ namespace
         }
         return history;
     }
-
-    // Square interior, in cells, of the PML reflection runs.
-    constexpr std::size_t REFLECTION_INTERIOR = 60;
-
-    // Margin around the reference interior, wide enough that its wall echoes nothing in time.
-    constexpr std::size_t REFLECTION_MARGIN = 100;
-
-    // Steps of a reflection run.
-    constexpr std::size_t REFLECTION_STEPS = 250;
 
     // Record Ez at a probe from a Gaussian source in an interior inside a border of cells.
     std::vector<FloatType> interior_trace(const Sim2D::Options &opts, std::size_t border,
