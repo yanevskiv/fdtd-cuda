@@ -76,24 +76,25 @@ add_custom_target(bench
     USES_TERMINAL
     VERBATIM)
 
-# The report of the benchmark directory FDTD_BENCH_DIR: figures, Markdown and, with pandoc, a PDF.
-set(FDTD_BENCH_DIR "" CACHE STRING "Benchmark directory of the bench-report target")
+# The report of the benchmark run FDTD_BENCH_DIR: figures, Markdown and, with pandoc, a PDF.
+set(FDTD_BENCH_DIR "" CACHE STRING "Benchmark run directory of the bench-report target")
 find_program(FDTD_PANDOC pandoc)
-if(NOT FDTD_BENCH_DIR)
+string(REGEX REPLACE "/+$" "" bench_run "${FDTD_BENCH_DIR}")
+get_filename_component(bench_stamp "${bench_run}" NAME)
+set(bench_report ${bench_run}/benchmark_${bench_stamp})
+if(NOT bench_run)
     set(bench_report_steps
         COMMAND ${CMAKE_COMMAND} -E echo "bench-report: FDTD_BENCH_DIR names no directory"
         COMMAND ${CMAKE_COMMAND} -E false)
 else()
     set(bench_report_steps
-        COMMAND ${PROJECT_SOURCE_DIR}/tools/plot_benchmark.py ${FDTD_BENCH_DIR}
-        COMMAND ${PROJECT_SOURCE_DIR}/tools/tabulate_benchmark.py ${FDTD_BENCH_DIR})
+        COMMAND ${PROJECT_SOURCE_DIR}/tools/plot_benchmark.py ${bench_run}
+        COMMAND ${PROJECT_SOURCE_DIR}/tools/tabulate_benchmark.py ${bench_run})
     if(FDTD_PANDOC)
         list(APPEND bench_report_steps
-            COMMAND ${CMAKE_COMMAND} -E make_directory ${PROJECT_SOURCE_DIR}/dist/docs
             COMMAND ${FDTD_PANDOC} --from=markdown --pdf-engine=lualatex --columns=1000
-                --resource-path=${FDTD_BENCH_DIR}/report
-                ${FDTD_BENCH_DIR}/report/benchmark_report.md
-                -o ${PROJECT_SOURCE_DIR}/dist/docs/benchmark_report.pdf)
+                --resource-path=${bench_run} ${bench_report}.md -o ${bench_report}.pdf
+            COMMAND ${CMAKE_COMMAND} -E echo "==> Creating PDF: ${bench_report}.pdf")
     else()
         list(APPEND bench_report_steps
             COMMAND ${CMAKE_COMMAND} -E echo "bench-report: pandoc is missing, so no PDF")

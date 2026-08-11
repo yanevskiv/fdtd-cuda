@@ -1,7 +1,7 @@
 # Thin wrapper over CMakePresets.json. Settings live in the presets.
 
 PRESET ?= debug
-BENCH_DIR ?= $(dir $(lastword $(sort $(wildcard build/results/benchmarks/*/benchmark.csv))))
+BENCH_DIR ?= $(lastword $(sort $(wildcard build/results/benchmarks/*)))
 
 SOURCES = $(shell git ls-files --cached --others --exclude-standard 'include/*.h' 'src/*.h' 'src/*.cpp' 'src/*.cu' 'src/*.cuh' \
 	'tests/*.cpp' 'tests/*.h' 'samples/*.cpp')

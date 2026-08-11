@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 #
-# Draw the figures of a benchmark directory: throughput, speedup and efficiency.
+# Draw the figures of a benchmark run: throughput, speedup and efficiency.
 #
 # Copyright (C) 2026 Ivan Janevski
 #
@@ -28,9 +28,8 @@ import matplotlib.pyplot as plt
 MARKERS = ["o", "s", "^", "D", "v", "P", "X", "*"]
 
 
-def load(directory):
-    """Read the samples of DIR/benchmark.csv, skipping the '#' lines."""
-    path = os.path.join(directory, "benchmark.csv")
+def load(path):
+    """Read the samples of a benchmark CSV, skipping the '#' lines."""
     with open(path, encoding="utf-8") as f:
         rows = [line for line in f if not line.startswith("#")]
 
@@ -76,8 +75,8 @@ def statistics(data, values, x_column):
 
 
 def save(fig, args, name):
-    """Save a figure as name in the output directory and close it."""
-    path = os.path.join(args.output_dir, name)
+    """Save a figure as images/<name>_<stamp>.png in the run directory and close it."""
+    path = os.path.join(args.output_dir, f"{name}_{args.stamp}.png")
     fig.savefig(path, dpi=args.dpi, bbox_inches="tight")
     plt.close(fig)
 
@@ -124,7 +123,7 @@ def plot_by_size(args, data, values):
     setup(ax, "Grid size nx = ny", "Throughput (Mcells/s)", "Throughput versus grid size")
     ax.legend()
 
-    save(fig, args, "throughput.png")
+    save(fig, args, "throughput")
 
 
 def plot_by_threads(args, data, values, ylabel, title, filename, ideal):
@@ -162,8 +161,8 @@ def plot_by_threads(args, data, values, ylabel, title, filename, ideal):
 
 
 def remove(args, name):
-    """Remove a figure an earlier run left in the output directory."""
-    path = os.path.join(args.output_dir, name)
+    """Remove a figure an earlier report of the run left in the output directory."""
+    path = os.path.join(args.output_dir, f"{name}_{args.stamp}.png")
     if os.path.exists(path):
         os.remove(path)
 
@@ -171,27 +170,26 @@ def remove(args, name):
 def main():
     """Parse the arguments and draw the figures."""
     parser = argparse.ArgumentParser(
-        description="Plot the figures of a benchmark directory."
+        description="Plot the figures of a benchmark run into DIR/images."
     )
 
-    parser.add_argument("dir", help="directory holding benchmark.csv")
-    parser.add_argument("-O", "--output-dir", help="default: DIR/report")
+    parser.add_argument("dir", help="run directory, named after its timestamp")
     parser.add_argument("--dpi", type=int, default=120)
 
     args = parser.parse_args()
 
-    if args.output_dir is None:
-        args.output_dir = os.path.join(args.dir, "report")
+    args.stamp = os.path.basename(os.path.normpath(args.dir))
+    args.output_dir = os.path.join(args.dir, "images")
     os.makedirs(args.output_dir, exist_ok=True)
 
-    data = load(args.dir)
+    data = load(os.path.join(args.dir, f"benchmark_{args.stamp}.csv"))
     throughput, speedup, efficiency = calculate(data)
 
     plot_by_size(args, data, throughput)
 
     if np.all(np.isnan(speedup)):
-        remove(args, "speedup.png")
-        remove(args, "efficiency.png")
+        remove(args, "speedup")
+        remove(args, "efficiency")
         print("==> No OpenMP samples with a serial run of the same size: no speedup plots")
         return
 
@@ -201,7 +199,7 @@ def main():
         speedup,
         "Speedup S(p)",
         "Speedup versus number of threads",
-        "speedup.png",
+        "speedup",
         ideal="linear",
     )
 
@@ -211,7 +209,7 @@ def main():
         efficiency,
         "Efficiency E(p)",
         "Efficiency versus number of threads",
-        "efficiency.png",
+        "efficiency",
         ideal="unit",
     )
 

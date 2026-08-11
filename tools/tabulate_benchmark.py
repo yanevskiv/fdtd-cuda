@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 #
-# Write the Markdown report of a benchmark directory: the machine, the medians and the figures.
+# Write the Markdown report of a benchmark run: the machine, the medians and the figures.
 #
 # Copyright (C) 2026 Ivan Janevski
 #
@@ -27,18 +27,17 @@ TEMPLATE = os.path.join(os.path.dirname(__file__), "report", "benchmark_report.m
 CONFIG = ["backend", "variant", "precision", "threads", "nx", "ny", "nsteps"]
 
 FIGURES = [
-    ("throughput.png", "Throughput versus grid size"),
-    ("speedup.png", "Speedup versus number of threads"),
-    ("efficiency.png", "Efficiency versus number of threads"),
+    ("throughput", "Throughput versus grid size"),
+    ("speedup", "Speedup versus number of threads"),
+    ("efficiency", "Efficiency versus number of threads"),
 ]
 
 
-def load(directory):
-    """Read DIR/benchmark.csv.
+def load(path):
+    """Read a benchmark CSV.
 
     Returns the '# key: value' lines as (key, value) pairs, and the samples.
     """
-    path = os.path.join(directory, "benchmark.csv")
     sysinfo = []
     rows = []
 
@@ -102,13 +101,14 @@ def results_table(data):
     return "\n".join(lines)
 
 
-def figure_list(output_dir):
-    """Return the Markdown of the figures plot_benchmark.py drew into the output directory."""
+def figure_list(directory, stamp):
+    """Return the Markdown of the figures plot_benchmark.py drew into DIR/images."""
     lines = []
 
     for name, caption in FIGURES:
-        if os.path.exists(os.path.join(output_dir, name)):
-            lines.append(f"![{caption}]({name}){{width=90%}}")
+        image = f"images/{name}_{stamp}.png"
+        if os.path.exists(os.path.join(directory, image)):
+            lines.append(f"![{caption}]({image}){{width=90%}}")
 
     if not lines:
         return "No figures: run plot_benchmark.py on this directory first."
@@ -125,34 +125,30 @@ def figure_list(output_dir):
 def main():
     """Parse the arguments and write the report."""
     parser = argparse.ArgumentParser(
-        description="Write the Markdown report of a benchmark directory."
+        description="Write the Markdown report of a benchmark run into DIR."
     )
 
-    parser.add_argument("dir", help="directory holding benchmark.csv")
-    parser.add_argument("-O", "--output-dir", help="default: DIR/report")
+    parser.add_argument("dir", help="run directory, named after its timestamp")
 
     args = parser.parse_args()
 
-    if args.output_dir is None:
-        args.output_dir = os.path.join(args.dir, "report")
-    os.makedirs(args.output_dir, exist_ok=True)
-
-    sysinfo, data = load(args.dir)
+    stamp = os.path.basename(os.path.normpath(args.dir))
+    sysinfo, data = load(os.path.join(args.dir, f"benchmark_{stamp}.csv"))
 
     with open(TEMPLATE, encoding="utf-8") as f:
         template = string.Template(f.read())
 
     text = template.substitute(
         date=dict(sysinfo).get("date", "unknown"),
-        source=os.path.basename(os.path.normpath(args.dir)),
+        stamp=stamp,
         samples=len(data),
         configurations=len(np.unique(data[CONFIG])),
         machine=machine_table(sysinfo),
         results=results_table(data),
-        figures=figure_list(args.output_dir),
+        figures=figure_list(args.dir, stamp),
     )
 
-    path = os.path.join(args.output_dir, "benchmark_report.md")
+    path = os.path.join(args.dir, f"benchmark_{stamp}.md")
     with open(path, "w", encoding="utf-8") as f:
         f.write(text)
 

@@ -1,6 +1,6 @@
 #!/bin/bash
 #
-# Run the benchmark program once per grid size and collect the rows into one benchmark.csv.
+# Run the benchmark program once per grid size and collect the rows into one CSV per run.
 #
 # Copyright (C) 2026 Ivan Janevski
 #
@@ -25,12 +25,12 @@ STEPS=500
 REPEAT=10
 BACKENDS=()
 THREADS=()
-DIR=""
+OUT="results/benchmarks"
 
 # Print usage instructions
 usage() {
     echo "Usage: $0 -p PROGRAM [-n STEPS] [-r REPEAT] [-b BACKEND]... [-t THREADS]..." \
-        "[-o DIR] SIZE..." >&2
+        "[-o OUTDIR] SIZE..." >&2
 }
 
 # Print an error and the usage, then exit 2
@@ -38,16 +38,6 @@ usage_error() {
     echo "benchmark.sh: $1" >&2
     usage
     exit 2
-}
-
-# Name the default output directory under results/ after the date and, in a git checkout, the commit
-default_dir() {
-    local name commit=""
-    name="$(date -u +%Y%m%d-%H%M%S)"
-    if command -v git >/dev/null && git -C "$HERE" rev-parse --git-dir >/dev/null 2>&1; then
-        commit="$(git -C "$HERE" rev-parse --short=12 HEAD 2>/dev/null)"
-    fi
-    echo "results/benchmarks/$name${commit:+-$commit}"
 }
 
 # Print a line on standard error and append it to the run log
@@ -62,7 +52,7 @@ while getopts "p:n:r:b:t:o:h" opt; do
         r) REPEAT="$OPTARG" ;;
         b) BACKENDS+=(--backend "$OPTARG") ;;
         t) THREADS+=(--threads "$OPTARG") ;;
-        o) DIR="$OPTARG" ;;
+        o) OUT="$OPTARG" ;;
         h) usage; exit 0 ;;
         *) usage; exit 2 ;;
     esac
@@ -71,12 +61,15 @@ shift $((OPTIND - 1))
 
 [ -n "$PROG" ] && [ -x "$PROG" ] || usage_error "-p must name the benchmark program"
 [ "$#" -ge 1 ] || usage_error "no grid size given"
-DIR="${DIR:-$(default_dir)}"
-[ "${DIR#/}" != "$DIR" ] || DIR="$PWD/$DIR"
-CSV="$DIR/benchmark.csv"
-LOG="$DIR/run.log"
-if [ -e "$CSV" ]; then
-    echo "benchmark.sh: $CSV already exists" >&2
+[ "${OUT#/}" != "$OUT" ] || OUT="$PWD/$OUT"
+
+# A run is named after its start in milliseconds since 1970, in its directory and every file.
+STAMP="$(date +%s%3N)"
+DIR="$OUT/$STAMP"
+CSV="$DIR/benchmark_$STAMP.csv"
+LOG="$DIR/benchmark_$STAMP.log"
+if [ -e "$DIR" ]; then
+    echo "benchmark.sh: $DIR already exists" >&2
     exit 1
 fi
 mkdir -p "$DIR" || exit 1
