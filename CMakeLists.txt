@@ -65,6 +65,17 @@ target_link_libraries(fdtd_benchmark PUBLIC fdtd::fdtd PRIVATE fdtd_args fdtd_wa
 add_executable(benchmark src/benchmark.cpp)
 target_link_libraries(benchmark PRIVATE fdtd_benchmark fdtd_warnings)
 
+# The benchmark sweep, run by hand; timing is never a test.
+set(FDTD_BENCH_SIZES "128;256;512;1024;2048" CACHE STRING "Grid sizes of the bench target")
+set(FDTD_BENCH_STEPS 500 CACHE STRING "Time steps per sample of the bench target")
+set(FDTD_BENCH_REPEAT 10 CACHE STRING "Samples per configuration of the bench target")
+add_custom_target(bench
+    COMMAND ${PROJECT_SOURCE_DIR}/tools/benchmark.sh -p $<TARGET_FILE:benchmark>
+        -n ${FDTD_BENCH_STEPS} -r ${FDTD_BENCH_REPEAT} ${FDTD_BENCH_SIZES}
+    DEPENDS benchmark
+    USES_TERMINAL
+    VERBATIM)
+
 if(FDTD_BUILD_SAMPLES)
     add_executable(sample_point_source samples/sample_point_source.cpp)
     target_link_libraries(sample_point_source PRIVATE fdtd::fdtd fdtd_warnings)

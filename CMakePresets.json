@@ -56,6 +56,16 @@
                 "FDTD_WITH_CUDA": "OFF",
                 "FDTD_WERROR": "ON"
             }
+        },
+        {
+            "name": "bench",
+            "displayName": "Benchmark (gcc, Release, no tests or samples)",
+            "inherits": ["base", "gcc"],
+            "cacheVariables": {
+                "CMAKE_BUILD_TYPE": "Release",
+                "FDTD_BUILD_TESTS": "OFF",
+                "FDTD_BUILD_SAMPLES": "OFF"
+            }
         }
     ],
     "buildPresets": [
@@ -63,7 +73,8 @@
         { "name": "release", "configurePreset": "release" },
         { "name": "clang-debug", "configurePreset": "clang-debug" },
         { "name": "clang-release", "configurePreset": "clang-release" },
-        { "name": "ci-cpu", "configurePreset": "ci-cpu" }
+        { "name": "ci-cpu", "configurePreset": "ci-cpu" },
+        { "name": "bench", "configurePreset": "bench" }
     ],
     "testPresets": [
         {

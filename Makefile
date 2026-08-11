@@ -5,7 +5,7 @@ PRESET ?= debug
 SOURCES = $(shell git ls-files --cached --others --exclude-standard 'include/*.h' 'src/*.h' 'src/*.cpp' 'src/*.cu' 'src/*.cuh' \
 	'tests/*.cpp' 'tests/*.h' 'samples/*.cpp')
 
-.PHONY: all configure build test install workflow lint lint-changed format clean
+.PHONY: all configure build test install workflow bench lint lint-changed format clean
 
 all: build
 
@@ -23,6 +23,10 @@ install: build
 
 workflow:
 	cmake --workflow --preset $(PRESET)
+
+bench:
+	cmake --preset bench
+	cmake --build --preset bench --target bench
 
 TIDY = clang-tidy -p build/$(PRESET) --quiet --header-filter='^.*/include/fdtd/.*' \
 	--warnings-as-errors=readability-identifier-naming
