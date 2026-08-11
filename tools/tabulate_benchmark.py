@@ -63,10 +63,11 @@ def load(path):
 def run_date(stamp):
     """Return the start of a run in UTC, from its timestamp in milliseconds.
 
-    Returns it as 'January 19, 2026 (14:05:09)'.
+    Returns it as 'January 19, 2026 (14:05:09Z)', the time with its zone as ISO 8601 writes it.
     """
     start = datetime.datetime.fromtimestamp(int(stamp) / 1000, tz=datetime.timezone.utc)
-    return f"{start:%B} {start.day}, {start:%Y} ({start:%H:%M:%S})"
+    time = start.isoformat(timespec="seconds").split("T")[1].replace("+00:00", "Z")
+    return f"{start:%B} {start.day}, {start:%Y} ({time})"
 
 
 def machine_table(sysinfo):
