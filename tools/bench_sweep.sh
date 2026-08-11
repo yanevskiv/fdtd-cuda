@@ -21,6 +21,7 @@ set -u -o pipefail
 
 HERE="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 CONFIG="$(dirname "$HERE")/config"
+NAME="../config"
 PROG=""
 OUT="results/benchmarks"
 
@@ -38,11 +39,7 @@ usage_error() {
 
 # Print an error about the config file and exit 1
 config_error() {
-    echo "" >&2
-    echo "*** bench_sweep.sh: $1" >&2
-    echo "*** Copy config.example to config in the project root and edit it:" >&2
-    echo "***     cp config.example config" >&2
-    echo "" >&2
+    echo "bench_sweep.sh: $1 (try: cp config.example config)" >&2
     exit 1
 }
 
@@ -54,7 +51,7 @@ log() {
 while getopts "p:c:o:h" opt; do
     case "$opt" in
         p) PROG="$OPTARG" ;;
-        c) CONFIG="$OPTARG" ;;
+        c) CONFIG="$OPTARG"; NAME="$OPTARG" ;;
         o) OUT="$OPTARG" ;;
         h) usage; exit 0 ;;
         *) usage; exit 2 ;;
@@ -64,12 +61,12 @@ shift $((OPTIND - 1))
 
 [ -n "$PROG" ] && [ -x "$PROG" ] || usage_error "-p must name the benchmark program"
 [ "$#" -eq 0 ] || usage_error "no arguments after the options; the sweep is in $CONFIG"
-[ -f "$CONFIG" ] || config_error "no config file at $CONFIG"
+[ -f "$CONFIG" ] || config_error "can't find '$NAME' file"
 
 # shellcheck source=../config.example
-. "$CONFIG" || config_error "$CONFIG failed to load"
+. "$CONFIG" || config_error "can't load '$NAME' file"
 for name in BENCH_STEPS BENCH_REPEAT BENCH_BACKENDS BENCH_THREADS BENCH_SIZES; do
-    [ -n "${!name:-}" ] || config_error "$CONFIG does not set $name"
+    [ -n "${!name:-}" ] || config_error "'$NAME' file doesn't set $name"
 done
 
 # The settings are space-separated lists, one option of the program per item.
