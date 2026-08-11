@@ -1,0 +1,388 @@
+/*
+ * C++ file for the benchmark program.
+ *
+ *
+ * Copyright (C) 2026 Ivan Janevski
+ *
+ * fdtd-cuda  is free software; you can redistribute it and/or modify it
+ * under the terms of the GNU General Public License as published by the
+ * Free  Software  Foundation;  either  version 3 of the License, or (at
+ * your option) any later version.
+ *
+ * fdtd-cuda  is  distributed  in  the  hope that it will be useful, but
+ * WITHOUT   ANY   WARRANTY;   without  even  the  implied  warranty  of
+ * MERCHANTABILITY  or  FITNESS  FOR  A  PARTICULAR PURPOSE. See the GNU
+ * General Public License for more details.
+ *
+ * You  should  have  received  a copy of the GNU General Public License
+ * along with fdtd-cuda; if not, see <https://www.gnu.org/licenses/>.
+ */
+
+// Function declarations.
+#include "fdtd/fdtd_benchmark.h"
+
+// Shared argument parsing.
+#include "fdtd/fdtd_args.h"
+
+// The simulation and the source waveform.
+#include "fdtd/TMz/fdtd_tmz_sim2d.h"
+#include "fdtd/TMz/fdtd_tmz_waveform.h"
+#include "fdtd/fdtd_float.h"
+
+// Standard library for timing, sorting, string building, files and errors.
+#include <algorithm>
+#include <chrono>
+#include <fstream>
+#include <iomanip>
+#include <sstream>
+#include <stdexcept>
+
+// Namespace for the fdtd library.
+namespace fdtd
+{
+    // Helpers private to this file.
+    namespace
+    {
+        // Width of the Gaussian source in time steps, as fdtd-openmp's benchmark uses.
+        constexpr double PULSE_WIDTH_STEPS = 12;
+
+        // Precision of this build as the CSV names it.
+        constexpr std::string_view PRECISION = FDTD_DOUBLE ? "double" : "float";
+
+        // Add a backend to the list unless it is there already.
+        void add_backend(std::vector<TMz::BackendType> &backends, TMz::BackendType type)
+        {
+            if (std::find(backends.begin(), backends.end(), type) == backends.end()) {
+                backends.push_back(type);
+            }
+        }
+
+        // Apply one option and its value to the settings.
+        void apply(BenchmarkOptions &options, std::string_view name, std::string_view value)
+        {
+            if (name == "--nx") {
+                options.nx = parse_size_arg(name, value);
+            } else if (name == "--ny") {
+                options.ny = parse_size_arg(name, value);
+            } else if (name == "--steps") {
+                options.steps = parse_size_arg(name, value);
+            } else if (name == "--repeat") {
+                options.repeat = parse_size_arg(name, value);
+            } else if (name == "--warmup") {
+                options.warmup = parse_nonnegative_arg(name, value);
+            } else if (name == "--backend") {
+                if (value == "all") {
+                    for (const auto type : TMz::available_backends()) {
+                        add_backend(options.backends, type);
+                    }
+                } else {
+                    add_backend(options.backends, parse_backend_arg(name, value));
+                }
+            } else if (name == "--variant") {
+                if (value.empty()) {
+                    throw std::invalid_argument("--variant: empty name");
+                }
+                options.variants.emplace_back(value);
+            } else if (name == "--threads") {
+                options.threads.push_back(parse_size_arg(name, value));
+            } else if (name == "--boundary") {
+                options.boundary = parse_boundary_arg(name, value);
+            } else if (name == "--output") {
+                if (value.empty()) {
+                    throw std::invalid_argument("--output: empty file name");
+                }
+                options.output = std::string(value);
+            } else {
+                std::ostringstream message;
+                message << "unknown option: ";
+                message << name;
+                throw std::invalid_argument(message.str());
+            }
+        }
+
+        // Check the settings the parser leaves to the library.
+        void check(const BenchmarkOptions &options, std::span<const TMz::BackendType> backends,
+                   std::span<const std::string> variants)
+        {
+            if (options.steps == 0) {
+                throw std::invalid_argument("run_benchmark: steps must be positive");
+            }
+            if (options.repeat == 0) {
+                throw std::invalid_argument("run_benchmark: repeat must be positive");
+            }
+            for (const auto type : backends) {
+                if (!TMz::is_backend_available(type)) {
+                    std::ostringstream message;
+                    message << "run_benchmark: backend not compiled in: ";
+                    message << TMz::backend_name(type);
+                    throw std::invalid_argument(message.str());
+                }
+            }
+            for (const std::string &variant : variants) {
+                if (variant != "default") {
+                    std::ostringstream message;
+                    message << "run_benchmark: unknown variant: ";
+                    message << variant;
+                    throw std::invalid_argument(message.str());
+                }
+            }
+        }
+
+        // Build the workload, time its run, and sum Ez once the fields are back.
+        BenchmarkSample measure(const BenchmarkOptions &options, std::size_t ny,
+                                TMz::BackendType backend, const std::string &variant,
+                                std::size_t threads, std::size_t repeat)
+        {
+            TMz::Sim2D::Options simOptions;
+            simOptions.boundary = options.boundary;
+            simOptions.backend = backend;
+            TMz::Sim2D sim(options.nx, ny, simOptions);
+            sim.add_source(options.nx / 2, ny / 2, TMz::Component::Ez,
+                           TMz::Gaussian::from_steps(sim.dt(), PULSE_WIDTH_STEPS));
+
+            const auto start = std::chrono::steady_clock::now();
+            sim.run(options.steps);
+            const auto stop = std::chrono::steady_clock::now();
+
+            sim.download();
+            double checksum = 0;
+            for (const FloatType value : sim.fields().ez()) {
+                checksum += static_cast<double>(value);
+            }
+            const double seconds = std::chrono::duration<double>(stop - start).count();
+            return {
+                .backend = backend,
+                .variant = variant,
+                .threads = threads,
+                .nx = options.nx,
+                .ny = ny,
+                .nsteps = options.steps,
+                .repeat = repeat,
+                .seconds = seconds,
+                .checksum = checksum,
+            };
+        }
+
+        // Seconds since a time point of the steady clock.
+        double seconds_since(std::chrono::steady_clock::time_point start)
+        {
+            return std::chrono::duration<double>(std::chrono::steady_clock::now() - start).count();
+        }
+
+        // Run the workload untimed until the warm-up time has passed.
+        void warm_up(const BenchmarkOptions &options, std::size_t ny, TMz::BackendType backend,
+                     const std::string &variant, std::size_t threads)
+        {
+            if (!(options.warmup > 0)) {
+                return;
+            }
+            const auto start = std::chrono::steady_clock::now();
+            do {
+                measure(options, ny, backend, variant, threads, 0);
+            } while (seconds_since(start) < options.warmup);
+        }
+
+        // Take the median of the sample times, the mean of the middle two for an even count.
+        double median_seconds(std::span<const BenchmarkSample> samples)
+        {
+            std::vector<double> seconds;
+            seconds.reserve(samples.size());
+            for (const BenchmarkSample &sample : samples) {
+                seconds.push_back(sample.seconds);
+            }
+            std::sort(seconds.begin(), seconds.end());
+            const std::size_t mid = seconds.size() / 2;
+            return seconds.size() % 2 == 1 ? seconds[mid] : (seconds[mid - 1] + seconds[mid]) / 2;
+        }
+
+        // Write the summary line of one configuration.
+        void summarize(std::span<const BenchmarkSample> samples, std::ostream &log)
+        {
+            const BenchmarkSample &first = samples.front();
+            const double median = median_seconds(samples);
+            const double cells = static_cast<double>(first.nx) * static_cast<double>(first.ny) *
+                                 static_cast<double>(first.nsteps);
+            std::ostringstream line;
+            line << TMz::backend_name(first.backend);
+            line << ' ';
+            line << first.variant;
+            line << ", threads ";
+            line << first.threads;
+            line << ", ";
+            line << first.nx;
+            line << " x ";
+            line << first.ny;
+            line << ", ";
+            line << first.nsteps;
+            line << " steps: median ";
+            line << std::fixed;
+            line << std::setprecision(6);
+            line << median;
+            line << " s, ";
+            line << std::setprecision(1);
+            line << cells / median / 1e6;
+            line << " Mcells/s, checksum ";
+            line << std::defaultfloat;
+            line << std::setprecision(17);
+            line << first.checksum;
+            line << '\n';
+            log << line.str();
+        }
+    }
+
+    // Split the arguments, then set the flags and apply each option with its value.
+    BenchmarkOptions parse_benchmark_options(std::span<const std::string_view> args)
+    {
+        static constexpr std::string_view FLAGS[] = {"-h",        "--help",        "-v",
+                                                     "--version", "--header-only", "--no-header"};
+        BenchmarkOptions options;
+        for (const Argument &arg : split_arguments(args, FLAGS)) {
+            if (arg.name == "-h" || arg.name == "--help") {
+                options.help = true;
+            } else if (arg.name == "-v" || arg.name == "--version") {
+                options.version = true;
+            } else if (arg.name == "--header-only") {
+                options.header_only = true;
+            } else if (arg.name == "--no-header") {
+                options.no_header = true;
+            } else {
+                apply(options, arg.name, arg.value);
+            }
+        }
+        return options;
+    }
+
+    // Build the usage text.
+    std::string benchmark_usage(std::string_view program)
+    {
+        std::ostringstream usage;
+        usage << "Usage: ";
+        usage << program;
+        usage << " [options]\n";
+        usage << "\n";
+        usage << "Measure the 2D TMz time loop: a vacuum grid with a Gaussian Ez source at the\n";
+        usage << "centre, repeated per backend, variant and thread count, one CSV row per\n";
+        usage << "sample. A summary per configuration goes to standard error.\n";
+        usage << "\n";
+        usage << "Options:\n";
+        usage << "  --nx N                Cells along x (default: 256)\n";
+        usage << "  --ny N                Cells along y (default: nx)\n";
+        usage << "  --steps N             Time steps per sample (default: 500)\n";
+        usage << "  --repeat N            Samples per configuration (default: 10)\n";
+        usage << "  --warmup S            Seconds of untimed runs first, 0 for none\n";
+        usage << "                        (default: 0.1)\n";
+        usage << "  --backend B           Backend, serial, openmp, cuda or all; repeatable\n";
+        usage << "                        (default: all)\n";
+        usage << "  --variant V           Variant of the backend options; repeatable\n";
+        usage << "                        (default: default)\n";
+        usage << "  --threads N           Thread count, ignored by serial; repeatable\n";
+        usage << "                        (default: 1)\n";
+        usage << "  --boundary B          Outer boundary, pec, pmc or pml (default: pml)\n";
+        usage << "  --output FILE         Write the CSV to FILE (default: standard output)\n";
+        usage << "  --header-only         Write only the CSV header and exit\n";
+        usage << "  --no-header           Leave the CSV header out\n";
+        usage << "  -h, --help            Show this message and exit\n";
+        usage << "  -v, --version         Show the version and exit\n";
+        usage << "\n";
+        usage << "Example:\n";
+        usage << "  ";
+        usage << program;
+        usage << " --nx 1024 --steps 200 --repeat 5 --output bench.csv\n";
+        return usage.str();
+    }
+
+    // List the columns.
+    std::string benchmark_csv_header()
+    {
+        return "backend,variant,precision,threads,nx,ny,nsteps,repeat,seconds,checksum";
+    }
+
+    // Format the columns in header order.
+    std::string format_benchmark_row(const BenchmarkSample &sample)
+    {
+        std::ostringstream row;
+        row << TMz::backend_name(sample.backend);
+        row << ',';
+        row << sample.variant;
+        row << ',';
+        row << PRECISION;
+        row << ',';
+        row << sample.threads;
+        row << ',';
+        row << sample.nx;
+        row << ',';
+        row << sample.ny;
+        row << ',';
+        row << sample.nsteps;
+        row << ',';
+        row << sample.repeat;
+        row << ',';
+        row << std::fixed;
+        row << std::setprecision(9);
+        row << sample.seconds;
+        row << ',';
+        row << std::defaultfloat;
+        row << std::setprecision(17);
+        row << sample.checksum;
+        return row.str();
+    }
+
+    // Resolve the defaults, then measure each configuration and write its rows.
+    std::vector<BenchmarkSample> run_benchmark(const BenchmarkOptions &options, std::ostream &out,
+                                               std::ostream &log)
+    {
+        const std::vector<TMz::BackendType> backends =
+            options.backends.empty() ? TMz::available_backends() : options.backends;
+        const std::vector<std::string> variants =
+            options.variants.empty() ? std::vector<std::string>{"default"} : options.variants;
+        const std::vector<std::size_t> threadCounts =
+            options.threads.empty() ? std::vector<std::size_t>{1} : options.threads;
+        const std::vector<std::size_t> serialThreads{1};
+        const std::size_t ny = options.ny > 0 ? options.ny : options.nx;
+        if (!options.header_only) {
+            check(options, backends, variants);
+        }
+
+        std::ofstream file;
+        if (!options.output.empty()) {
+            file.open(options.output);
+            if (!file) {
+                std::ostringstream message;
+                message << "run_benchmark: cannot write ";
+                message << options.output.string();
+                throw std::runtime_error(message.str());
+            }
+        }
+        std::ostream &csv = options.output.empty() ? out : file;
+        if (!options.no_header || options.header_only) {
+            csv << benchmark_csv_header();
+            csv << '\n';
+        }
+
+        std::vector<BenchmarkSample> samples;
+        if (options.header_only) {
+            return samples;
+        }
+        for (const auto backend : backends) {
+            const std::vector<std::size_t> &counts =
+                backend == TMz::BackendType::Serial ? serialThreads : threadCounts;
+            for (const std::string &variant : variants) {
+                for (const std::size_t threads : counts) {
+                    warm_up(options, ny, backend, variant, threads);
+                    const std::size_t first = samples.size();
+                    for (std::size_t r = 0; r < options.repeat; ++r) {
+                        samples.push_back(measure(options, ny, backend, variant, threads, r));
+                        csv << format_benchmark_row(samples.back());
+                        csv << '\n';
+                        csv << std::flush;
+                    }
+                    summarize(std::span(samples).subspan(first), log);
+                }
+            }
+        }
+        if (!csv) {
+            throw std::runtime_error("run_benchmark: failed writing the CSV");
+        }
+        return samples;
+    }
+}

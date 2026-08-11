@@ -48,8 +48,7 @@ namespace fdtd
         }
     }
 
-    // Walk the arguments, taking flags alone and splitting "--name=value" or taking the
-    // next argument as the value.
+    // Walk the arguments, taking each option's value after '=' or from the next argument.
     std::vector<Argument> split_arguments(std::span<const std::string_view> args,
                                           std::span<const std::string_view> flags)
     {

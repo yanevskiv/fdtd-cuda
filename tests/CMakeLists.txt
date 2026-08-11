@@ -12,6 +12,7 @@ include(Catch)
 
 add_executable(fdtd_tests
     test_fdtd_args.cpp
+    test_fdtd_benchmark.cpp
     test_fdtd_constants.cpp
     test_fdtd_driver.cpp
     test_fdtd_tmz_backend.cpp
@@ -27,7 +28,7 @@ add_executable(fdtd_tests
     test_fdtd_version.cpp
     test_physics.cpp
     test_smoke.cpp)
-target_link_libraries(fdtd_tests PRIVATE fdtd::fdtd fdtd_args fdtd_driver fdtd_warnings Catch2::Catch2WithMain)
+target_link_libraries(fdtd_tests PRIVATE fdtd::fdtd fdtd_args fdtd_benchmark fdtd_driver fdtd_warnings Catch2::Catch2WithMain)
 target_compile_definitions(fdtd_tests PRIVATE
     FDTD_TEST_PROJECT_VERSION="${PROJECT_VERSION}"
     FDTD_TEST_PROJECT_VERSION_MAJOR=${PROJECT_VERSION_MAJOR}

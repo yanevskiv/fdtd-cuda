@@ -58,6 +58,13 @@ add_executable(fdtd_cli src/main.cpp)
 set_target_properties(fdtd_cli PROPERTIES OUTPUT_NAME fdtd)
 target_link_libraries(fdtd_cli PRIVATE fdtd_driver fdtd_warnings)
 
+# The benchmark: a static library the tests link, and the benchmark program.
+add_library(fdtd_benchmark STATIC src/fdtd/fdtd_benchmark.cpp)
+target_link_libraries(fdtd_benchmark PUBLIC fdtd::fdtd PRIVATE fdtd_args fdtd_warnings)
+
+add_executable(benchmark src/benchmark.cpp)
+target_link_libraries(benchmark PRIVATE fdtd_benchmark fdtd_warnings)
+
 if(FDTD_BUILD_SAMPLES)
     add_executable(sample_point_source samples/sample_point_source.cpp)
     target_link_libraries(sample_point_source PRIVATE fdtd::fdtd fdtd_warnings)
@@ -74,6 +81,7 @@ endif()
 install(DIRECTORY include/ DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}
     PATTERN backends EXCLUDE
     PATTERN fdtd_args.h EXCLUDE
+    PATTERN fdtd_benchmark.h EXCLUDE
     PATTERN fdtd_driver.h EXCLUDE)
 install(TARGETS fdtd EXPORT fdtdTargets)
 install(TARGETS fdtd_cli RUNTIME DESTINATION ${CMAKE_INSTALL_BINDIR})

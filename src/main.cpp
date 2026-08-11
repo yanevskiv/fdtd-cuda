@@ -28,8 +28,7 @@
 #include <string_view>
 #include <vector>
 
-// Parse the arguments, run the driver, and report errors with exit status 2 for usage
-// and 1 for a failed run.
+// Parse the arguments and run the driver, exiting 2 on bad usage and 1 on failure.
 int main(int argc, char **argv)
 {
     const std::vector<std::string_view> args(argv + 1, argv + argc);
