@@ -1,11 +1,12 @@
 # Thin wrapper over CMakePresets.json. Settings live in the presets.
 
 PRESET ?= debug
+BENCH_DIR ?= $(dir $(lastword $(sort $(wildcard results/benchmarks/*/benchmark.csv))))
 
 SOURCES = $(shell git ls-files --cached --others --exclude-standard 'include/*.h' 'src/*.h' 'src/*.cpp' 'src/*.cu' 'src/*.cuh' \
 	'tests/*.cpp' 'tests/*.h' 'samples/*.cpp')
 
-.PHONY: all configure build test install workflow bench lint lint-changed format clean
+.PHONY: all configure build test install workflow bench bench-report lint lint-changed format clean
 
 all: build
 
@@ -27,6 +28,10 @@ workflow:
 bench:
 	cmake --preset bench
 	cmake --build --preset bench --target bench
+
+bench-report:
+	cmake --preset bench -DFDTD_BENCH_DIR=$(BENCH_DIR)
+	cmake --build --preset bench --target bench-report
 
 TIDY = clang-tidy -p build/$(PRESET) --quiet --header-filter='^.*/include/fdtd/.*' \
 	--warnings-as-errors=readability-identifier-naming

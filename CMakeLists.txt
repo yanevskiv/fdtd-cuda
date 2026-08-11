@@ -75,6 +75,34 @@ add_custom_target(bench
     USES_TERMINAL
     VERBATIM)
 
+# The report of the benchmark directory FDTD_BENCH_DIR: figures, Markdown and, with pandoc, a PDF.
+set(FDTD_BENCH_DIR "" CACHE STRING "Benchmark directory of the bench-report target")
+find_program(FDTD_PANDOC pandoc)
+if(NOT FDTD_BENCH_DIR)
+    set(bench_report_steps
+        COMMAND ${CMAKE_COMMAND} -E echo "bench-report: FDTD_BENCH_DIR names no directory"
+        COMMAND ${CMAKE_COMMAND} -E false)
+else()
+    set(bench_report_steps
+        COMMAND ${PROJECT_SOURCE_DIR}/tools/plot_benchmark.py ${FDTD_BENCH_DIR}
+        COMMAND ${PROJECT_SOURCE_DIR}/tools/tabulate_benchmark.py ${FDTD_BENCH_DIR})
+    if(FDTD_PANDOC)
+        list(APPEND bench_report_steps
+            COMMAND ${CMAKE_COMMAND} -E make_directory ${PROJECT_SOURCE_DIR}/dist/docs
+            COMMAND ${FDTD_PANDOC} --from=markdown --pdf-engine=lualatex --columns=1000
+                --resource-path=${FDTD_BENCH_DIR}/report
+                ${FDTD_BENCH_DIR}/report/benchmark_report.md
+                -o ${PROJECT_SOURCE_DIR}/dist/docs/benchmark_report.pdf)
+    else()
+        list(APPEND bench_report_steps
+            COMMAND ${CMAKE_COMMAND} -E echo "bench-report: pandoc is missing, so no PDF")
+    endif()
+endif()
+add_custom_target(bench-report ${bench_report_steps}
+    WORKING_DIRECTORY ${PROJECT_SOURCE_DIR}
+    USES_TERMINAL
+    VERBATIM)
+
 if(FDTD_BUILD_SAMPLES)
     add_executable(sample_point_source samples/sample_point_source.cpp)
     target_link_libraries(sample_point_source PRIVATE fdtd::fdtd fdtd_warnings)
