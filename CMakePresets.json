@@ -6,8 +6,8 @@
             "name": "base",
             "hidden": true,
             "generator": "Ninja",
-            "binaryDir": "${sourceDir}/build/${presetName}",
-            "installDir": "${sourceDir}/build/${presetName}/install",
+            "binaryDir": "${sourceDir}/build/out/${presetName}",
+            "installDir": "${sourceDir}/build/install",
             "cacheVariables": {
                 "CMAKE_EXPORT_COMPILE_COMMANDS": "ON",
                 "FDTD_BUILD_TESTS": "ON"

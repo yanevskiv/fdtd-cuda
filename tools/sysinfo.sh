@@ -19,7 +19,7 @@
 
 set -u
 
-ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+HERE="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 BUILD_DIR="${1:-}"
 CACHE="${BUILD_DIR:+$BUILD_DIR/CMakeCache.txt}"
 
@@ -60,9 +60,9 @@ get_date() {
 
 # Print the commit and whether tracked files differ from it, or nothing outside a git checkout
 get_git() {
-    command -v git >/dev/null && git -C "$ROOT" rev-parse --git-dir >/dev/null 2>&1 || return 0
-    emit git_commit "$(git -C "$ROOT" rev-parse --short=12 HEAD 2>/dev/null)"
-    if [ -n "$(git -C "$ROOT" status --porcelain --untracked-files=no 2>/dev/null)" ]; then
+    command -v git >/dev/null && git -C "$HERE" rev-parse --git-dir >/dev/null 2>&1 || return 0
+    emit git_commit "$(git -C "$HERE" rev-parse --short=12 HEAD 2>/dev/null)"
+    if [ -n "$(git -C "$HERE" status --porcelain --untracked-files=no 2>/dev/null)" ]; then
         emit git_dirty yes
     else
         emit git_dirty no

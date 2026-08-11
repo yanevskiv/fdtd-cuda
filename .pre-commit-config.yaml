@@ -9,6 +9,6 @@ repos:
         files: ^(include/|src/|tests/|samples/)
       - id: clang-tidy-naming
         name: clang-tidy naming
-        entry: clang-tidy -p build/debug --quiet --header-filter=^.*/include/fdtd/.* --warnings-as-errors=readability-identifier-naming
+        entry: clang-tidy -p build/out/debug --quiet --header-filter=^.*/include/fdtd/.* --warnings-as-errors=readability-identifier-naming
         language: system
         files: ^(src/|tests/|samples/).*\.cpp$

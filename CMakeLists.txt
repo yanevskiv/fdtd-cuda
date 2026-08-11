@@ -64,7 +64,7 @@ target_link_libraries(fdtd_benchmark PUBLIC fdtd::fdtd PRIVATE fdtd_args fdtd_wa
 add_executable(benchmark src/benchmark.cpp)
 target_link_libraries(benchmark PRIVATE fdtd_benchmark fdtd_warnings)
 
-# The benchmark sweep, run by hand; timing is never a test.
+# The benchmark sweep into build/results/, run by hand; timing is never a test.
 set(FDTD_BENCH_SIZES "128;256;512;1024;2048" CACHE STRING "Grid sizes of the bench target")
 set(FDTD_BENCH_STEPS 500 CACHE STRING "Time steps per sample of the bench target")
 set(FDTD_BENCH_REPEAT 10 CACHE STRING "Samples per configuration of the bench target")
@@ -72,6 +72,7 @@ add_custom_target(bench
     COMMAND ${PROJECT_SOURCE_DIR}/tools/benchmark.sh -p $<TARGET_FILE:benchmark>
         -n ${FDTD_BENCH_STEPS} -r ${FDTD_BENCH_REPEAT} ${FDTD_BENCH_SIZES}
     DEPENDS benchmark
+    WORKING_DIRECTORY ${PROJECT_SOURCE_DIR}/build
     USES_TERMINAL
     VERBATIM)
 
@@ -122,7 +123,15 @@ install(DIRECTORY include/ DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}
     PATTERN fdtd_benchmark.h EXCLUDE
     PATTERN fdtd_driver.h EXCLUDE)
 install(TARGETS fdtd EXPORT fdtdTargets)
-install(TARGETS fdtd_cli RUNTIME DESTINATION ${CMAKE_INSTALL_BINDIR})
+install(TARGETS fdtd_cli benchmark RUNTIME DESTINATION ${CMAKE_INSTALL_BINDIR})
+install(PROGRAMS
+    tools/benchmark.sh
+    tools/plot_benchmark.py
+    tools/plot_sim.py
+    tools/sysinfo.sh
+    tools/tabulate_benchmark.py
+    DESTINATION ${CMAKE_INSTALL_BINDIR}/tools)
+install(FILES tools/report/benchmark_report.md DESTINATION ${CMAKE_INSTALL_BINDIR}/tools/report)
 install(EXPORT fdtdTargets
     NAMESPACE fdtd::
     DESTINATION ${CMAKE_INSTALL_LIBDIR}/cmake/fdtd)

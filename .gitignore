@@ -1,7 +1,6 @@
 # Build artifacts
 /build/
 /dist/
-/results/
 /out/
 
 # Editors and tools

@@ -19,7 +19,7 @@
 
 set -u -o pipefail
 
-ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+HERE="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 PROG=""
 STEPS=500
 REPEAT=10
@@ -40,14 +40,14 @@ usage_error() {
     exit 2
 }
 
-# Name the default output directory after the date and, in a git checkout, the commit
+# Name the default output directory under results/ after the date and, in a git checkout, the commit
 default_dir() {
     local name commit=""
     name="$(date -u +%Y%m%d-%H%M%S)"
-    if command -v git >/dev/null && git -C "$ROOT" rev-parse --git-dir >/dev/null 2>&1; then
-        commit="$(git -C "$ROOT" rev-parse --short=12 HEAD 2>/dev/null)"
+    if command -v git >/dev/null && git -C "$HERE" rev-parse --git-dir >/dev/null 2>&1; then
+        commit="$(git -C "$HERE" rev-parse --short=12 HEAD 2>/dev/null)"
     fi
-    echo "$ROOT/results/benchmarks/$name${commit:+-$commit}"
+    echo "results/benchmarks/$name${commit:+-$commit}"
 }
 
 # Print a line on standard error and append it to the run log
@@ -72,6 +72,7 @@ shift $((OPTIND - 1))
 [ -n "$PROG" ] && [ -x "$PROG" ] || usage_error "-p must name the benchmark program"
 [ "$#" -ge 1 ] || usage_error "no grid size given"
 DIR="${DIR:-$(default_dir)}"
+[ "${DIR#/}" != "$DIR" ] || DIR="$PWD/$DIR"
 CSV="$DIR/benchmark.csv"
 LOG="$DIR/run.log"
 if [ -e "$CSV" ]; then
@@ -82,7 +83,7 @@ mkdir -p "$DIR" || exit 1
 : > "$LOG"
 
 # The machine description and the CSV header come first, then one block of rows per size.
-"$ROOT/tools/sysinfo.sh" "$(dirname "$PROG")" > "$CSV"
+"$HERE/sysinfo.sh" "$(dirname "$PROG")" > "$CSV"
 "$PROG" --header-only >> "$CSV" || exit 1
 for size in "$@"; do
     log "==> nx=ny=$size steps=$STEPS repeat=$REPEAT"
