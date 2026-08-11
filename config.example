@@ -1,7 +1,10 @@
-# Settings of the benchmark sweep, read by tools/bench_sweep.sh (make bench).
+# Settings of the benchmark sweep and the profile run, read by tools/bench_sweep.sh (make bench)
+# and tools/profile_run.sh (make profile).
 #
 # Copy this file to config in the project root and edit it; config is not tracked.
 # It is sourced by bash. Lists are space-separated.
+
+# --- Benchmark sweep ---
 
 # Time steps per sample
 BENCH_STEPS=500
@@ -17,3 +20,20 @@ BENCH_THREADS="1"
 
 # Grid sizes, nx = ny
 BENCH_SIZES="128 256 512 1024 2048"
+
+# --- Profile run ---
+
+# Tools, any of: perf-stat perf-record callgrind cachegrind memcheck
+PROFILE_TOOLS="perf-stat perf-record callgrind cachegrind memcheck"
+
+# Backend and thread count profiled
+PROFILE_BACKEND="serial"
+PROFILE_THREADS=1
+
+# Grid size, nx = ny, and time steps under perf
+PROFILE_PERF_SIZE=1024
+PROFILE_PERF_STEPS=200
+
+# Grid size and time steps under valgrind, which runs far slower than perf
+PROFILE_VALGRIND_SIZE=256
+PROFILE_VALGRIND_STEPS=200

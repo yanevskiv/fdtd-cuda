@@ -66,6 +66,12 @@
                 "FDTD_BUILD_TESTS": "OFF",
                 "FDTD_BUILD_SAMPLES": "OFF"
             }
+        },
+        {
+            "name": "profile",
+            "displayName": "Profile (the bench preset with symbols and frame pointers)",
+            "inherits": ["bench"],
+            "cacheVariables": { "CMAKE_CXX_FLAGS": "-g -fno-omit-frame-pointer" }
         }
     ],
     "buildPresets": [
@@ -74,7 +80,8 @@
         { "name": "clang-debug", "configurePreset": "clang-debug" },
         { "name": "clang-release", "configurePreset": "clang-release" },
         { "name": "ci-cpu", "configurePreset": "ci-cpu" },
-        { "name": "bench", "configurePreset": "bench" }
+        { "name": "bench", "configurePreset": "bench" },
+        { "name": "profile", "configurePreset": "profile" }
     ],
     "testPresets": [
         {

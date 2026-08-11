@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 #
-# Draw the figures of a benchmark run: throughput, speedup and efficiency.
+# Draw the figures of a benchmark run into a report: throughput, speedup and efficiency.
 #
 # Copyright (C) 2026 Ivan Janevski
 #
@@ -75,7 +75,7 @@ def statistics(data, values, x_column):
 
 
 def save(fig, args, name):
-    """Save a figure as images/<name>_<stamp>.png in the run directory and close it."""
+    """Save a figure as images/<name>_<stamp>.png in the report directory and close it."""
     path = os.path.join(args.output_dir, f"{name}_{args.stamp}.png")
     fig.savefig(path, dpi=args.dpi, bbox_inches="tight")
     plt.close(fig)
@@ -161,7 +161,7 @@ def plot_by_threads(args, data, values, ylabel, title, filename, ideal):
 
 
 def remove(args, name):
-    """Remove a figure an earlier report of the run left in the output directory."""
+    """Remove a figure an earlier run of this script left in the report directory."""
     path = os.path.join(args.output_dir, f"{name}_{args.stamp}.png")
     if os.path.exists(path):
         os.remove(path)
@@ -170,19 +170,21 @@ def remove(args, name):
 def main():
     """Parse the arguments and draw the figures."""
     parser = argparse.ArgumentParser(
-        description="Plot the figures of a benchmark run into DIR/images."
+        description="Plot the figures of a benchmark run DIR into REPORT/images."
     )
 
-    parser.add_argument("dir", help="run directory, named after its timestamp")
+    parser.add_argument("dir", help="benchmark run directory, named after its timestamp")
+    parser.add_argument("report", help="report directory, named after its timestamp")
     parser.add_argument("--dpi", type=int, default=120)
 
     args = parser.parse_args()
 
-    args.stamp = os.path.basename(os.path.normpath(args.dir))
-    args.output_dir = os.path.join(args.dir, "images")
+    run = os.path.basename(os.path.normpath(args.dir))
+    args.stamp = os.path.basename(os.path.normpath(args.report))
+    args.output_dir = os.path.join(args.report, "images")
     os.makedirs(args.output_dir, exist_ok=True)
 
-    data = load(os.path.join(args.dir, f"benchmark_{args.stamp}.csv"))
+    data = load(os.path.join(args.dir, f"benchmark_{run}.csv"))
     throughput, speedup, efficiency = calculate(data)
 
     plot_by_size(args, data, throughput)

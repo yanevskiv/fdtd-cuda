@@ -2,11 +2,14 @@
 
 PRESET ?= debug
 BENCH_DIR ?= $(lastword $(sort $(wildcard build/results/benchmarks/*)))
+PROFILE_DIR ?= $(lastword $(sort $(wildcard build/results/profiles/*)))
+REPORT_DIR ?= build/reports/$(shell date +%s%3N)
 
 SOURCES = $(shell git ls-files --cached --others --exclude-standard 'include/*.h' 'src/*.h' 'src/*.cpp' 'src/*.cu' 'src/*.cuh' \
 	'tests/*.cpp' 'tests/*.h' 'samples/*.cpp')
 
-.PHONY: all configure build test install workflow bench bench-report lint lint-changed format clean
+.PHONY: all configure build test install workflow bench profile report
+.PHONY: lint lint-changed format clean
 
 all: build
 
@@ -29,9 +32,14 @@ bench:
 	cmake --preset bench
 	cmake --build --preset bench --target bench
 
-bench-report:
-	cmake --preset bench -DFDTD_BENCH_DIR=$(BENCH_DIR)
-	cmake --build --preset bench --target bench-report
+profile:
+	cmake --preset profile
+	cmake --build --preset profile --target profile
+
+report:
+	cmake --preset bench -DFDTD_REPORT_DIR=$(REPORT_DIR) -DFDTD_BENCH_DIR=$(BENCH_DIR) \
+		-DFDTD_PROFILE_DIR=$(PROFILE_DIR)
+	cmake --build --preset bench --target report
 
 TIDY = clang-tidy -p build/out/$(PRESET) --quiet --header-filter='^.*/include/fdtd/.*' \
 	--warnings-as-errors=readability-identifier-naming

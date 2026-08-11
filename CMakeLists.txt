@@ -72,31 +72,54 @@ add_custom_target(bench
     USES_TERMINAL
     VERBATIM)
 
-# The report of the benchmark run FDTD_BENCH_DIR: figures, Markdown and, with pandoc, a PDF.
-set(FDTD_BENCH_DIR "" CACHE STRING "Benchmark run directory of the bench-report target")
+# The profile run of the config file into build/results/, run by hand with the profile preset.
+add_custom_target(profile
+    COMMAND ${PROJECT_SOURCE_DIR}/tools/profile_run.sh -p $<TARGET_FILE:benchmark>
+    DEPENDS benchmark
+    WORKING_DIRECTORY ${PROJECT_SOURCE_DIR}/build
+    USES_TERMINAL
+    VERBATIM)
+
+# The report in FDTD_REPORT_DIR of the runs FDTD_BENCH_DIR and FDTD_PROFILE_DIR, either of which
+# may be empty: figures, Markdown and, with pandoc, a PDF.
+set(FDTD_REPORT_DIR "" CACHE STRING "Output directory of the report target")
+set(FDTD_BENCH_DIR "" CACHE STRING "Benchmark run directory of the report target")
+set(FDTD_PROFILE_DIR "" CACHE STRING "Profile run directory of the report target")
 find_program(FDTD_PANDOC pandoc)
+string(REGEX REPLACE "/+$" "" report_dir "${FDTD_REPORT_DIR}")
 string(REGEX REPLACE "/+$" "" bench_run "${FDTD_BENCH_DIR}")
-get_filename_component(bench_stamp "${bench_run}" NAME)
-set(bench_report ${bench_run}/benchmark_${bench_stamp})
-if(NOT bench_run)
-    set(bench_report_steps
-        COMMAND ${CMAKE_COMMAND} -E echo "bench-report: FDTD_BENCH_DIR names no directory"
+string(REGEX REPLACE "/+$" "" profile_run "${FDTD_PROFILE_DIR}")
+get_filename_component(report_stamp "${report_dir}" NAME)
+set(report_file ${report_dir}/report_${report_stamp})
+if(NOT report_dir OR (NOT bench_run AND NOT profile_run))
+    set(report_steps
+        COMMAND ${CMAKE_COMMAND} -E echo
+            "report: FDTD_REPORT_DIR and FDTD_BENCH_DIR or FDTD_PROFILE_DIR must name directories"
         COMMAND ${CMAKE_COMMAND} -E false)
 else()
-    set(bench_report_steps
-        COMMAND ${PROJECT_SOURCE_DIR}/tools/plot_benchmark.py ${bench_run}
-        COMMAND ${PROJECT_SOURCE_DIR}/tools/tabulate_benchmark.py ${bench_run})
+    set(report_steps COMMAND ${CMAKE_COMMAND} -E make_directory ${report_dir})
+    set(report_runs)
+    if(bench_run)
+        list(APPEND report_steps
+            COMMAND ${PROJECT_SOURCE_DIR}/tools/plot_benchmark.py ${bench_run} ${report_dir})
+        list(APPEND report_runs -b ${bench_run})
+    endif()
+    if(profile_run)
+        list(APPEND report_runs -p ${profile_run})
+    endif()
+    list(APPEND report_steps
+        COMMAND ${PROJECT_SOURCE_DIR}/tools/tabulate_report.py ${report_dir} ${report_runs})
     if(FDTD_PANDOC)
-        list(APPEND bench_report_steps
+        list(APPEND report_steps
             COMMAND ${FDTD_PANDOC} --from=markdown --pdf-engine=lualatex --columns=1000
-                --resource-path=${bench_run} ${bench_report}.md -o ${bench_report}.pdf
-            COMMAND ${CMAKE_COMMAND} -E echo "==> Creating PDF: ${bench_report}.pdf")
+                --resource-path=${report_dir} ${report_file}.md -o ${report_file}.pdf
+            COMMAND ${CMAKE_COMMAND} -E echo "==> Creating PDF: ${report_file}.pdf")
     else()
-        list(APPEND bench_report_steps
-            COMMAND ${CMAKE_COMMAND} -E echo "bench-report: pandoc is missing, so no PDF")
+        list(APPEND report_steps
+            COMMAND ${CMAKE_COMMAND} -E echo "report: pandoc is missing, so no PDF")
     endif()
 endif()
-add_custom_target(bench-report ${bench_report_steps}
+add_custom_target(report ${report_steps}
     WORKING_DIRECTORY ${PROJECT_SOURCE_DIR}
     USES_TERMINAL
     VERBATIM)
@@ -125,10 +148,15 @@ install(PROGRAMS
     tools/bench_sweep.sh
     tools/plot_benchmark.py
     tools/plot_sim.py
+    tools/profile_run.sh
     tools/sysinfo.sh
-    tools/tabulate_benchmark.py
+    tools/tabulate_report.py
     DESTINATION ${CMAKE_INSTALL_BINDIR}/tools)
-install(FILES tools/report/benchmark_report.md DESTINATION ${CMAKE_INSTALL_BINDIR}/tools/report)
+install(FILES
+    tools/report/benchmark_section.md
+    tools/report/performance_report.md
+    tools/report/profile_section.md
+    DESTINATION ${CMAKE_INSTALL_BINDIR}/tools/report)
 install(EXPORT fdtdTargets
     NAMESPACE fdtd::
     DESTINATION ${CMAKE_INSTALL_LIBDIR}/cmake/fdtd)
