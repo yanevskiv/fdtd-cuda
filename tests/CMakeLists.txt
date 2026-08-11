@@ -45,3 +45,11 @@ add_test(NAME "fdtd program runs"
             --output ${CMAKE_CURRENT_BINARY_DIR}/fdtd_program_run)
 set_tests_properties("fdtd program help" "fdtd program rejects bad options" "fdtd program runs"
     PROPERTIES LABELS "unit;driver")
+
+# The benchmark program end to end: a short run whose output has the CSV header and a row.
+set(bench_header "backend,variant,precision,threads,nx,ny,nsteps,repeat,seconds,checksum")
+add_test(NAME "benchmark program smoke"
+    COMMAND benchmark --nx 64 --steps 10 --repeat 2 --warmup 0)
+set_tests_properties("benchmark program smoke" PROPERTIES
+    LABELS "bench-smoke"
+    PASS_REGULAR_EXPRESSION "${bench_header}\nserial,default,[a-z]+,1,64,64,10,")
