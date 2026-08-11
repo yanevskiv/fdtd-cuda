@@ -1,0 +1,19 @@
+# Settings of the benchmark sweep, read by tools/bench_sweep.sh (make bench).
+#
+# Copy this file to config in the project root and edit it; config is not tracked.
+# It is sourced by bash. Lists are space-separated.
+
+# Time steps per sample
+BENCH_STEPS=500
+
+# Samples per configuration
+BENCH_REPEAT=10
+
+# Backends: serial, openmp, cuda, or all for every compiled one
+BENCH_BACKENDS="all"
+
+# Thread counts, ignored by serial
+BENCH_THREADS="1"
+
+# Grid sizes, nx = ny
+BENCH_SIZES="128 256 512 1024 2048"
