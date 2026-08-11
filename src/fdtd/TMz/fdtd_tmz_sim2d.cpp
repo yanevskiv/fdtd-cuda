@@ -22,7 +22,7 @@
 
 // Coefficients and the Courant limit.
 #include "fdtd/TMz/fdtd_tmz_coeffs2d.h"
-#include "fdtd/TMz/fdtd_tmz_courant.h"
+#include "fdtd/TMz/fdtd_tmz_grid2d.h"
 
 // Standard library for algorithms, math, errors and moves.
 #include <algorithm>

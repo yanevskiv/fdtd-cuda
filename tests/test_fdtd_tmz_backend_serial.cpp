@@ -23,7 +23,7 @@
 
 // Project headers under test.
 #include "fdtd/TMz/backends/fdtd_tmz_backend_serial.h"
-#include "fdtd/TMz/fdtd_tmz_courant.h"
+#include "fdtd/TMz/fdtd_tmz_grid2d.h"
 
 // Standard library for math, sizes and buffers.
 #include <algorithm>

@@ -23,7 +23,7 @@
 
 // Project headers under test.
 #include "fdtd/TMz/fdtd_tmz_coeffs2d.h"
-#include "fdtd/TMz/fdtd_tmz_courant.h"
+#include "fdtd/TMz/fdtd_tmz_grid2d.h"
 #include "fdtd/fdtd_constants.h"
 
 // Standard library for limits and errors.

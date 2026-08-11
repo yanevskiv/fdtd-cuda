@@ -20,15 +20,23 @@
 // Catch2 declarations for the tests.
 #include <catch2/catch_test_macros.hpp>
 #include <catch2/generators/catch_generators.hpp>
+#include <catch2/matchers/catch_matchers_floating_point.hpp>
 
-// Project header under test.
+// Project headers under test.
 #include "fdtd/TMz/fdtd_tmz_grid2d.h"
+#include "fdtd/fdtd_constants.h"
 
-// Standard library for limits, errors and sets.
+// Standard library for math, limits, errors and sets.
+#include <cmath>
 #include <cstddef>
 #include <limits>
 #include <set>
 #include <stdexcept>
+
+// Shorthand for the types under test.
+using Catch::Matchers::WithinRel;
+using fdtd::TMz::courant_dt;
+using fdtd::TMz::Grid2D;
 
 // Verify the accessors and the size of a grid.
 TEST_CASE("Grid2D stores its geometry", "[unit][grid2d]")
@@ -78,4 +86,41 @@ TEST_CASE("Grid2D rejects invalid geometry", "[unit][grid2d]")
     CHECK_THROWS_AS(Grid2D(4, 4, std::numeric_limits<fdtd::FloatType>::quiet_NaN(), 1),
                     std::invalid_argument);
     CHECK_THROWS_AS(Grid2D(huge, 2), std::invalid_argument);
+}
+
+// Verify the square-cell limit dx / (c0 * sqrt(2)) and its scaling with S.
+TEST_CASE("courant_dt on square cells", "[unit][courant]")
+{
+    const Grid2D grid(8, 8, 1e-3F, 1e-3F);
+    const double dx = double(grid.dx());
+    const double limit = dx / (fdtd::C_0 * std::sqrt(2.0));
+
+    CHECK_THAT(courant_dt(grid, 1.0), WithinRel(limit, 1e-12));
+    CHECK_THAT(courant_dt(grid, 0.5), WithinRel(0.5 * limit, 1e-12));
+}
+
+// Verify rectangular cells against the formula and below the 1D limit of either side.
+TEST_CASE("courant_dt on rectangular cells", "[unit][courant]")
+{
+    const Grid2D grid(8, 8, 2e-3F, 1e-3F);
+    const double dx = double(grid.dx());
+    const double dy = double(grid.dy());
+    const double limit = 1.0 / (fdtd::C_0 * std::sqrt(1.0 / (dx * dx) + 1.0 / (dy * dy)));
+    const double dt = courant_dt(grid, 0.99);
+
+    CHECK_THAT(dt, WithinRel(0.99 * limit, 1e-12));
+    CHECK(dt < dy / fdtd::C_0);
+}
+
+// Verify that Courant numbers outside (0, 1] are rejected.
+TEST_CASE("courant_dt rejects invalid Courant numbers", "[unit][courant]")
+{
+    const Grid2D grid(4, 4);
+
+    CHECK_THROWS_AS(courant_dt(grid, 0.0), std::invalid_argument);
+    CHECK_THROWS_AS(courant_dt(grid, -0.5), std::invalid_argument);
+    CHECK_THROWS_AS(courant_dt(grid, 1.01), std::invalid_argument);
+    CHECK_THROWS_AS(courant_dt(grid, std::numeric_limits<double>::quiet_NaN()),
+                    std::invalid_argument);
+    CHECK_NOTHROW(courant_dt(grid, 1.0));
 }

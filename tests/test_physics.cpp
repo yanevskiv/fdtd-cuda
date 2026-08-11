@@ -22,8 +22,8 @@
 #include <catch2/generators/catch_generators.hpp>
 #include <catch2/matchers/catch_matchers_floating_point.hpp>
 
-#include "fdtd/TMz/fdtd_tmz_courant.h"
 #include "fdtd/TMz/fdtd_tmz_fields2d.h"
+#include "fdtd/TMz/fdtd_tmz_grid2d.h"
 #include "fdtd/TMz/fdtd_tmz_material2d.h"
 #include "fdtd/TMz/fdtd_tmz_sim2d.h"
 #include "fdtd/TMz/fdtd_tmz_waveform.h"

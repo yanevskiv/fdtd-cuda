@@ -24,7 +24,7 @@
 
 // Project headers under test.
 #include "fdtd/TMz/fdtd_tmz_backend.h"
-#include "fdtd/TMz/fdtd_tmz_courant.h"
+#include "fdtd/TMz/fdtd_tmz_grid2d.h"
 
 // Standard library for algorithms, sizes and errors.
 #include <algorithm>

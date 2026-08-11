@@ -28,7 +28,6 @@ add_library(fdtd
     src/fdtd/TMz/fdtd_tmz_waveform.cpp
     src/fdtd/TMz/fdtd_tmz_backend.cpp
     src/fdtd/TMz/fdtd_tmz_coeffs2d.cpp
-    src/fdtd/TMz/fdtd_tmz_courant.cpp
     src/fdtd/TMz/fdtd_tmz_fields2d.cpp
     src/fdtd/TMz/fdtd_tmz_grid2d.cpp
     src/fdtd/TMz/fdtd_tmz_material2d.cpp

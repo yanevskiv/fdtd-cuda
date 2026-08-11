@@ -121,6 +121,19 @@ namespace fdtd
             /** Row pitch in elements. */
             std::size_t m_pitch;
         };
+
+        /**
+         * Time step for a Courant number on a grid in vacuum.
+         *
+         * The 2D stability limit is dt <= 1 / (c0 * sqrt(1/dx^2 + 1/dy^2)); the result is
+         * that limit scaled by the Courant number. Computed in double.
+         *
+         * @param grid Grid whose cell sizes set the limit.
+         * @param courant Courant number S, with 0 < S <= 1.
+         * @return Time step in seconds.
+         * @throws std::invalid_argument When S is outside (0, 1].
+         */
+        double courant_dt(const Grid2D &grid, double courant);
     }
 }
 
