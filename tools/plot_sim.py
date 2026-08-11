@@ -34,6 +34,11 @@ HEADER = struct.Struct("<8sIIQQQddd")
 
 
 def read_snapshot(path):
+    """Read a version 1 snapshot file.
+
+    Returns a dict with the step, the time in seconds, the cell sizes dx and dy in
+    meters, and Ez as a float64 array of shape (ny, nx).
+    """
     with open(path, "rb") as f:
         raw = f.read()
     if len(raw) < HEADER.size:
@@ -50,6 +55,11 @@ def read_snapshot(path):
 
 
 def read_probe(path):
+    """Read a probe CSV file.
+
+    Returns the first comment line, without its '#', and the rows as a structured
+    array with the columns of the header (step, time, ez).
+    """
     comment = ""
     with open(path, encoding="utf-8") as f:
         rows = []
@@ -62,6 +72,7 @@ def read_probe(path):
 
 
 def save(args, fig, name):
+    """Save a figure as name in the output directory and close it."""
     os.makedirs(args.output_dir, exist_ok=True)
     path = os.path.join(args.output_dir, name)
     fig.savefig(path, dpi=args.dpi, bbox_inches="tight")
@@ -70,16 +81,19 @@ def save(args, fig, name):
 
 
 def extent_mm(snap):
+    """Return the extent of a snapshot in millimeters, as imshow takes it."""
     ny, nx = snap["ez"].shape
     return [0, nx * snap["dx"] * 1e3, 0, ny * snap["dy"] * 1e3]
 
 
 def color_limit(snaps):
+    """Return the largest |Ez| over the snapshots, or 1 when they are all zero."""
     peak = max(float(np.max(np.abs(s["ez"]))) for s in snaps)
     return peak if peak > 0 else 1.0
 
 
 def draw_heatmap(ax, snap, limit):
+    """Draw Ez of a snapshot on a symmetric color scale of +-limit and return the image."""
     image = ax.imshow(snap["ez"], origin="lower", cmap="RdBu_r", vmin=-limit, vmax=limit,
                       extent=extent_mm(snap), interpolation="nearest")
     ax.set_xlabel("x (mm)")
@@ -89,6 +103,7 @@ def draw_heatmap(ax, snap, limit):
 
 
 def plot_heatmaps(args, snaps):
+    """Write one heatmap per snapshot, each on its own scale unless --shared-scale is set."""
     limit = color_limit(snaps) if args.shared_scale else None
     for snap in snaps:
         fig, ax = plt.subplots(figsize=(6, 5))
@@ -99,6 +114,7 @@ def plot_heatmaps(args, snaps):
 
 
 def plot_probes(args, probes):
+    """Write the traces of every probe on one plot."""
     fig, ax = plt.subplots(figsize=(8, 4))
     for path, (comment, data) in probes:
         label = comment or os.path.basename(path)
@@ -112,12 +128,14 @@ def plot_probes(args, probes):
 
 
 def animate(args, snaps):
+    """Write an animated GIF of the snapshots on one shared color scale."""
     limit = color_limit(snaps)
     fig, ax = plt.subplots(figsize=(6, 5))
     image = draw_heatmap(ax, snaps[0], limit)
     fig.colorbar(image, ax=ax, label="$E_z$ (V/m)")
 
     def update(k):
+        """Show snapshot k and return the artists that changed."""
         snap = snaps[k]
         image.set_data(snap["ez"])
         ax.set_title(f"$E_z$ at step {snap['step']}, t = {snap['time'] * 1e12:.1f} ps")
@@ -132,6 +150,7 @@ def animate(args, snaps):
 
 
 def main():
+    """Parse the arguments and plot what the input directory holds."""
     parser = argparse.ArgumentParser(
         description="Plot the snapshots and probe traces the fdtd driver wrote to a directory."
     )
