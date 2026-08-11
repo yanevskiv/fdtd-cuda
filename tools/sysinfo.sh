@@ -58,19 +58,15 @@ get_date() {
     emit date "$(date -u +%Y-%m-%dT%H:%M:%SZ)"
 }
 
-# Print the commit and whether tracked files differ from it
+# Print the commit and whether tracked files differ from it, or nothing outside a git checkout
 get_git() {
-    local commit="" dirty=""
-    if command -v git >/dev/null && git -C "$ROOT" rev-parse --git-dir >/dev/null 2>&1; then
-        commit="$(git -C "$ROOT" rev-parse --short=12 HEAD 2>/dev/null)"
-        if [ -n "$(git -C "$ROOT" status --porcelain --untracked-files=no 2>/dev/null)" ]; then
-            dirty=yes
-        else
-            dirty=no
-        fi
+    command -v git >/dev/null && git -C "$ROOT" rev-parse --git-dir >/dev/null 2>&1 || return 0
+    emit git_commit "$(git -C "$ROOT" rev-parse --short=12 HEAD 2>/dev/null)"
+    if [ -n "$(git -C "$ROOT" status --porcelain --untracked-files=no 2>/dev/null)" ]; then
+        emit git_dirty yes
+    else
+        emit git_dirty no
     fi
-    emit git_commit "${commit:-${FDTD_GIT_COMMIT:-}}"
-    emit git_dirty "${dirty:-${FDTD_GIT_DIRTY:-}}"
 }
 
 # Print the CPU model and its sockets, cores and hardware threads
