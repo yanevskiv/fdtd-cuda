@@ -1,5 +1,6 @@
 ---
 title: Benchmark report
+subtitle: fdtd-cuda
 date: $date
 papersize: a4
 geometry:
@@ -8,6 +9,7 @@ colorlinks: true
 header-includes:
   - \usepackage{float}
   - \floatplacement{figure}{H}
+  - \AtBeginEnvironment{longtable}{\small}
 ---
 
 # Run

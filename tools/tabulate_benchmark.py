@@ -20,6 +20,7 @@
 import os
 import argparse
 import string
+import datetime
 import numpy as np
 
 TEMPLATE = os.path.join(os.path.dirname(__file__), "report", "benchmark_report.md")
@@ -57,6 +58,15 @@ def load(path):
         encoding="utf-8",
     )
     return sysinfo, np.atleast_1d(data)
+
+
+def run_date(stamp):
+    """Return the start of a run in UTC, from its timestamp in milliseconds.
+
+    Returns it as 'January 19, 2026 (14:05:09)'.
+    """
+    start = datetime.datetime.fromtimestamp(int(stamp) / 1000, tz=datetime.timezone.utc)
+    return f"{start:%B} {start.day}, {start:%Y} ({start:%H:%M:%S})"
 
 
 def machine_table(sysinfo):
@@ -139,7 +149,7 @@ def main():
         template = string.Template(f.read())
 
     text = template.substitute(
-        date=dict(sysinfo).get("date", "unknown"),
+        date=run_date(stamp),
         stamp=stamp,
         samples=len(data),
         configurations=len(np.unique(data[CONFIG])),
