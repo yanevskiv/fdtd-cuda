@@ -36,8 +36,7 @@ namespace fdtd::TMz
     // Helpers private to this file.
     namespace
     {
-        // Return the explicit dt if it is valid, otherwise derive it from the Courant
-        // number; reject an explicit dt above the limit when stability is checked.
+        // Return a valid explicit dt within the limit, or derive dt from the Courant number.
         double options_dt(const Grid2D &grid, const Sim2D::Options &options)
         {
             if (options.dt == 0) {
@@ -52,8 +51,7 @@ namespace fdtd::TMz
             return options.dt;
         }
 
-        // Grade the PML of a material from the options, or clear it unless the boundary is
-        // Boundary::Pml.
+        // Grade the material's PML from the options, or clear it unless the boundary is Pml.
         void apply_pml(Material2D &material, const Sim2D::Options &options)
         {
             const std::size_t thickness =
@@ -69,8 +67,7 @@ namespace fdtd::TMz
         // Empty.
     }
 
-    // Build the grid, the vacuum material with its PML and the backend, and upload the
-    // coefficients.
+    // Build the grid, the vacuum material with its PML and the backend, and upload coefficients.
     Sim2D::Sim2D(std::size_t nx, std::size_t ny, const Options &options)
         : m_options(options)
         , m_grid(nx, ny, options.dx, options.dy)
@@ -115,8 +112,7 @@ namespace fdtd::TMz
         return m_material;
     }
 
-    // Check the grid, keep the material with the PML of the options and upload its
-    // coefficients.
+    // Check the grid, keep the material with the options' PML and upload its coefficients.
     void Sim2D::set_material(const Material2D &material)
     {
         const Grid2D &grid = material.grid();
@@ -136,8 +132,7 @@ namespace fdtd::TMz
         return *m_backend;
     }
 
-    // Check the cell, outside the edge it may not drive and outside the PML, and keep the
-    // source.
+    // Check that the source may drive the cell and is outside the PML, then keep it.
     void Sim2D::add_source(std::size_t i, std::size_t j, Component component, Waveform waveform)
     {
         const std::size_t nx = m_grid.nx();
@@ -263,8 +258,7 @@ namespace fdtd::TMz
         advance(end - m_step_count);
     }
 
-    // Skip an empty run; otherwise merge sources on the same cell, sample every source for
-    // the steps ahead, then step the backend and count the steps.
+    // Merge sources on the same cell, sample them for the steps ahead and step the backend.
     void Sim2D::advance(std::size_t nsteps)
     {
         if (nsteps == 0) {

@@ -68,8 +68,7 @@ TEST_CASE("Coeffs2D in vacuum", "[unit][coeffs2d]")
     }
 }
 
-// Verify a lossy dielectric and magnetic cell against hand values, and that the
-// cells around it stay vacuum.
+// Verify a lossy dielectric and magnetic cell against hand values, its neighbours vacuum.
 TEST_CASE("Coeffs2D in a lossy medium", "[unit][coeffs2d]")
 {
     const Grid2D grid(3, 3);
@@ -97,8 +96,7 @@ TEST_CASE("Coeffs2D in a lossy medium", "[unit][coeffs2d]")
     CHECK_THAT(double(coeffs.coeff_ez_x2()[v]), WithinRel(dt / fdtd::EPS_0, TOL));
 }
 
-// Verify that without a PML the x and y copies are equal, and equal bit for bit to the
-// single pair per field computed before the split.
+// Verify that without a PML the x and y copies equal the single pre-split pair bit for bit.
 TEST_CASE("Coeffs2D without a PML matches the isotropic coefficients", "[unit][coeffs2d]")
 {
     const Grid2D grid(6, 5);
@@ -129,9 +127,7 @@ TEST_CASE("Coeffs2D without a PML matches the isotropic coefficients", "[unit][c
     }
 }
 
-// Verify that each pair takes the PML profile of its own direction: Ez along x and Hy
-// decay only in the left and right layers, Ez along y and Hx only in the bottom and top
-// ones, and the interior keeps vacuum.
+// Verify that each coefficient pair takes the PML profile of its own direction only.
 TEST_CASE("Coeffs2D follows the PML profiles by direction", "[unit][coeffs2d][pml]")
 {
     const Grid2D grid(20, 16);
@@ -179,9 +175,7 @@ TEST_CASE("Coeffs2D follows the PML profiles by direction", "[unit][coeffs2d][pm
     CHECK(coeffs.coeff_hy_1()[centre] == fdtd::FloatType(1));
 }
 
-// Verify that the PML conductivities scale with eps_r and mu_r, so that in a medium the
-// decay factors match those of vacuum and only the curl factors change, by 1/eps_r and
-// 1/mu_r.
+// Verify that the PML scales with eps_r and mu_r, leaving the decay factors those of vacuum.
 TEST_CASE("Coeffs2D scales the PML by the medium", "[unit][coeffs2d][pml]")
 {
     const Grid2D grid(20, 16);
@@ -213,8 +207,7 @@ TEST_CASE("Coeffs2D scales the PML by the medium", "[unit][coeffs2d][pml]")
     }
 }
 
-// Verify that a perfect-conductor limit drives the Ez decay to -1 and its curl factor
-// far below vacuum.
+// Verify that a perfect-conductor limit drives the Ez decay to -1, its curl factor near zero.
 TEST_CASE("Coeffs2D approaches a conductor", "[unit][coeffs2d]")
 {
     const Grid2D grid(1, 1);

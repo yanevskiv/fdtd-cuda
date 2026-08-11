@@ -65,9 +65,7 @@ static void run(Fields2D &fields, const Coeffs2D &coeffs, Boundary boundary, int
     }
 }
 
-// Verify one step from a unit Ez impulse in vacuum on square cells with S = 1/2.
-// Then c^2 dt^2 / dx^2 = S^2 / 2 = 1/8, so the centre falls to 1 - 4/8 = 1/2 and
-// each of its four neighbours rises to 1/8.
+// Verify one step from a unit Ez impulse at S = 1/2: the centre to 1/2, each neighbour to 1/8.
 TEST_CASE("Serial update of an Ez impulse", "[unit][serial_update]")
 {
     const Grid2D grid(7, 7, 1e-3F, 1e-3F);
@@ -95,9 +93,7 @@ TEST_CASE("Serial update of an Ez impulse", "[unit][serial_update]")
     CHECK_THAT(double(fields.ez()[grid.index(2, 2)]), WithinAbs(0.0, 1e-12));
 }
 
-// Verify that each update reads its own coefficient arrays: Hx the Hx pair, Hy the Hy
-// pair and the interior Ez the pair along x, with every curl factor zero so only the
-// decay factors act.
+// Verify that each update reads its own coefficient arrays, with every curl factor zero.
 TEST_CASE("Serial update reads the coefficients by field", "[unit][serial_update]")
 {
     const Grid2D grid(4, 4);
@@ -124,8 +120,7 @@ TEST_CASE("Serial update reads the coefficients by field", "[unit][serial_update
     CHECK(fields.ez()[grid.index(2, 2)] == FloatType(0.5));
 }
 
-// Verify that the update leaves the edge Ez, the last-row Hx and the last-column
-// Hy untouched.
+// Verify that the update leaves the edge Ez, last-row Hx and last-column Hy untouched.
 TEST_CASE("Serial update leaves the edges alone", "[unit][serial_update]")
 {
     const Grid2D grid(4, 3);
@@ -190,8 +185,7 @@ TEST_CASE("PEC boundary zeroes the edge Ez", "[unit][boundary]")
     }
 }
 
-// Verify PMC at a corner and on the right edge against hand values, with the H
-// outside the domain set non-zero to show it is read as zero.
+// Verify PMC at a corner and the right edge against hand values, H outside read as zero.
 TEST_CASE("PMC boundary reads H outside as zero", "[unit][boundary]")
 {
     const Grid2D grid(3, 3, 1e-3F, 2e-3F);
@@ -225,8 +219,7 @@ TEST_CASE("PMC boundary reads H outside as zero", "[unit][boundary]")
     CHECK(ez(1, 1) == centre);
 }
 
-// Verify that a centred impulse stays mirror- and transpose-symmetric under PMC on
-// square cells, and that it reaches the edge, which PEC keeps at zero.
+// Verify that an impulse stays symmetric under PMC on square cells and reaches the edge.
 TEST_CASE("PMC boundary keeps a centred impulse symmetric", "[unit][boundary]")
 {
     const Grid2D grid(9, 9, 1e-3F, 1e-3F);
@@ -269,9 +262,7 @@ TEST_CASE("Boundary on degenerate grids", "[unit][boundary]")
     }
 }
 
-// Verify that the interior and split updates cover every non-edge cell once: with lossless
-// coefficients, Ezx = Ez and Ezy = 0 they match the plain update, Ez is the sum of its
-// parts in the PML and the parts stay as they were elsewhere.
+// Verify that the interior and split updates together cover every non-edge cell once.
 TEST_CASE("Split update matches the plain update without loss", "[unit][serial_update][pml]")
 {
     const std::size_t pml = 3;
@@ -310,8 +301,7 @@ TEST_CASE("Split update matches the plain update without loss", "[unit][serial_u
     }
 }
 
-// Verify that each split part decays with the conductivity along its own direction: Ezx in
-// the left and right slabs, Ezy in the bottom and top ones and both in a corner.
+// Verify that each split part decays with the conductivity along its own direction.
 TEST_CASE("Split update damps each part along its direction", "[unit][serial_update][pml]")
 {
     const Grid2D grid(20, 16);

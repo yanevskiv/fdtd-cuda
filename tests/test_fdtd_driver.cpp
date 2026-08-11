@@ -136,8 +136,7 @@ TEST_CASE("Driver rejects bad arguments", "[unit][driver]")
     CHECK_THROWS_AS(parse({"stray"}), std::invalid_argument);
 }
 
-// Verify that a small run writes the snapshots and probe file it promises, and that the
-// last snapshot and the probe agree on Ez at the probe cell.
+// Verify that a small run writes its files and that the last snapshot agrees with the probe.
 TEST_CASE("Driver smoke run", "[unit][driver]")
 {
     const auto dir = std::filesystem::temp_directory_path() / "fdtd_test_driver_smoke";
@@ -171,8 +170,7 @@ TEST_CASE("Driver smoke run", "[unit][driver]")
     std::filesystem::remove_all(dir);
 }
 
-// Verify that a run with the PML writes its files, keeps the wall behind the PML at zero
-// and logs the boundary.
+// Verify that a PML run writes its files, keeps the wall at zero and logs the boundary.
 TEST_CASE("Driver smoke run with the PML", "[unit][driver]")
 {
     const auto dir = std::filesystem::temp_directory_path() / "fdtd_test_driver_pml";

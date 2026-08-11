@@ -46,8 +46,7 @@ TEST_CASE("courant_dt on square cells", "[unit][courant]")
     CHECK_THAT(courant_dt(grid, 0.5), WithinRel(0.5 * limit, 1e-12));
 }
 
-// Verify rectangular cells against the general formula and that the limit lies
-// below the 1D limit of either side.
+// Verify rectangular cells against the formula and below the 1D limit of either side.
 TEST_CASE("courant_dt on rectangular cells", "[unit][courant]")
 {
     const Grid2D grid(8, 8, 2e-3F, 1e-3F);

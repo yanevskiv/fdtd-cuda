@@ -175,8 +175,7 @@ TEST_CASE("Material2D starts without a PML", "[unit][material2d][pml]")
     }
 }
 
-// Verify that a layer must fit twice, that order and reflection are in range, that a
-// rejected call changes nothing, and that thickness 0 ignores the other settings.
+// Verify the PML checks, that a rejected call changes nothing, and that thickness 0 is off.
 TEST_CASE("Material2D set_pml rejects bad settings", "[unit][material2d][pml]")
 {
     Material2D mat(Grid2D(21, 21));
@@ -201,8 +200,7 @@ TEST_CASE("Material2D set_pml rejects bad settings", "[unit][material2d][pml]")
     }
 }
 
-// Verify the electric profiles: sigma_max at the walls, the grading inside the layers,
-// zero past their inner edges, mirrored, and each varying along its own axis only.
+// Verify the electric profiles: sigma_max at the walls, graded inside, zero past, mirrored.
 TEST_CASE("Material2D set_pml grades the electric profiles", "[unit][material2d][pml]")
 {
     const Grid2D grid(40, 30, fdtd::FloatType(1e-3), fdtd::FloatType(2e-3));
@@ -243,8 +241,7 @@ TEST_CASE("Material2D set_pml grades the electric profiles", "[unit][material2d]
     }
 }
 
-// Verify that the round trip at normal incidence, exp(-2 eta0 integral of sigma), gives
-// back the target reflection for the sigma_max at the walls.
+// Verify that the normal-incidence round trip gives back the target reflection.
 TEST_CASE("Material2D set_pml reaches the target reflection", "[unit][material2d][pml]")
 {
     const Grid2D grid(40, 30, fdtd::FloatType(1e-3), fdtd::FloatType(1e-3));
@@ -255,8 +252,7 @@ TEST_CASE("Material2D set_pml reaches the target reflection", "[unit][material2d
     CHECK_THAT(std::exp(-2 * fdtd::ETA_0 * integral), WithinRel(1e-6, 1e-4));
 }
 
-// Verify that the magnetic profiles sit half a cell further and are matched to the
-// electric ones by mu0 / eps0.
+// Verify that the magnetic profiles sit half a cell further, scaled by mu0 / eps0.
 TEST_CASE("Material2D set_pml grades the magnetic profiles", "[unit][material2d][pml]")
 {
     const Grid2D grid(40, 30, fdtd::FloatType(1e-3), fdtd::FloatType(2e-3));

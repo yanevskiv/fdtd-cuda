@@ -187,8 +187,7 @@ TEST_CASE("Sim2D checks the PML settings when active", "[unit][sim2d][pml]")
     CHECK_THROWS_AS(Sim2D(16, 16, opts), std::invalid_argument);
 }
 
-// Verify that set_material grades the PML of the options into the new material, and
-// clears a PML the material carries when the boundary has none.
+// Verify that set_material grades the options' PML into the material, or clears it.
 TEST_CASE("Sim2D set_material keeps the PML of the options", "[unit][sim2d][pml]")
 {
     Sim2D::Options opts;
@@ -218,8 +217,7 @@ TEST_CASE("Sim2D rejects an edge Ez source with the PML", "[unit][sim2d][pml]")
     CHECK_THROWS_AS(sim.add_source(0, 3, Component::Ez, ramp), std::invalid_argument);
 }
 
-// Verify that sources inside the PML are rejected for every component, and taken just past
-// it or under PEC.
+// Verify that sources in the PML are rejected for every component, and taken just past it.
 TEST_CASE("Sim2D rejects sources inside the PML", "[unit][sim2d][pml]")
 {
     Sim2D::Options opts;

@@ -34,8 +34,7 @@ namespace fdtd::TMz
     // Helpers private to this file.
     namespace
     {
-        // Throw unless the medium is finite, with positive eps_r and mu_r and
-        // non-negative conductivities.
+        // Throw unless the medium is finite, with positive eps_r and mu_r and conductivities >= 0.
         void check_medium(const Material2D::Medium &m)
         {
             const bool finite = std::isfinite(m.eps_r) && std::isfinite(m.mu_r) &&
@@ -46,8 +45,7 @@ namespace fdtd::TMz
             }
         }
 
-        // Throw unless the layer fits twice on each axis and the order and reflection
-        // are in range.
+        // Throw unless the layer fits twice on each axis and order and reflection are in range.
         void check_pml(const Grid2D &grid, std::size_t thickness, double order, double reflection)
         {
             if (2 * thickness >= grid.nx() || 2 * thickness >= grid.ny()) {
@@ -69,8 +67,7 @@ namespace fdtd::TMz
             return -(order + 1) * std::log(reflection) / (2 * ETA_0 * double(thickness) * cellSize);
         }
 
-        // Grade sigma_max by the depth past the inner edge of the nearer layer, relative to
-        // the thickness and capped at the wall, raised to the order.
+        // Grade sigma_max by the depth into the nearer layer over its thickness, to the order.
         double pml_sigma(double position, std::size_t n, std::size_t thickness, double order,
                          double sigmaMax) noexcept
         {
@@ -130,8 +127,7 @@ namespace fdtd::TMz
         }
     }
 
-    // Clip the circle's bounding box to the grid, clamping to [0, n] before the
-    // conversion to an index, and set the cells inside it.
+    // Clip the circle's bounding box to the grid and set the cells inside the circle.
     void Material2D::fill_circle(double ci, double cj, double radius, const Medium &medium)
     {
         check_medium(medium);

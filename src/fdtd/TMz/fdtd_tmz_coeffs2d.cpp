@@ -34,8 +34,7 @@ namespace fdtd::TMz
     // Helpers private to this file.
     namespace
     {
-        // Store the decay and curl factors of a cell for a conductivity and an absolute
-        // permittivity or permeability.
+        // Store a cell's decay and curl factors for a conductivity and eps or mu.
         void set_pair(AlignedBuffer<FloatType> &decay, AlignedBuffer<FloatType> &curl,
                       std::size_t k, double sigma, double perm, double dt) noexcept
         {
@@ -45,8 +44,7 @@ namespace fdtd::TMz
         }
     }
 
-    // Check the time step, allocate the arrays and fill them cell by cell, adding the PML
-    // profiles to the isotropic conductivities.
+    // Check dt, then fill the arrays cell by cell, adding the PML profiles to the conductivities.
     Coeffs2D::Coeffs2D(const Material2D &material, double dt)
         : m_grid(material.grid())
         , m_dt(dt)

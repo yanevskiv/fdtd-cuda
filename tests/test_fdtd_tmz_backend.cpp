@@ -153,8 +153,7 @@ TEST_CASE("Serial backend takes coefficients and a boundary", "[unit][backend][s
     CHECK_NOTHROW(backend->step(1));
 }
 
-// Verify one step from a unit impulse in vacuum on square cells with S = 1/2: the centre
-// falls to 1/2 and each neighbour rises to 1/8, as c^2 dt^2 / dx^2 = S^2 / 2.
+// Verify one step from a unit impulse at S = 1/2: the centre falls to 1/2, neighbours rise to 1/8.
 TEST_CASE("Serial backend steps an impulse", "[unit][backend][serial]")
 {
     const Grid2D grid(7, 7, 1e-3F, 1e-3F);
@@ -188,8 +187,7 @@ TEST_CASE("Serial backend holds the edge Ez at zero under PEC", "[unit][backend]
     }
 }
 
-// Verify that a centred impulse stays symmetric about x, about y and about the centre on
-// rectangular cells, and about the diagonal on square ones, under both boundaries.
+// Verify that a centred impulse keeps its mirror symmetries, and the diagonal one on square cells.
 TEST_CASE("Serial backend keeps a centred impulse symmetric", "[unit][backend][serial]")
 {
     const Boundary boundary = GENERATE(Boundary::Pec, Boundary::Pmc);
@@ -236,9 +234,7 @@ TEST_CASE("Serial backend steps compose", "[unit][backend][serial]")
     CHECK(std::equal(a.hy().begin(), a.hy().end(), b.hy().begin()));
 }
 
-// Verify that each source value lands on its cell: Ez after the edge update, H after the
-// H update, so a step from zero fields leaves exactly the injected values there; the H
-// sources land before the E update, so the Ez next to them moves.
+// Verify that each source value lands on its cell, the H sources before the E update.
 TEST_CASE("Serial backend adds point sources", "[unit][backend][serial]")
 {
     const Grid2D grid(9, 7);
@@ -259,8 +255,7 @@ TEST_CASE("Serial backend adds point sources", "[unit][backend][serial]")
     CHECK(f.ez()[grid.index(6, 5)] != FloatType(0));
 }
 
-// Verify that values are read step-major: a zero in step 0 and a one in step 1 leave only
-// the one, since nothing has moved yet when it lands.
+// Verify that source values are read step-major.
 TEST_CASE("Serial backend reads source values per step", "[unit][backend][serial]")
 {
     const Grid2D grid(9, 9);
@@ -303,8 +298,7 @@ TEST_CASE("Serial backend rejects bad sources", "[unit][backend][serial]")
     CHECK_NOTHROW(backend->step(0, distinct, std::span<const FloatType>{}));
 }
 
-// Verify that every step appends each probe's value as it stands at the end of the step,
-// and that setting the probes again clears the records.
+// Verify that each step appends every probe's end-of-step value and that resetting clears them.
 TEST_CASE("Serial backend records probes", "[unit][backend][serial]")
 {
     const Grid2D grid(9, 9);
@@ -353,8 +347,7 @@ TEST_CASE("Serial backend rejects probes outside the grid", "[unit][backend][ser
     CHECK(backend->probe_count() == 1);
 }
 
-// Verify that the split update runs only under Boundary::Pml: Ez is then the sum of its parts
-// across the PML, while under PEC the same coefficients leave the parts at zero.
+// Verify that only Boundary::Pml runs the split update, Ez being the sum of its parts there.
 TEST_CASE("Serial backend splits Ez in the PML only under Boundary::Pml",
           "[unit][backend][serial][pml]")
 {

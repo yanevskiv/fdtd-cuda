@@ -149,8 +149,7 @@ namespace fdtd::TMz
         }
     }
 
-    // Run the split update over the bottom and top slabs across the width, then over the
-    // left and right slabs between them; a layer under two cells has no non-edge slab.
+    // Run the split update over the bottom and top slabs, then the left and right slabs between.
     void serial_update_pml(Fields2D &fields, CoeffsView coeffs, std::size_t pml) noexcept
     {
         if (pml < 2) {
@@ -164,8 +163,7 @@ namespace fdtd::TMz
         split_update_rect(fields, coeffs, nx - pml, nx - 1, pml, ny - pml);
     }
 
-    // Visit the edge cells once each: the first and last rows whole, then the first and
-    // last cells of the rows between, which also covers grids one cell wide.
+    // Visit each edge cell once: the first and last rows, then the ends of the rows between.
     template <typename Visit> static void for_each_edge(const Grid2D &grid, Visit visit)
     {
         const std::size_t nx = grid.nx();
@@ -184,8 +182,7 @@ namespace fdtd::TMz
         }
     }
 
-    // Zero the edge Ez and its split parts under PEC, or apply the Ez update with H outside
-    // the domain read as zero.
+    // Zero the edge Ez and its parts under PEC, or update it reading H outside the domain as zero.
     void serial_update_boundary(Fields2D &fields, CoeffsView coeffs, Boundary boundary) noexcept
     {
         const Grid2D &grid = fields.grid();
@@ -388,8 +385,7 @@ namespace fdtd::TMz
         m_records.clear();
     }
 
-    // Run H, the H sources, the interior E, the split E of an active PML, the edge E and the
-    // Ez sources once per step, then record the probes.
+    // Per step run H, H sources, interior E, PML split E, edge E and Ez sources, then the probes.
     void SerialBackend::advance(std::size_t nsteps, std::span<const PointInjection> points,
                                 std::span<const FloatType> values)
     {

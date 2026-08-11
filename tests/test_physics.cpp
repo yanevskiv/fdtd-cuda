@@ -92,19 +92,14 @@ namespace
         return 0.5 * sum * double(grid.dx()) * double(grid.dy());
     }
 
-    // Return the electromagnetic energy per unit length in z of one set of fields, in J/m:
-    // eps |Ez|^2 / 2 + mu (|Hx|^2 + |Hy|^2) / 2 over every cell, times dx dy.
+    // Return the field energy per unit length in z, in J/m, summed over the cells.
     double field_energy(const Fields2D &fields, const Material2D &material)
     {
         require_same_size(fields.grid(), material.grid());
         return energy(fields.ez(), fields, fields, material);
     }
 
-    // Return the energy per unit length in z that the Yee scheme conserves, in J/m. Ez at
-    // step n sits between H at n - 1/2 and n + 1/2, so the magnetic term takes the product
-    // of the two: eps |Ez^n|^2 / 2 + mu H^(n-1/2) . H^(n+1/2) / 2. In a lossless closed box
-    // it stays constant to rounding once the sources are off, where the energy of one set
-    // of fields oscillates by a few percent. Only H is read from next.
+    // Return the energy Yee conserves, eps Ez^2 / 2 + mu H^(n-1/2) . H^(n+1/2) / 2, in J/m.
     double field_energy(const Fields2D &fields, const Fields2D &next, const Material2D &material)
     {
         require_same_size(fields.grid(), material.grid());
@@ -128,8 +123,7 @@ namespace
         return peak;
     }
 
-    // Add a soft Ez point source and Ez probes to a simulation that has not run, run it,
-    // and return one trace per probe, one value per step.
+    // Add an Ez source and probes to an unrun simulation, run it and return one trace per probe.
     std::vector<std::vector<FloatType>> point_source_traces(Sim2D &sim, Cell source,
                                                             fdtd::TMz::Waveform waveform,
                                                             std::span<const Cell> probes,
@@ -150,8 +144,7 @@ namespace
         return traces;
     }
 
-    // Return the conserved energy of the fields as they are now, running one extra step for
-    // H half a step later.
+    // Return the conserved energy now, running one extra step for the later H.
     double conserved_energy(Sim2D &sim)
     {
         const auto now = sim.snapshot();
@@ -160,8 +153,7 @@ namespace
         return field_energy(now.fields, next.fields, sim.material());
     }
 
-    // Run a centred Gaussian source and return the conserved energy after every block of
-    // steps; each measurement runs one extra step.
+    // Run a centred Gaussian source and return the conserved energy after every block of steps.
     std::vector<double> energy_history(Sim2D &sim, std::size_t blocks, std::size_t blockSteps)
     {
         const std::size_t n = sim.grid().nx();
@@ -177,15 +169,13 @@ namespace
     // Square interior, in cells, of the PML reflection runs.
     constexpr std::size_t REFLECTION_INTERIOR = 60;
 
-    // Margin around the interior of the reference run, wide enough that its PEC wall
-    // reflects nothing back to the probe within the window.
+    // Margin around the reference interior, wide enough that its wall echoes nothing in time.
     constexpr std::size_t REFLECTION_MARGIN = 100;
 
     // Steps of a reflection run.
     constexpr std::size_t REFLECTION_STEPS = 250;
 
-    // Record Ez at a probe from a Gaussian source on a square grid of the interior plus a
-    // border of some cells on each side, with the cells given from the interior's corner.
+    // Record Ez at a probe from a Gaussian source in an interior inside a border of cells.
     std::vector<FloatType> interior_trace(const Sim2D::Options &opts, std::size_t border,
                                           Cell source, Cell probe)
     {
@@ -197,9 +187,7 @@ namespace
                                    REFLECTION_STEPS)[0];
     }
 
-    // Return the reflection of a PML of some thickness in dB: the largest difference
-    // between the trace in front of it and the trace of a PEC domain too large to reflect
-    // in time, over the largest value of the latter.
+    // Return a PML's reflection in dB against a PEC domain too large to reflect in time.
     double pml_reflection_db(std::size_t thickness, Cell source, Cell probe)
     {
         Sim2D::Options opts;
@@ -223,8 +211,7 @@ namespace
         return same(a.ez(), b.ez()) && same(a.hx(), b.hx()) && same(a.hy(), b.hy());
     }
 
-    // Return the step of a trace's peak, refined between steps by a parabola through the
-    // largest sample and its neighbours.
+    // Return the step of a trace's peak, refined by a parabola through it and its neighbours.
     double peak_step(const std::vector<FloatType> &trace)
     {
         const std::size_t k = find_peak(trace).index;
@@ -326,8 +313,7 @@ TEST_CASE("S = 1.01 grows with check_stability off", "[physics][stability]")
     CHECK((!std::isfinite(growth) || growth > 1e6));
 }
 
-// Verify that a pulse travels at C_0 along an axis and along the diagonal within 1%, and
-// that the axis is the slower direction, as Yee dispersion has it near the Courant limit.
+// Verify the speed C_0 within 1% along an axis and the diagonal, the axis being slower.
 TEST_CASE("Pulses travel at the speed of light", "[physics][speed]")
 {
     Sim2D sim(256, 256);
@@ -346,8 +332,7 @@ TEST_CASE("Pulses travel at the speed of light", "[physics][speed]")
     CHECK(axialRatio > diagonalRatio);
 }
 
-// Verify that the peak of a cylindrical wave falls off as 1 / sqrt(r) in the far field,
-// within 3%: dispersion spreads the pulse and lowers the peak a little with distance.
+// Verify that a cylindrical wave's peak falls off as 1 / sqrt(r) in the far field within 3%.
 TEST_CASE("Far-field peak follows 1 / sqrt(r)", "[physics][falloff]")
 {
     Sim2D sim(256, 256);
@@ -368,8 +353,7 @@ TEST_CASE("Far-field peak follows 1 / sqrt(r)", "[physics][falloff]")
     }
 }
 
-// Verify that a closed box with a dielectric rod keeps the energy Yee conserves, within a
-// bound of 1000 rounding units of FloatType over 2000 steps, under PEC and under PMC.
+// Verify that a closed box with a rod conserves Yee's energy over 2000 steps, PEC and PMC.
 TEST_CASE("Closed box conserves energy", "[physics][energy]")
 {
     const Boundary boundary = GENERATE(Boundary::Pec, Boundary::Pmc);
@@ -399,8 +383,7 @@ TEST_CASE("Closed box conserves energy", "[physics][energy]")
     CHECK(drift < bound);
 }
 
-// Verify that the PML settings change nothing when the PML is off: Boundary::Pml with
-// thickness 0 steps as PEC, and PEC and PMC ignore the PML settings, bit for bit.
+// Verify bit for bit that the PML settings change nothing while the PML is off.
 TEST_CASE("PML off reproduces the closed box bit for bit", "[physics][pml]")
 {
     const Boundary boundary = GENERATE(Boundary::Pml, Boundary::Pec, Boundary::Pmc);
@@ -425,8 +408,7 @@ TEST_CASE("PML off reproduces the closed box bit for bit", "[physics][pml]")
     CHECK(same_fields(run(opts), run(plain)));
 }
 
-// Verify that a PML of 10 and 20 cells reflects less than thresholds set from measurement,
-// about 10 dB above it, at normal, 45 degree and grazing incidence and from a corner.
+// Verify that the PML reflects below its thresholds at 10 and 20 cells and four incidences.
 TEST_CASE("PML reflects below the threshold", "[physics][pml]")
 {
     struct Case
@@ -448,8 +430,7 @@ TEST_CASE("PML reflects below the threshold", "[physics][pml]")
     CHECK(reflection < c.threshold);
 }
 
-// Verify that the energy of a PML box falls by five orders of magnitude between the end of
-// the source and a thousand steps.
+// Verify that a PML box loses five orders of magnitude of energy in a thousand steps.
 TEST_CASE("PML box loses its energy", "[physics][pml]")
 {
     Sim2D::Options opts;
@@ -466,8 +447,7 @@ TEST_CASE("PML box loses its energy", "[physics][pml]")
     CHECK(ratio < 1e-5);
 }
 
-// Verify that the energy of a PML box keeps falling over three thousand steps, without
-// the late growth an unstable PML would show.
+// Verify that a PML box's energy keeps falling over three thousand steps, with no late growth.
 TEST_CASE("PML box does not grow", "[physics][pml][stability]")
 {
     Sim2D::Options opts;

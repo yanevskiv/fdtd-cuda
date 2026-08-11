@@ -50,8 +50,7 @@ namespace
         std::cout << '\n';
     }
 
-    // Run a 60 x 60 interior inside a border of some cells, with a pulse 20 cells from the left
-    // of the interior, and return Ez 5 cells from the left; write the final Ez when asked.
+    // Run a pulse in a 60 x 60 interior inside a border and return Ez 5 cells from its left.
     std::vector<fdtd::FloatType> run_trace(const fdtd::TMz::Sim2D::Options &options,
                                            std::size_t border, const char *snapshot)
     {
@@ -85,8 +84,7 @@ namespace
     }
 }
 
-// Measure the reflection of a 20-cell PML at normal incidence against a domain too large
-// to reflect anything back in time.
+// Measure a 20-cell PML at normal incidence against a domain too large to echo in time.
 int main()
 {
     // Bring the library names into scope.
