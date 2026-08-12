@@ -135,8 +135,7 @@ TEST_CASE("Interior block leaves out the edge and the PML", "[unit][block2d]")
     CHECK(pml.j1 == 6);
 }
 
-// Verify that any cut of the grid into blocks updates the fields as the whole grid does, bit for
-// bit.
+// Verify that any cut into blocks updates the fields as the whole grid does, bit for bit.
 TEST_CASE("Block updates match the whole-grid update", "[unit][block2d]")
 {
     const auto boundary = GENERATE(Boundary::Pec, Boundary::Pmc, Boundary::Pml);

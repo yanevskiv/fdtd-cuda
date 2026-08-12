@@ -20,6 +20,10 @@
 // Class and routine declarations.
 #include "fdtd/TMz/backends/fdtd_tmz_backend_serial.h"
 
+// The partition of the grid and the stepper over it.
+#include "fdtd/TMz/backends/fdtd_tmz_partition2d.h"
+#include "fdtd/TMz/backends/fdtd_tmz_stepper2d.h"
+
 // Standard library for copies, sizes, errors and buffers.
 #include <algorithm>
 #include <cstddef>
@@ -68,46 +72,6 @@ namespace fdtd::TMz
     static void copy_field(std::span<const FloatType> source, std::span<FloatType> target)
     {
         std::copy(source.begin(), source.end(), target.begin());
-    }
-
-    // Add one step's values to the points of the H components, or of Ez.
-    static void add_sources(Fields2D &fields, std::span<const PointInjection> points,
-                            const FloatType *values, bool magnetic)
-    {
-        for (std::size_t k = 0; k < points.size(); ++k) {
-            const PointInjection &point = points[k];
-            switch (point.component) {
-                case Component::Ez:
-                    if (!magnetic) {
-                        fields.ez()[point.index] += values[k];
-                    }
-                    break;
-                case Component::Hx:
-                    if (magnetic) {
-                        fields.hx()[point.index] += values[k];
-                    }
-                    break;
-                case Component::Hy:
-                    if (magnetic) {
-                        fields.hy()[point.index] += values[k];
-                    }
-                    break;
-            }
-        }
-    }
-
-    // Return the value of one component at a cell.
-    static FloatType read_point(const Fields2D &fields, const PointProbe &point)
-    {
-        switch (point.component) {
-            case Component::Hx:
-                return fields.hx()[point.index];
-            case Component::Hy:
-                return fields.hy()[point.index];
-            case Component::Ez:
-                break;
-        }
-        return fields.ez()[point.index];
     }
 
     // Allocate the backend's fields and coefficient arrays.
@@ -218,7 +182,7 @@ namespace fdtd::TMz
         m_records.clear();
     }
 
-    // Per step run H, H sources, interior E, PML split E, edge E and Ez sources, then the probes.
+    // Step the whole grid as one part, the H phase then the E phase of every step.
     void SerialBackend::advance(std::size_t nsteps, std::span<const PointInjection> points,
                                 std::span<const FloatType> values)
     {
@@ -229,18 +193,14 @@ namespace fdtd::TMz
                                 m_coeff_ez_y2.data(), m_coeff_hx_1.data(), m_coeff_hx_2.data(),
                                 m_coeff_hy_1.data(), m_coeff_hy_2.data());
         const std::size_t pml = m_boundary == Boundary::Pml ? m_pml_thickness : 0;
-        m_records.reserve(m_records.size() + nsteps * m_probes.size());
+        const std::size_t first = m_records.size();
+        m_records.resize(first + nsteps * m_probes.size());
+        const Partition2D partition = Partition2D::whole(grid());
+        const Stepper2D stepper(m_fields, coeffs, pml, m_boundary, partition, points, values,
+                                m_probes, m_records.data() + first);
         for (std::size_t n = 0; n < nsteps; ++n) {
-            const FloatType *row = values.data() + n * points.size();
-            serial_update_h(m_fields, coeffs);
-            add_sources(m_fields, points, row, true);
-            serial_update_e(m_fields, coeffs, pml);
-            serial_update_pml(m_fields, coeffs, pml);
-            serial_update_boundary(m_fields, coeffs, m_boundary);
-            add_sources(m_fields, points, row, false);
-            for (const PointProbe &probe : m_probes) {
-                m_records.push_back(read_point(m_fields, probe));
-            }
+            stepper.h_phase(0, n);
+            stepper.e_phase(0, n);
         }
     }
 }

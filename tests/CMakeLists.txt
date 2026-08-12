@@ -23,6 +23,8 @@ add_executable(fdtd_tests
     test_fdtd_tmz_grid2d.cpp
     test_fdtd_tmz_material2d.cpp
     test_fdtd_tmz_omp_options.cpp
+    test_fdtd_tmz_partition2d.cpp
+    test_fdtd_tmz_stepper2d.cpp
     test_fdtd_tmz_output.cpp
     test_fdtd_tmz_sim2d.cpp
     test_fdtd_tmz_waveform.cpp
