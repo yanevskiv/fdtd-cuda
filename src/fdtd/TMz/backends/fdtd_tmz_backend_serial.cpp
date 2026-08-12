@@ -30,195 +30,28 @@
 // Namespace for the 2D TMz module.
 namespace fdtd::TMz
 {
-    // Take the arrays of a coefficient set.
-    CoeffsView::CoeffsView(const Coeffs2D &coeffs) noexcept
-        : CoeffsView(coeffs.coeff_ez_x1().data(), coeffs.coeff_ez_x2().data(),
-                     coeffs.coeff_ez_y1().data(), coeffs.coeff_ez_y2().data(),
-                     coeffs.coeff_hx_1().data(), coeffs.coeff_hx_2().data(),
-                     coeffs.coeff_hy_1().data(), coeffs.coeff_hy_2().data())
-    {
-        // Empty.
-    }
-
-    // Take eight arrays.
-    CoeffsView::CoeffsView(const FloatType *ezX1, const FloatType *ezX2, const FloatType *ezY1,
-                           const FloatType *ezY2, const FloatType *hx1, const FloatType *hx2,
-                           const FloatType *hy1, const FloatType *hy2) noexcept
-        : coeff_ez_x1(ezX1)
-        , coeff_ez_x2(ezX2)
-        , coeff_ez_y1(ezY1)
-        , coeff_ez_y2(ezY2)
-        , coeff_hx_1(hx1)
-        , coeff_hx_2(hx2)
-        , coeff_hy_1(hy1)
-        , coeff_hy_2(hy2)
-    {
-        // Empty.
-    }
-
-    // Update Hx row by row below the last row, then Hy row by row left of the last column.
+    // Update H over the whole grid.
     void serial_update_h(Fields2D &fields, CoeffsView coeffs) noexcept
     {
-        const Grid2D &grid = fields.grid();
-        const std::size_t nx = grid.nx();
-        const std::size_t ny = grid.ny();
-        const std::size_t pitch = grid.pitch();
-        const FloatType invDx = FloatType(1) / grid.dx();
-        const FloatType invDy = FloatType(1) / grid.dy();
-
-        const FloatType *__restrict Ez = fields.ez().data();
-        FloatType *__restrict Hx = fields.hx().data();
-        FloatType *__restrict Hy = fields.hy().data();
-        const FloatType *__restrict Chx1 = coeffs.coeff_hx_1;
-        const FloatType *__restrict Chx2 = coeffs.coeff_hx_2;
-        const FloatType *__restrict Chy1 = coeffs.coeff_hy_1;
-        const FloatType *__restrict Chy2 = coeffs.coeff_hy_2;
-
-        for (std::size_t j = 0; j + 1 < ny; ++j) {
-            const std::size_t row = j * pitch;
-            for (std::size_t i = 0; i < nx; ++i) {
-                const std::size_t k = row + i;
-                Hx[k] = Chx1[k] * Hx[k] - Chx2[k] * invDy * (Ez[k + pitch] - Ez[k]);
-            }
-        }
-
-        for (std::size_t j = 0; j < ny; ++j) {
-            const std::size_t row = j * pitch;
-            for (std::size_t i = 0; i + 1 < nx; ++i) {
-                const std::size_t k = row + i;
-                Hy[k] = Chy1[k] * Hy[k] + Chy2[k] * invDx * (Ez[k + 1] - Ez[k]);
-            }
-        }
+        update_h_block(fields, coeffs, whole_block(fields.grid()));
     }
 
-    // Update the interior Ez row by row, inside the PML when there is one.
+    // Update the interior Ez over the whole grid, inside the PML when there is one.
     void serial_update_e(Fields2D &fields, CoeffsView coeffs, std::size_t pml) noexcept
     {
-        const Grid2D &grid = fields.grid();
-        const std::size_t pitch = grid.pitch();
-        const std::size_t lo = std::max<std::size_t>(pml, 1);
-        const std::size_t iEnd = grid.nx() - std::min(lo, grid.nx());
-        const std::size_t jEnd = grid.ny() - std::min(lo, grid.ny());
-        const FloatType invDx = FloatType(1) / grid.dx();
-        const FloatType invDy = FloatType(1) / grid.dy();
-
-        FloatType *__restrict Ez = fields.ez().data();
-        const FloatType *__restrict Hx = fields.hx().data();
-        const FloatType *__restrict Hy = fields.hy().data();
-        const FloatType *__restrict Cex1 = coeffs.coeff_ez_x1;
-        const FloatType *__restrict Cex2 = coeffs.coeff_ez_x2;
-
-        for (std::size_t j = lo; j < jEnd; ++j) {
-            const std::size_t row = j * pitch;
-            for (std::size_t i = lo; i < iEnd; ++i) {
-                const std::size_t k = row + i;
-                const FloatType curl =
-                    (Hy[k] - Hy[k - 1]) * invDx - (Hx[k] - Hx[k - pitch]) * invDy;
-                Ez[k] = Cex1[k] * Ez[k] + Cex2[k] * curl;
-            }
-        }
+        update_e_interior_block(fields, coeffs, whole_block(fields.grid()), pml);
     }
 
-    // Update Ezx and Ezy over a rectangle of non-edge cells row by row, and Ez as their sum.
-    static void split_update_rect(Fields2D &fields, CoeffsView coeffs, std::size_t i0,
-                                  std::size_t i1, std::size_t j0, std::size_t j1) noexcept
-    {
-        const Grid2D &grid = fields.grid();
-        const std::size_t pitch = grid.pitch();
-        const FloatType invDx = FloatType(1) / grid.dx();
-        const FloatType invDy = FloatType(1) / grid.dy();
-
-        FloatType *__restrict Ez = fields.ez().data();
-        FloatType *__restrict Ezx = fields.ezx().data();
-        FloatType *__restrict Ezy = fields.ezy().data();
-        const FloatType *__restrict Hx = fields.hx().data();
-        const FloatType *__restrict Hy = fields.hy().data();
-        const FloatType *__restrict Cex1 = coeffs.coeff_ez_x1;
-        const FloatType *__restrict Cex2 = coeffs.coeff_ez_x2;
-        const FloatType *__restrict Cey1 = coeffs.coeff_ez_y1;
-        const FloatType *__restrict Cey2 = coeffs.coeff_ez_y2;
-
-        for (std::size_t j = j0; j < j1; ++j) {
-            const std::size_t row = j * pitch;
-            for (std::size_t i = i0; i < i1; ++i) {
-                const std::size_t k = row + i;
-                Ezx[k] = Cex1[k] * Ezx[k] + Cex2[k] * invDx * (Hy[k] - Hy[k - 1]);
-                Ezy[k] = Cey1[k] * Ezy[k] - Cey2[k] * invDy * (Hx[k] - Hx[k - pitch]);
-                Ez[k] = Ezx[k] + Ezy[k];
-            }
-        }
-    }
-
-    // Run the split update over the bottom and top slabs, then the left and right slabs between.
+    // Update Ezx, Ezy and Ez over the PML slabs.
     void serial_update_pml(Fields2D &fields, CoeffsView coeffs, std::size_t pml) noexcept
     {
-        if (pml < 2) {
-            return;
-        }
-        const std::size_t nx = fields.grid().nx();
-        const std::size_t ny = fields.grid().ny();
-        split_update_rect(fields, coeffs, 1, nx - 1, 1, pml);
-        split_update_rect(fields, coeffs, 1, nx - 1, ny - pml, ny - 1);
-        split_update_rect(fields, coeffs, 1, pml, pml, ny - pml);
-        split_update_rect(fields, coeffs, nx - pml, nx - 1, pml, ny - pml);
+        update_pml_block(fields, coeffs, whole_block(fields.grid()), pml);
     }
 
-    // Visit each edge cell once: the first and last rows, then the ends of the rows between.
-    template <typename Visit> static void for_each_edge(const Grid2D &grid, Visit visit)
-    {
-        const std::size_t nx = grid.nx();
-        const std::size_t ny = grid.ny();
-        for (std::size_t i = 0; i < nx; ++i) {
-            visit(i, std::size_t(0));
-            if (ny > 1) {
-                visit(i, ny - 1);
-            }
-        }
-        for (std::size_t j = 1; j + 1 < ny; ++j) {
-            visit(std::size_t(0), j);
-            if (nx > 1) {
-                visit(nx - 1, j);
-            }
-        }
-    }
-
-    // Zero the edge Ez and its parts under PEC, or update it reading H outside the domain as zero.
+    // Update the edge Ez of the whole grid.
     void serial_update_boundary(Fields2D &fields, CoeffsView coeffs, Boundary boundary) noexcept
     {
-        const Grid2D &grid = fields.grid();
-        FloatType *__restrict Ez = fields.ez().data();
-
-        if (boundary != Boundary::Pmc) {
-            FloatType *__restrict Ezx = fields.ezx().data();
-            FloatType *__restrict Ezy = fields.ezy().data();
-            for_each_edge(grid, [&](std::size_t i, std::size_t j) {
-                const std::size_t k = grid.index(i, j);
-                Ez[k] = 0;
-                Ezx[k] = 0;
-                Ezy[k] = 0;
-            });
-            return;
-        }
-
-        const std::size_t nx = grid.nx();
-        const std::size_t ny = grid.ny();
-        const std::size_t pitch = grid.pitch();
-        const FloatType invDx = FloatType(1) / grid.dx();
-        const FloatType invDy = FloatType(1) / grid.dy();
-        const FloatType *__restrict Hx = fields.hx().data();
-        const FloatType *__restrict Hy = fields.hy().data();
-        const FloatType *__restrict Cex1 = coeffs.coeff_ez_x1;
-        const FloatType *__restrict Cex2 = coeffs.coeff_ez_x2;
-
-        for_each_edge(grid, [&](std::size_t i, std::size_t j) {
-            const std::size_t k = grid.index(i, j);
-            const FloatType hyRight = i + 1 < nx ? Hy[k] : FloatType(0);
-            const FloatType hyLeft = i > 0 ? Hy[k - 1] : FloatType(0);
-            const FloatType hxTop = j + 1 < ny ? Hx[k] : FloatType(0);
-            const FloatType hxBottom = j > 0 ? Hx[k - pitch] : FloatType(0);
-            const FloatType curl = (hyRight - hyLeft) * invDx - (hxTop - hxBottom) * invDy;
-            Ez[k] = Cex1[k] * Ez[k] + Cex2[k] * curl;
-        });
+        update_boundary_block(fields, coeffs, whole_block(fields.grid()), boundary);
     }
 
     // Check that two grids hold the same geometry.

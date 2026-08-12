@@ -17,6 +17,7 @@ add_executable(fdtd_tests
     test_fdtd_driver.cpp
     test_fdtd_tmz_backend.cpp
     test_fdtd_tmz_backend_serial.cpp
+    test_fdtd_tmz_block2d.cpp
     test_fdtd_tmz_coeffs2d.cpp
     test_fdtd_tmz_fields2d.cpp
     test_fdtd_tmz_grid2d.cpp

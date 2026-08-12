@@ -1,5 +1,5 @@
 /*
- * C++ header for the 2D TMz serial backend and its update routines.
+ * C++ header for the 2D TMz serial backend and its whole-grid update routines.
  *
  * Copyright (C) 2026 Ivan Janevski
  *
@@ -20,6 +20,7 @@
 #ifndef FDTD_TMZ_BACKEND_SERIAL_H
 #define FDTD_TMZ_BACKEND_SERIAL_H
 
+#include "fdtd/TMz/backends/fdtd_tmz_block2d.h"
 #include "fdtd/TMz/fdtd_tmz_backend.h"
 #include "fdtd/TMz/fdtd_tmz_boundary.h"
 #include "fdtd/TMz/fdtd_tmz_coeffs2d.h"
@@ -37,71 +38,7 @@ namespace fdtd
     namespace TMz
     {
         /**
-         * Pointers to the eight coefficient arrays the serial routines read.
-         *
-         * The routines take these rather than a Coeffs2D so the backend can keep its own
-         * arrays, as a GPU backend keeps device arrays. A Coeffs2D converts implicitly.
-         */
-        struct CoeffsView
-        {
-            /**
-             * View the arrays of a coefficient set, which must outlive the view.
-             *
-             * @param coeffs Coefficients to view.
-             */
-            CoeffsView(const Coeffs2D &coeffs) noexcept; // NOLINT(google-explicit-constructor)
-
-            /**
-             * View eight arrays over the same grid, laid out as in Coeffs2D.
-             *
-             * @param ezX1 Ez decay factors along x.
-             * @param ezX2 Ez curl factors along x.
-             * @param ezY1 Ez decay factors along y.
-             * @param ezY2 Ez curl factors along y.
-             * @param hx1 Hx decay factors.
-             * @param hx2 Hx curl factors.
-             * @param hy1 Hy decay factors.
-             * @param hy2 Hy curl factors.
-             */
-            CoeffsView(const FloatType *ezX1, const FloatType *ezX2, const FloatType *ezY1,
-                       const FloatType *ezY2, const FloatType *hx1, const FloatType *hx2,
-                       const FloatType *hy1, const FloatType *hy2) noexcept;
-
-            /** Ez decay factors along x. */
-            const FloatType *coeff_ez_x1;
-
-            /** Ez curl factors along x, before 1/dx. */
-            const FloatType *coeff_ez_x2;
-
-            /** Ez decay factors along y. */
-            const FloatType *coeff_ez_y1;
-
-            /** Ez curl factors along y, before 1/dy. */
-            const FloatType *coeff_ez_y2;
-
-            /** Hx decay factors. */
-            const FloatType *coeff_hx_1;
-
-            /** Hx curl factors, before 1/dy. */
-            const FloatType *coeff_hx_2;
-
-            /** Hy decay factors. */
-            const FloatType *coeff_hy_1;
-
-            /** Hy curl factors, before 1/dx. */
-            const FloatType *coeff_hy_2;
-        };
-
-        /**
-         * Advance Hx and Hy by one step from the differences of Ez.
-         *
-         * With Hx(i, j) at (i, j + 1/2) and Hy(i, j) at (i + 1/2, j):
-         *
-         *     Hx(i, j) = Chx1 Hx(i, j) - Chx2 / dy (Ez(i, j + 1) - Ez(i, j)),  j < ny - 1,
-         *     Hy(i, j) = Chy1 Hy(i, j) + Chy2 / dx (Ez(i + 1, j) - Ez(i, j)),  i < nx - 1,
-         *
-         * with the coefficients of cell (i, j). Hx on the last row and Hy on the last
-         * column lie outside the domain and are left untouched. Inner loop along x.
+         * Advance Hx and Hy over the whole grid by one step, as update_h_block does.
          *
          * @param fields Fields to update.
          * @param coeffs Coefficient arrays on the same grid as the fields.
@@ -109,15 +46,8 @@ namespace fdtd
         void serial_update_h(Fields2D &fields, CoeffsView coeffs) noexcept;
 
         /**
-         * Advance Ez by one step from the curl of H, inside the PML.
-         *
-         *     Ez(i, j) = Cex1 Ez(i, j) + Cex2 ((Hy(i, j) - Hy(i - 1, j)) / dx
-         *                                    - (Hx(i, j) - Hx(i, j - 1)) / dy)
-         *
-         * over max(pml, 1) <= i < nx - max(pml, 1) and the same along j, with the x
-         * coefficients, which equal the y ones there. With no PML that is the whole
-         * interior. The PML is left to serial_update_pml, the edge Ez to the outer boundary.
-         * Inner loop along x.
+         * Advance the Ez inside the PML over the whole grid by one step, as
+         * update_e_interior_block does; with no PML that is every Ez off the edge.
          *
          * @param fields Fields to update.
          * @param coeffs Coefficient arrays on the same grid as the fields.
@@ -126,18 +56,8 @@ namespace fdtd
         void serial_update_e(Fields2D &fields, CoeffsView coeffs, std::size_t pml) noexcept;
 
         /**
-         * Advance Ez inside the PML by one step as the split fields Ezx and Ezy.
-         *
-         *     Ezx(i, j) = Cex1 Ezx(i, j) + Cex2 / dx (Hy(i, j) - Hy(i - 1, j)),
-         *     Ezy(i, j) = Cey1 Ezy(i, j) - Cey2 / dy (Hx(i, j) - Hx(i, j - 1)),
-         *     Ez(i, j)  = Ezx(i, j) + Ezy(i, j),
-         *
-         * over the non-edge cells that serial_update_e leaves out: the bottom and top slabs
-         * of pml - 1 rows across the width, then the left and right slabs of pml - 1
-         * columns between them. The corners lie in the bottom and top slabs and carry both
-         * conductivities through the coefficients. Ez there is rebuilt from its parts each
-         * step, so fields put in by hand keep Ez = Ezx + Ezy inside the PML. Inner loop
-         * along x.
+         * Advance the Ez in the PML over the whole grid by one step as Ezx and Ezy, as
+         * update_pml_block does.
          *
          * @param fields Fields to update.
          * @param coeffs Coefficient arrays on the same grid as the fields.
@@ -146,13 +66,8 @@ namespace fdtd
         void serial_update_pml(Fields2D &fields, CoeffsView coeffs, std::size_t pml) noexcept;
 
         /**
-         * Update the edge Ez, which serial_update_e and serial_update_pml leave alone; call it
-         * right after them.
-         *
-         * Under PEC and PML the edge Ez is set to zero, with Ezx and Ezy. Under PMC it takes the
-         * interior update, with the x coefficients, and every H outside the domain read as zero:
-         * Hy(-1, j) and Hy(nx
-         * - 1, j), Hx(i, -1) and Hx(i, ny - 1). Corners combine both.
+         * Update the edge Ez of the whole grid, as update_boundary_block does; call it right
+         * after serial_update_e and serial_update_pml.
          *
          * @param fields Fields to update.
          * @param coeffs Coefficient arrays on the same grid as the fields.
