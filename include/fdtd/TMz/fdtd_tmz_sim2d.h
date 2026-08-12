@@ -26,6 +26,7 @@
 #include "fdtd/TMz/fdtd_tmz_fields2d.h"
 #include "fdtd/TMz/fdtd_tmz_grid2d.h"
 #include "fdtd/TMz/fdtd_tmz_material2d.h"
+#include "fdtd/TMz/fdtd_tmz_omp_options.h"
 #include "fdtd/TMz/fdtd_tmz_waveform.h"
 #include "fdtd/fdtd_float.h"
 
@@ -88,6 +89,9 @@ namespace fdtd
                 /** Backend to run on. */
                 BackendType backend = BackendType::Serial;
 
+                /** Settings of the OpenMP backend, ignored by the others. */
+                OmpOptions omp;
+
                 /** Whether an explicit dt above the Courant limit is rejected. */
                 bool check_stability = true;
             };
@@ -110,7 +114,7 @@ namespace fdtd
              * @throws std::invalid_argument On a bad grid, a Courant number outside (0, 1],
              *         a negative or non-finite dt, or, with check_stability, an explicit
              *         dt above the Courant limit, or, with an active PML, PML settings that
-             *         Material2D::set_pml() rejects.
+             *         Material2D::set_pml() rejects, or backend settings the backend rejects.
              * @throws std::runtime_error When the backend is not compiled in.
              */
             Sim2D(std::size_t nx, std::size_t ny, const Options &options);

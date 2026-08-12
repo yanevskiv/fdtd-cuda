@@ -22,6 +22,7 @@ option(FDTD_DOUBLE "Use double instead of float for fdtd::FloatType" OFF)
 option(FDTD_BUILD_TESTS "Build the Catch2 tests" ${PROJECT_IS_TOP_LEVEL})
 option(FDTD_WERROR "Treat compiler warnings as errors" OFF)
 option(FDTD_BUILD_SAMPLES "Build the samples" ${PROJECT_IS_TOP_LEVEL})
+option(FDTD_EXACT "Build the library without contracted multiply-adds, for bit-for-bit backend tests" OFF)
 
 # The library.
 add_library(fdtd
@@ -42,8 +43,17 @@ target_include_directories(fdtd PUBLIC
 target_compile_definitions(fdtd PUBLIC
     FDTD_DOUBLE=$<BOOL:${FDTD_DOUBLE}>
     FDTD_WITH_OPENMP=$<BOOL:${FDTD_WITH_OPENMP}>
-    FDTD_WITH_CUDA=$<BOOL:${FDTD_WITH_CUDA}>)
+    FDTD_WITH_CUDA=$<BOOL:${FDTD_WITH_CUDA}>
+    FDTD_EXACT=$<BOOL:${FDTD_EXACT}>)
 target_link_libraries(fdtd PRIVATE $<BUILD_INTERFACE:fdtd_warnings>)
+if(FDTD_WITH_OPENMP)
+    target_link_libraries(fdtd PRIVATE OpenMP::OpenMP_CXX)
+endif()
+
+# The exact build: no multiply-add is contracted, so rounding follows the source.
+if(FDTD_EXACT)
+    target_compile_options(fdtd PRIVATE $<$<COMPILE_LANG_AND_ID:CXX,GNU,Clang>:-ffp-contract=off>)
+endif()
 
 # Argument parsing shared by the programs.
 add_library(fdtd_args STATIC src/fdtd/fdtd_args.cpp)
@@ -170,4 +180,4 @@ install(FILES
     ${PROJECT_BINARY_DIR}/fdtdConfigVersion.cmake
     DESTINATION ${CMAKE_INSTALL_LIBDIR}/cmake/fdtd)
 
-message(STATUS "fdtd ${PROJECT_VERSION}: OpenMP=${FDTD_WITH_OPENMP} CUDA=${FDTD_WITH_CUDA} double=${FDTD_DOUBLE} tests=${FDTD_BUILD_TESTS}")
+message(STATUS "fdtd ${PROJECT_VERSION}: OpenMP=${FDTD_WITH_OPENMP} CUDA=${FDTD_WITH_CUDA} double=${FDTD_DOUBLE} exact=${FDTD_EXACT} tests=${FDTD_BUILD_TESTS}")

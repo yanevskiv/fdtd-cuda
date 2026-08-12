@@ -90,6 +90,29 @@ TEST_CASE("Registry reports what was compiled in", "[unit][backend]")
     }
 }
 
+// Verify that the serial backend ignores the settings of the OpenMP backend, even invalid ones.
+TEST_CASE("Serial backend ignores the OpenMP options", "[unit][backend][serial]")
+{
+    const Grid2D grid(9, 7);
+    fdtd::TMz::BackendOptions options;
+    options.omp.tile_x = 0;
+    options.omp.threads = 3;
+    auto plain = make_impulse(grid, 0.9, 4, 3, Boundary::Pmc);
+    auto backend = fdtd::TMz::make_backend(fdtd::TMz::BackendType::Serial, grid, options);
+    backend->upload(Coeffs2D(Material2D(grid), fdtd::TMz::courant_dt(grid, 0.9)));
+    backend->set_boundary(Boundary::Pmc);
+    backend->upload(download(*plain));
+
+    plain->step(5);
+    backend->step(5);
+
+    const Fields2D a = download(*plain);
+    const Fields2D b = download(*backend);
+    CHECK(std::equal(a.ez().begin(), a.ez().end(), b.ez().begin()));
+    CHECK(std::equal(a.hx().begin(), a.hx().end(), b.hx().begin()));
+    CHECK(std::equal(a.hy().begin(), a.hy().end(), b.hy().begin()));
+}
+
 // Verify the backend names.
 TEST_CASE("Backend types have lowercase names", "[unit][backend]")
 {

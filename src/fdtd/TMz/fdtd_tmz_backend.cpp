@@ -116,9 +116,17 @@ namespace fdtd::TMz
         return std::find(types.begin(), types.end(), type) != types.end();
     }
 
-    // Create a backend, or report that it is not compiled in.
+    // Create a backend with the default settings.
     std::unique_ptr<Backend> make_backend(BackendType type, const Grid2D &grid)
     {
+        return make_backend(type, grid, BackendOptions{});
+    }
+
+    // Create a backend, or report that it is not compiled in.
+    std::unique_ptr<Backend> make_backend(BackendType type, const Grid2D &grid,
+                                          const BackendOptions &options)
+    {
+        static_cast<void>(options);
         switch (type) {
             case BackendType::Serial:
                 return std::make_unique<SerialBackend>(grid);

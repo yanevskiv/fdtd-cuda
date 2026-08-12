@@ -58,6 +58,15 @@
             }
         },
         {
+            "name": "exact",
+            "displayName": "Exact (gcc, Release, no contracted multiply-adds)",
+            "inherits": ["base", "gcc"],
+            "cacheVariables": {
+                "CMAKE_BUILD_TYPE": "Release",
+                "FDTD_EXACT": "ON"
+            }
+        },
+        {
             "name": "bench",
             "displayName": "Benchmark (gcc, Release, no tests or samples)",
             "inherits": ["base", "gcc"],
@@ -80,6 +89,7 @@
         { "name": "clang-debug", "configurePreset": "clang-debug" },
         { "name": "clang-release", "configurePreset": "clang-release" },
         { "name": "ci-cpu", "configurePreset": "ci-cpu" },
+        { "name": "exact", "configurePreset": "exact" },
         { "name": "bench", "configurePreset": "bench" },
         { "name": "profile", "configurePreset": "profile" }
     ],
@@ -94,7 +104,8 @@
         { "name": "release", "inherits": "base", "configurePreset": "release" },
         { "name": "clang-debug", "inherits": "base", "configurePreset": "clang-debug" },
         { "name": "clang-release", "inherits": "base", "configurePreset": "clang-release" },
-        { "name": "ci-cpu", "inherits": "base", "configurePreset": "ci-cpu" }
+        { "name": "ci-cpu", "inherits": "base", "configurePreset": "ci-cpu" },
+        { "name": "exact", "inherits": "base", "configurePreset": "exact" }
     ],
     "workflowPresets": [
         {

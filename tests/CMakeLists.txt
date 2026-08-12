@@ -21,13 +21,17 @@ add_executable(fdtd_tests
     test_fdtd_tmz_fields2d.cpp
     test_fdtd_tmz_grid2d.cpp
     test_fdtd_tmz_material2d.cpp
+    test_fdtd_tmz_omp_options.cpp
     test_fdtd_tmz_output.cpp
     test_fdtd_tmz_sim2d.cpp
     test_fdtd_tmz_waveform.cpp
     test_fdtd_version.cpp
     test_physics.cpp)
 target_link_libraries(fdtd_tests PRIVATE fdtd::fdtd fdtd_args fdtd_benchmark fdtd_driver fdtd_warnings Catch2::Catch2WithMain)
+# The bound of the backend comparisons, in machine epsilons per step.
+set(FDTD_TEST_TOLERANCE 4 CACHE STRING "Bound of the backend comparisons in machine epsilons per step")
 target_compile_definitions(fdtd_tests PRIVATE
+    FDTD_TEST_TOLERANCE=${FDTD_TEST_TOLERANCE}
     FDTD_TEST_PROJECT_VERSION="${PROJECT_VERSION}"
     FDTD_TEST_PROJECT_VERSION_MAJOR=${PROJECT_VERSION_MAJOR}
     FDTD_TEST_PROJECT_VERSION_MINOR=${PROJECT_VERSION_MINOR}

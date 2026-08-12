@@ -74,7 +74,7 @@ namespace fdtd::TMz
         , m_dt(options_dt(m_grid, options))
         , m_material(m_grid)
         , m_fields(m_grid)
-        , m_backend(make_backend(options.backend, m_grid))
+        , m_backend(make_backend(options.backend, m_grid, {.omp = options.omp}))
     {
         apply_pml(m_material, m_options);
         m_backend->upload(Coeffs2D(m_material, m_dt));

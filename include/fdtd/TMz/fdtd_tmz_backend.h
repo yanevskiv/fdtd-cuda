@@ -25,6 +25,7 @@
 #include "fdtd/TMz/fdtd_tmz_component.h"
 #include "fdtd/TMz/fdtd_tmz_fields2d.h"
 #include "fdtd/TMz/fdtd_tmz_grid2d.h"
+#include "fdtd/TMz/fdtd_tmz_omp_options.h"
 #include "fdtd/fdtd_float.h"
 
 #include <cstddef>
@@ -49,6 +50,13 @@ namespace fdtd
 
             /** GPU backend. */
             Cuda
+        };
+
+        /** Settings a backend is created with; each backend reads its own part. */
+        struct BackendOptions
+        {
+            /** Settings of the OpenMP backend. */
+            OmpOptions omp;
         };
 
         /** A cell of one field component that a soft source adds to every step. */
@@ -278,6 +286,19 @@ namespace fdtd
          * @throws std::runtime_error When the backend is not compiled in.
          */
         std::unique_ptr<Backend> make_backend(BackendType type, const Grid2D &grid);
+
+        /**
+         * Create a backend with zeroed fields and its settings.
+         *
+         * @param type Backend type.
+         * @param grid Grid the backend works on.
+         * @param options Settings; a backend ignores those of the others.
+         * @return The new backend.
+         * @throws std::runtime_error When the backend is not compiled in.
+         * @throws std::invalid_argument When the backend's settings are invalid.
+         */
+        std::unique_ptr<Backend> make_backend(BackendType type, const Grid2D &grid,
+                                              const BackendOptions &options);
     }
 }
 
