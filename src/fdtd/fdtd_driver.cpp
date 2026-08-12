@@ -26,7 +26,7 @@
 
 // The simulation, its output files and the source waveform.
 #include "fdtd/TMz/fdtd_tmz_output.h"
-#include "fdtd/TMz/fdtd_tmz_sim2d.h"
+#include "fdtd/TMz/fdtd_tmz_simulation.h"
 #include "fdtd/TMz/fdtd_tmz_waveform.h"
 
 // Standard library for string building and errors.
@@ -144,7 +144,7 @@ namespace fdtd
         }
 
         // Write a snapshot of the current fields and log it.
-        void write_current(const TMz::Sim2D &sim, const std::filesystem::path &dir,
+        void write_current(const TMz::Simulation &sim, const std::filesystem::path &dir,
                            std::ostream &log)
         {
             const auto snap = sim.snapshot();
@@ -216,7 +216,7 @@ namespace fdtd
     // Build the simulation, run it in pieces between snapshots, then write the probes.
     void run_driver(const DriverOptions &options, std::ostream &log)
     {
-        TMz::Sim2D::Options simOptions;
+        TMz::Simulation::Options simOptions;
         simOptions.dx = FloatType(options.dx);
         simOptions.dy = FloatType(options.dy > 0 ? options.dy : options.dx);
         simOptions.courant = options.courant;
@@ -226,7 +226,7 @@ namespace fdtd
         simOptions.pml_reflection = options.pml_reflection;
         simOptions.backend = options.backend;
         const std::size_t ny = options.ny > 0 ? options.ny : options.nx;
-        TMz::Sim2D sim(options.nx, ny, simOptions);
+        TMz::Simulation sim(options.nx, ny, simOptions);
 
         if (options.pulses.empty()) {
             sim.add_source(options.nx / 2, ny / 2, TMz::Component::Ez,

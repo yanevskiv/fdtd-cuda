@@ -22,10 +22,10 @@
 #include <catch2/generators/catch_generators.hpp>
 
 // Project headers under test.
-#include "fdtd/TMz/backends/fdtd_tmz_partition2d.h"
-#include "fdtd/TMz/backends/fdtd_tmz_stepper2d.h"
-#include "fdtd/TMz/fdtd_tmz_grid2d.h"
-#include "fdtd/TMz/fdtd_tmz_material2d.h"
+#include "fdtd/TMz/backends/fdtd_tmz_partition.h"
+#include "fdtd/TMz/backends/fdtd_tmz_stepper.h"
+#include "fdtd/TMz/fdtd_tmz_grid.h"
+#include "fdtd/TMz/fdtd_tmz_material.h"
 
 // Standard library for algorithms, sizes and buffers.
 #include <algorithm>
@@ -35,15 +35,15 @@
 // Shorthand for the types under test.
 using fdtd::FloatType;
 using fdtd::TMz::Boundary;
-using fdtd::TMz::Coeffs2D;
+using fdtd::TMz::Coeffs;
 using fdtd::TMz::Component;
-using fdtd::TMz::Fields2D;
-using fdtd::TMz::Grid2D;
-using fdtd::TMz::Material2D;
-using fdtd::TMz::Partition2D;
+using fdtd::TMz::Fields;
+using fdtd::TMz::Grid;
+using fdtd::TMz::Material;
+using fdtd::TMz::Partition;
 using fdtd::TMz::PointInjection;
 using fdtd::TMz::PointProbe;
-using fdtd::TMz::Stepper2D;
+using fdtd::TMz::Stepper;
 
 // Helpers private to this file.
 namespace
@@ -55,19 +55,19 @@ namespace
     struct Run
     {
         /** Fields after the run. */
-        Fields2D fields;
+        Fields fields;
 
         /** Probe records, step-major. */
         std::vector<FloatType> records;
     };
 
     // Run the stepper part by part over a partition: every H phase, then every E phase.
-    Run run(const Grid2D &grid, const Partition2D &partition, Boundary boundary)
+    Run run(const Grid &grid, const Partition &partition, Boundary boundary)
     {
         const std::size_t pml = boundary == Boundary::Pml ? 4 : 0;
-        Material2D material(grid);
+        Material material(grid);
         material.set_pml(pml, 3, 1e-6);
-        const Coeffs2D coeffs(material, fdtd::TMz::courant_dt(grid, 0.9));
+        const Coeffs coeffs(material, fdtd::TMz::courant_dt(grid, 0.9));
         const std::vector<PointInjection> sources{{Component::Ez, grid.index(9, 8)},
                                                   {Component::Hx, grid.index(12, 6)},
                                                   {Component::Hy, grid.index(6, 11)}};
@@ -79,9 +79,9 @@ namespace
                                              {Component::Hy, grid.index(0, 0)},
                                              {Component::Ez, grid.index(10, 9)},
                                              {Component::Hx, grid.index(18, 13)}};
-        Run result{Fields2D(grid), std::vector<FloatType>(STEPS * probes.size())};
-        const Stepper2D stepper(result.fields, coeffs, pml, boundary, partition, sources, values,
-                                probes, result.records.data());
+        Run result{Fields(grid), std::vector<FloatType>(STEPS * probes.size())};
+        const Stepper stepper(result.fields, coeffs, pml, boundary, partition, sources, values,
+                              probes, result.records.data());
         for (std::size_t n = 0; n < STEPS; ++n) {
             for (std::size_t p = 0; p < partition.size(); ++p) {
                 stepper.h_phase(p, n);
@@ -106,22 +106,22 @@ namespace
 }
 
 // Verify that sources and probes owned by parts give the whole-grid run, bit for bit.
-TEST_CASE("Stepper over parts matches the whole grid", "[unit][stepper2d]")
+TEST_CASE("Stepper over parts matches the whole grid", "[unit][stepper]")
 {
     const auto boundary = GENERATE(Boundary::Pec, Boundary::Pmc, Boundary::Pml);
-    const Grid2D grid(21, 17);
-    const Run whole = run(grid, Partition2D::whole(grid), boundary);
+    const Grid grid(21, 17);
+    const Run whole = run(grid, Partition::whole(grid), boundary);
 
-    CHECK(same(whole, run(grid, Partition2D::tiles(grid, grid.nx(), 1), boundary)));
-    CHECK(same(whole, run(grid, Partition2D::tiles(grid, 5, 4), boundary)));
-    CHECK(same(whole, run(grid, Partition2D::ranges(grid, 6), boundary)));
+    CHECK(same(whole, run(grid, Partition::tiles(grid, grid.nx(), 1), boundary)));
+    CHECK(same(whole, run(grid, Partition::tiles(grid, 5, 4), boundary)));
+    CHECK(same(whole, run(grid, Partition::ranges(grid, 6), boundary)));
 }
 
 // Verify that the records are step-major, a repeated probe twice, and the sources land.
-TEST_CASE("Stepper writes its records step-major", "[unit][stepper2d]")
+TEST_CASE("Stepper writes its records step-major", "[unit][stepper]")
 {
-    const Grid2D grid(21, 17);
-    const Run result = run(grid, Partition2D::tiles(grid, 4, 4), Boundary::Pec);
+    const Grid grid(21, 17);
+    const Run result = run(grid, Partition::tiles(grid, 4, 4), Boundary::Pec);
 
     REQUIRE(result.records.size() == STEPS * 4);
     for (std::size_t n = 0; n < STEPS; ++n) {

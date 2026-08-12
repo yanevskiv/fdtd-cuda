@@ -20,7 +20,7 @@
 
 // The simulation, its output files and the source waveform.
 #include "fdtd/TMz/fdtd_tmz_output.h"
-#include "fdtd/TMz/fdtd_tmz_sim2d.h"
+#include "fdtd/TMz/fdtd_tmz_simulation.h"
 #include "fdtd/TMz/fdtd_tmz_waveform.h"
 #include "fdtd/fdtd_constants.h"
 
@@ -57,7 +57,7 @@ int main()
     using namespace fdtd;
 
     // Make a 200 x 200 box of 1 mm vacuum cells with PEC walls.
-    TMz::Sim2D sim(200, 200);
+    TMz::Simulation sim(200, 200);
 
     // Shape a Gaussian pulse 10 steps wide.
     const TMz::Gaussian pulse = TMz::Gaussian::from_steps(sim.dt(), 10);

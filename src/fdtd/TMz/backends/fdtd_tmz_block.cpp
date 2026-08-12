@@ -18,7 +18,7 @@
  */
 
 // Struct and kernel declarations.
-#include "fdtd/TMz/backends/fdtd_tmz_block2d.h"
+#include "fdtd/TMz/backends/fdtd_tmz_block.h"
 
 // Standard library for bounds and sizes.
 #include <algorithm>
@@ -32,7 +32,7 @@ namespace fdtd::TMz
     {
         // Visit each edge cell of a block once: the first and last rows, then the row ends between.
         template <typename Visit>
-        void for_each_edge(const Grid2D &grid, const Block2D &block, Visit visit)
+        void for_each_edge(const Grid &grid, const Block &block, Visit visit)
         {
             const std::size_t nx = grid.nx();
             const std::size_t ny = grid.ny();
@@ -61,7 +61,7 @@ namespace fdtd::TMz
     }
 
     // Take the arrays of a coefficient set.
-    CoeffsView::CoeffsView(const Coeffs2D &coeffs) noexcept
+    CoeffsView::CoeffsView(const Coeffs &coeffs) noexcept
         : CoeffsView(coeffs.coeff_ez_x1().data(), coeffs.coeff_ez_x2().data(),
                      coeffs.coeff_ez_y1().data(), coeffs.coeff_ez_y2().data(),
                      coeffs.coeff_hx_1().data(), coeffs.coeff_hx_2().data(),
@@ -87,10 +87,10 @@ namespace fdtd::TMz
     }
 
     // Zero the block's edge Ez and its parts, or update it reading H outside the domain as zero.
-    void update_boundary_block(Fields2D &fields, CoeffsView coeffs, const Block2D &block,
+    void update_boundary_block(Fields &fields, CoeffsView coeffs, const Block &block,
                                Boundary boundary) noexcept
     {
-        const Grid2D &grid = fields.grid();
+        const Grid &grid = fields.grid();
         FloatType *__restrict Ez = fields.ez().data();
 
         if (boundary != Boundary::Pmc) {

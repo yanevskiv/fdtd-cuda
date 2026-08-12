@@ -17,11 +17,11 @@
  * along with fdtd-cuda; if not, see <https://www.gnu.org/licenses/>.
  */
 
-#ifndef FDTD_TMZ_COEFFS2D_H
-#define FDTD_TMZ_COEFFS2D_H
+#ifndef FDTD_TMZ_COEFFS_H
+#define FDTD_TMZ_COEFFS_H
 
-#include "fdtd/TMz/fdtd_tmz_grid2d.h"
-#include "fdtd/TMz/fdtd_tmz_material2d.h"
+#include "fdtd/TMz/fdtd_tmz_grid.h"
+#include "fdtd/TMz/fdtd_tmz_material.h"
 #include "fdtd/fdtd_aligned_buffer.h"
 #include "fdtd/fdtd_float.h"
 
@@ -49,10 +49,10 @@ namespace fdtd
          *
          * Without a PML the x and y pairs of Ez are equal, and Hx and Hy are equal. The curl
          * factors leave out the cell size: the update applies 1/dx and 1/dy to the
-         * differences. Each array has grid().size() elements, indexed with Grid2D::index.
+         * differences. Each array has grid().size() elements, indexed with Grid::index.
          * Computed in double.
          */
-        class Coeffs2D
+        class Coeffs
         {
         public:
             /**
@@ -62,37 +62,37 @@ namespace fdtd
              * @param dt Time step in seconds, positive and finite.
              * @throws std::invalid_argument When dt is not positive and finite.
              */
-            Coeffs2D(const Material2D &material, double dt);
+            Coeffs(const Material &material, double dt);
 
             /** Coefficients are not copyable; a backend copies the arrays it needs. */
-            Coeffs2D(const Coeffs2D &) = delete;
+            Coeffs(const Coeffs &) = delete;
 
             /**
              * Coefficients are not copyable.
              *
              * @return These coefficients.
              */
-            Coeffs2D &operator=(const Coeffs2D &) = delete;
+            Coeffs &operator=(const Coeffs &) = delete;
 
             /** Take over another set's arrays. */
-            Coeffs2D(Coeffs2D &&) noexcept = default;
+            Coeffs(Coeffs &&) noexcept = default;
 
             /**
              * Take over another set's arrays.
              *
              * @return These coefficients.
              */
-            Coeffs2D &operator=(Coeffs2D &&) noexcept = default;
+            Coeffs &operator=(Coeffs &&) noexcept = default;
 
             /** Release the arrays. */
-            ~Coeffs2D() = default;
+            ~Coeffs() = default;
 
             /**
              * Grid the coefficients live on.
              *
              * @return The grid.
              */
-            const Grid2D &grid() const noexcept;
+            const Grid &grid() const noexcept;
 
             /**
              * Time step the coefficients were computed for.
@@ -104,7 +104,7 @@ namespace fdtd
             /**
              * Thickness of the PML the material carried.
              *
-             * @return Material2D::pml_thickness() of the material, zero without a PML.
+             * @return Material::pml_thickness() of the material, zero without a PML.
              */
             std::size_t pml_thickness() const noexcept;
 
@@ -166,7 +166,7 @@ namespace fdtd
 
         private:
             /** Grid the coefficients live on. */
-            Grid2D m_grid;
+            Grid m_grid;
 
             /** Time step in seconds. */
             double m_dt;

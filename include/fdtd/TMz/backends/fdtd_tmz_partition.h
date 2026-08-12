@@ -17,11 +17,11 @@
  * along with fdtd-cuda; if not, see <https://www.gnu.org/licenses/>.
  */
 
-#ifndef FDTD_TMZ_PARTITION2D_H
-#define FDTD_TMZ_PARTITION2D_H
+#ifndef FDTD_TMZ_PARTITION_H
+#define FDTD_TMZ_PARTITION_H
 
-#include "fdtd/TMz/backends/fdtd_tmz_block2d.h"
-#include "fdtd/TMz/fdtd_tmz_grid2d.h"
+#include "fdtd/TMz/backends/fdtd_tmz_block.h"
+#include "fdtd/TMz/fdtd_tmz_grid.h"
 
 #include <cstddef>
 #include <span>
@@ -41,7 +41,7 @@ namespace fdtd
          * contiguous runs of cells in row-major order, a partial row, whole rows and a
          * partial row.
          */
-        class Partition2D
+        class Partition
         {
         public:
             /**
@@ -50,7 +50,7 @@ namespace fdtd
              * @param grid Grid to cut.
              * @return The partition.
              */
-            static Partition2D whole(const Grid2D &grid);
+            static Partition whole(const Grid &grid);
 
             /**
              * Cut a grid into tiles of tileX by tileY cells, row-major, the last ones clipped.
@@ -61,7 +61,7 @@ namespace fdtd
              * @return The partition.
              * @throws std::invalid_argument When a tile side is zero.
              */
-            static Partition2D tiles(const Grid2D &grid, std::size_t tileX, std::size_t tileY);
+            static Partition tiles(const Grid &grid, std::size_t tileX, std::size_t tileY);
 
             /**
              * Cut a grid into parts contiguous ranges of cells in row-major order, part p
@@ -73,7 +73,7 @@ namespace fdtd
              * @return The partition.
              * @throws std::invalid_argument When parts is zero.
              */
-            static Partition2D ranges(const Grid2D &grid, std::size_t parts);
+            static Partition ranges(const Grid &grid, std::size_t parts);
 
             /**
              * Number of parts.
@@ -88,7 +88,7 @@ namespace fdtd
              * @param part Part below size().
              * @return The part's blocks, none for an empty range.
              */
-            std::span<const Block2D> blocks(std::size_t part) const noexcept;
+            std::span<const Block> blocks(std::size_t part) const noexcept;
 
             /**
              * Part that holds a cell.
@@ -119,7 +119,7 @@ namespace fdtd
              *
              * @param grid Grid to cut.
              */
-            explicit Partition2D(const Grid2D &grid);
+            explicit Partition(const Grid &grid);
 
             /**
              * Close the part made of the blocks added since the last one.
@@ -145,7 +145,7 @@ namespace fdtd
             std::vector<std::size_t> m_starts;
 
             /** Blocks of every part, part by part. */
-            std::vector<Block2D> m_blocks;
+            std::vector<Block> m_blocks;
 
             /** Part p's blocks run from m_offsets[p] to m_offsets[p + 1]. */
             std::vector<std::size_t> m_offsets;

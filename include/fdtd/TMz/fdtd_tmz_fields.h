@@ -17,10 +17,10 @@
  * along with fdtd-cuda; if not, see <https://www.gnu.org/licenses/>.
  */
 
-#ifndef FDTD_TMZ_FIELDS2D_H
-#define FDTD_TMZ_FIELDS2D_H
+#ifndef FDTD_TMZ_FIELDS_H
+#define FDTD_TMZ_FIELDS_H
 
-#include "fdtd/TMz/fdtd_tmz_grid2d.h"
+#include "fdtd/TMz/fdtd_tmz_grid.h"
 #include "fdtd/fdtd_aligned_buffer.h"
 #include "fdtd/fdtd_float.h"
 
@@ -36,12 +36,12 @@ namespace fdtd
          * The TMz fields Ez, Hx and Hy over a grid, with the split parts Ezx and Ezy of
          * Ez, as five aligned arrays.
          *
-         * Each array has grid().size() elements, indexed with Grid2D::index, and starts
+         * Each array has grid().size() elements, indexed with Grid::index, and starts
          * zeroed. The Yee staggering is in the update, not the storage. Ezx and Ezy span
          * the whole grid but are only kept inside a PML, where Ez = Ezx + Ezy; elsewhere
          * they stay zero.
          */
-        class Fields2D
+        class Fields
         {
         public:
             /**
@@ -49,14 +49,14 @@ namespace fdtd
              *
              * @param grid Grid the fields live on.
              */
-            explicit Fields2D(const Grid2D &grid);
+            explicit Fields(const Grid &grid);
 
             /**
              * Grid the fields live on.
              *
              * @return The grid.
              */
-            const Grid2D &grid() const noexcept;
+            const Grid &grid() const noexcept;
 
             /**
              * Electric field along z.
@@ -133,7 +133,7 @@ namespace fdtd
 
         private:
             /** Grid the fields live on. */
-            Grid2D m_grid;
+            Grid m_grid;
 
             /** Electric field along z. */
             AlignedBuffer<FloatType> m_ez;

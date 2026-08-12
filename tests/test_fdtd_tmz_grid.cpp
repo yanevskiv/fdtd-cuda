@@ -23,7 +23,7 @@
 #include <catch2/matchers/catch_matchers_floating_point.hpp>
 
 // Project headers under test.
-#include "fdtd/TMz/fdtd_tmz_grid2d.h"
+#include "fdtd/TMz/fdtd_tmz_grid.h"
 #include "fdtd/fdtd_constants.h"
 
 // Standard library for math, limits, errors and sets.
@@ -36,14 +36,14 @@
 // Shorthand for the types under test.
 using Catch::Matchers::WithinRel;
 using fdtd::TMz::courant_dt;
-using fdtd::TMz::Grid2D;
+using fdtd::TMz::Grid;
 
 // Verify the accessors and the size of a grid.
-TEST_CASE("Grid2D stores its geometry", "[unit][grid2d]")
+TEST_CASE("Grid stores its geometry", "[unit][grid]")
 {
     const fdtd::FloatType dx = 0.5;
     const fdtd::FloatType dy = 0.25;
-    const fdtd::TMz::Grid2D grid(7, 5, dx, dy);
+    const fdtd::TMz::Grid grid(7, 5, dx, dy);
     CHECK(grid.nx() == 7);
     CHECK(grid.ny() == 5);
     CHECK(grid.dx() == dx);
@@ -53,11 +53,11 @@ TEST_CASE("Grid2D stores its geometry", "[unit][grid2d]")
 }
 
 // Verify that indexing is row-major, x fastest, and covers every cell exactly once.
-TEST_CASE("Grid2D indexing is row-major and one to one", "[unit][grid2d]")
+TEST_CASE("Grid indexing is row-major and one to one", "[unit][grid]")
 {
     const auto [nx, ny] = GENERATE(
         table<std::size_t, std::size_t>({{1, 1}, {1, 9}, {9, 1}, {8, 8}, {7, 5}, {13, 31}}));
-    const fdtd::TMz::Grid2D grid(nx, ny);
+    const fdtd::TMz::Grid grid(nx, ny);
     std::set<std::size_t> seen;
 
     for (std::size_t j = 0; j < ny; ++j) {
@@ -74,24 +74,24 @@ TEST_CASE("Grid2D indexing is row-major and one to one", "[unit][grid2d]")
 }
 
 // Verify that invalid geometries are rejected.
-TEST_CASE("Grid2D rejects invalid geometry", "[unit][grid2d]")
+TEST_CASE("Grid rejects invalid geometry", "[unit][grid]")
 {
-    using fdtd::TMz::Grid2D;
+    using fdtd::TMz::Grid;
     const auto huge = std::numeric_limits<std::size_t>::max();
 
-    CHECK_THROWS_AS(Grid2D(0, 4), std::invalid_argument);
-    CHECK_THROWS_AS(Grid2D(4, 0), std::invalid_argument);
-    CHECK_THROWS_AS(Grid2D(4, 4, 0, 1), std::invalid_argument);
-    CHECK_THROWS_AS(Grid2D(4, 4, 1, -1), std::invalid_argument);
-    CHECK_THROWS_AS(Grid2D(4, 4, std::numeric_limits<fdtd::FloatType>::quiet_NaN(), 1),
+    CHECK_THROWS_AS(Grid(0, 4), std::invalid_argument);
+    CHECK_THROWS_AS(Grid(4, 0), std::invalid_argument);
+    CHECK_THROWS_AS(Grid(4, 4, 0, 1), std::invalid_argument);
+    CHECK_THROWS_AS(Grid(4, 4, 1, -1), std::invalid_argument);
+    CHECK_THROWS_AS(Grid(4, 4, std::numeric_limits<fdtd::FloatType>::quiet_NaN(), 1),
                     std::invalid_argument);
-    CHECK_THROWS_AS(Grid2D(huge, 2), std::invalid_argument);
+    CHECK_THROWS_AS(Grid(huge, 2), std::invalid_argument);
 }
 
 // Verify the square-cell limit dx / (c0 * sqrt(2)) and its scaling with S.
 TEST_CASE("courant_dt on square cells", "[unit][courant]")
 {
-    const Grid2D grid(8, 8, 1e-3F, 1e-3F);
+    const Grid grid(8, 8, 1e-3F, 1e-3F);
     const double dx = double(grid.dx());
     const double limit = dx / (fdtd::C_0 * std::sqrt(2.0));
 
@@ -102,7 +102,7 @@ TEST_CASE("courant_dt on square cells", "[unit][courant]")
 // Verify rectangular cells against the formula and below the 1D limit of either side.
 TEST_CASE("courant_dt on rectangular cells", "[unit][courant]")
 {
-    const Grid2D grid(8, 8, 2e-3F, 1e-3F);
+    const Grid grid(8, 8, 2e-3F, 1e-3F);
     const double dx = double(grid.dx());
     const double dy = double(grid.dy());
     const double limit = 1.0 / (fdtd::C_0 * std::sqrt(1.0 / (dx * dx) + 1.0 / (dy * dy)));
@@ -115,7 +115,7 @@ TEST_CASE("courant_dt on rectangular cells", "[unit][courant]")
 // Verify that Courant numbers outside (0, 1] are rejected.
 TEST_CASE("courant_dt rejects invalid Courant numbers", "[unit][courant]")
 {
-    const Grid2D grid(4, 4);
+    const Grid grid(4, 4);
 
     CHECK_THROWS_AS(courant_dt(grid, 0.0), std::invalid_argument);
     CHECK_THROWS_AS(courant_dt(grid, -0.5), std::invalid_argument);

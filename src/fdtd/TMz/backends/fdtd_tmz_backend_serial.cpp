@@ -21,8 +21,8 @@
 #include "fdtd/TMz/backends/fdtd_tmz_backend_serial.h"
 
 // The partition of the grid and the stepper over it.
-#include "fdtd/TMz/backends/fdtd_tmz_partition2d.h"
-#include "fdtd/TMz/backends/fdtd_tmz_stepper2d.h"
+#include "fdtd/TMz/backends/fdtd_tmz_partition.h"
+#include "fdtd/TMz/backends/fdtd_tmz_stepper.h"
 
 // Standard library for copies, sizes, errors and buffers.
 #include <algorithm>
@@ -35,31 +35,31 @@
 namespace fdtd::TMz
 {
     // Update H over the whole grid.
-    void serial_update_h(Fields2D &fields, CoeffsView coeffs) noexcept
+    void serial_update_h(Fields &fields, CoeffsView coeffs) noexcept
     {
         update_h_block(fields, coeffs, whole_block(fields.grid()));
     }
 
     // Update the interior Ez over the whole grid, inside the PML when there is one.
-    void serial_update_e(Fields2D &fields, CoeffsView coeffs, std::size_t pml) noexcept
+    void serial_update_e(Fields &fields, CoeffsView coeffs, std::size_t pml) noexcept
     {
         update_e_interior_block(fields, coeffs, whole_block(fields.grid()), pml);
     }
 
     // Update Ezx, Ezy and Ez over the PML slabs.
-    void serial_update_pml(Fields2D &fields, CoeffsView coeffs, std::size_t pml) noexcept
+    void serial_update_pml(Fields &fields, CoeffsView coeffs, std::size_t pml) noexcept
     {
         update_pml_block(fields, coeffs, whole_block(fields.grid()), pml);
     }
 
     // Update the edge Ez of the whole grid.
-    void serial_update_boundary(Fields2D &fields, CoeffsView coeffs, Boundary boundary) noexcept
+    void serial_update_boundary(Fields &fields, CoeffsView coeffs, Boundary boundary) noexcept
     {
         update_boundary_block(fields, coeffs, whole_block(fields.grid()), boundary);
     }
 
     // Check that two grids hold the same geometry.
-    static void require_same_grid(const Grid2D &expected, const Grid2D &actual)
+    static void require_same_grid(const Grid &expected, const Grid &actual)
     {
         if (expected.nx() != actual.nx() || expected.ny() != actual.ny() ||
             expected.pitch() != actual.pitch() || expected.dx() != actual.dx() ||
@@ -75,7 +75,7 @@ namespace fdtd::TMz
     }
 
     // Allocate the backend's fields and coefficient arrays.
-    SerialBackend::SerialBackend(const Grid2D &grid)
+    SerialBackend::SerialBackend(const Grid &grid)
         : m_fields(grid)
         , m_coeff_ez_x1(grid.size())
         , m_coeff_ez_x2(grid.size())
@@ -102,13 +102,13 @@ namespace fdtd::TMz
     }
 
     // Return the grid.
-    const Grid2D &SerialBackend::grid() const noexcept
+    const Grid &SerialBackend::grid() const noexcept
     {
         return m_fields.grid();
     }
 
     // Copy the fields in.
-    void SerialBackend::upload(const Fields2D &fields)
+    void SerialBackend::upload(const Fields &fields)
     {
         require_same_grid(grid(), fields.grid());
         copy_field(fields.ez(), m_fields.ez());
@@ -119,7 +119,7 @@ namespace fdtd::TMz
     }
 
     // Copy the fields out.
-    void SerialBackend::download(Fields2D &fields) const
+    void SerialBackend::download(Fields &fields) const
     {
         require_same_grid(grid(), fields.grid());
         copy_field(m_fields.ez(), fields.ez());
@@ -130,7 +130,7 @@ namespace fdtd::TMz
     }
 
     // Copy the coefficient arrays in.
-    void SerialBackend::upload(const Coeffs2D &coeffs)
+    void SerialBackend::upload(const Coeffs &coeffs)
     {
         require_same_grid(grid(), coeffs.grid());
         copy_field(coeffs.coeff_ez_x1(), {m_coeff_ez_x1.data(), m_coeff_ez_x1.size()});
@@ -195,9 +195,9 @@ namespace fdtd::TMz
         const std::size_t pml = m_boundary == Boundary::Pml ? m_pml_thickness : 0;
         const std::size_t first = m_records.size();
         m_records.resize(first + nsteps * m_probes.size());
-        const Partition2D partition = Partition2D::whole(grid());
-        const Stepper2D stepper(m_fields, coeffs, pml, m_boundary, partition, points, values,
-                                m_probes, m_records.data() + first);
+        const Partition partition = Partition::whole(grid());
+        const Stepper stepper(m_fields, coeffs, pml, m_boundary, partition, points, values,
+                              m_probes, m_records.data() + first);
         for (std::size_t n = 0; n < nsteps; ++n) {
             stepper.h_phase(0, n);
             stepper.e_phase(0, n);

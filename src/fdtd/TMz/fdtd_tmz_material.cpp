@@ -18,7 +18,7 @@
  */
 
 // Class declaration.
-#include "fdtd/TMz/fdtd_tmz_material2d.h"
+#include "fdtd/TMz/fdtd_tmz_material.h"
 
 // Project constants for the vacuum impedance.
 #include "fdtd/fdtd_constants.h"
@@ -35,28 +35,27 @@ namespace fdtd::TMz
     namespace
     {
         // Throw unless the medium is finite, with positive eps_r and mu_r and conductivities >= 0.
-        void check_medium(const Material2D::Medium &m)
+        void check_medium(const Material::Medium &m)
         {
             const bool finite = std::isfinite(m.eps_r) && std::isfinite(m.mu_r) &&
                                 std::isfinite(m.sigma_e) && std::isfinite(m.sigma_m);
             if (!finite || !(m.eps_r > 0) || !(m.mu_r > 0) || !(m.sigma_e >= 0) ||
                 !(m.sigma_m >= 0)) {
-                throw std::invalid_argument("Material2D: medium is not physical");
+                throw std::invalid_argument("Material: medium is not physical");
             }
         }
 
         // Throw unless the layer fits twice on each axis and order and reflection are in range.
-        void check_pml(const Grid2D &grid, std::size_t thickness, double order, double reflection)
+        void check_pml(const Grid &grid, std::size_t thickness, double order, double reflection)
         {
             if (2 * thickness >= grid.nx() || 2 * thickness >= grid.ny()) {
-                throw std::invalid_argument(
-                    "Material2D: 2 * PML thickness must be below nx and ny");
+                throw std::invalid_argument("Material: 2 * PML thickness must be below nx and ny");
             }
             if (!(order > 0) || !std::isfinite(order)) {
-                throw std::invalid_argument("Material2D: PML order must be positive and finite");
+                throw std::invalid_argument("Material: PML order must be positive and finite");
             }
             if (!(reflection > 0) || !(reflection < 1)) {
-                throw std::invalid_argument("Material2D: PML reflection must be in (0, 1)");
+                throw std::invalid_argument("Material: PML reflection must be in (0, 1)");
             }
         }
 
@@ -79,7 +78,7 @@ namespace fdtd::TMz
     }
 
     // Allocate the arrays and fill them with vacuum.
-    Material2D::Material2D(const Grid2D &grid)
+    Material::Material(const Grid &grid)
         : m_grid(grid)
         , m_eps_r(grid.size(), FloatType(1))
         , m_mu_r(grid.size(), FloatType(1))
@@ -92,30 +91,30 @@ namespace fdtd::TMz
     {}
 
     // Return the grid.
-    const Grid2D &Material2D::grid() const noexcept
+    const Grid &Material::grid() const noexcept
     {
         return m_grid;
     }
 
     // Gather the parameters of one cell after a bounds check.
-    Material2D::Medium Material2D::at(std::size_t i, std::size_t j) const
+    Material::Medium Material::at(std::size_t i, std::size_t j) const
     {
         if (i >= m_grid.nx() || j >= m_grid.ny()) {
-            throw std::out_of_range("Material2D: cell outside the grid");
+            throw std::out_of_range("Material: cell outside the grid");
         }
         const std::size_t k = m_grid.index(i, j);
         return {m_eps_r[k], m_mu_r[k], m_sigma_e[k], m_sigma_m[k]};
     }
 
     // Fill the whole grid through fill_rect.
-    void Material2D::fill(const Medium &medium)
+    void Material::fill(const Medium &medium)
     {
         fill_rect(0, 0, m_grid.nx(), m_grid.ny(), medium);
     }
 
     // Clip the rectangle to the grid and set its cells.
-    void Material2D::fill_rect(std::size_t i0, std::size_t j0, std::size_t i1, std::size_t j1,
-                               const Medium &medium)
+    void Material::fill_rect(std::size_t i0, std::size_t j0, std::size_t i1, std::size_t j1,
+                             const Medium &medium)
     {
         check_medium(medium);
         i1 = std::min(i1, m_grid.nx());
@@ -128,11 +127,11 @@ namespace fdtd::TMz
     }
 
     // Clip the circle's bounding box to the grid and set the cells inside the circle.
-    void Material2D::fill_circle(double ci, double cj, double radius, const Medium &medium)
+    void Material::fill_circle(double ci, double cj, double radius, const Medium &medium)
     {
         check_medium(medium);
         if (!std::isfinite(ci) || !std::isfinite(cj) || !std::isfinite(radius) || !(radius >= 0)) {
-            throw std::invalid_argument("Material2D: circle must be finite and non-negative");
+            throw std::invalid_argument("Material: circle must be finite and non-negative");
         }
 
         const auto lo = [](double v, std::size_t n) {
@@ -159,31 +158,31 @@ namespace fdtd::TMz
     }
 
     // Return the relative permittivity.
-    std::span<const FloatType> Material2D::eps_r() const noexcept
+    std::span<const FloatType> Material::eps_r() const noexcept
     {
         return m_eps_r;
     }
 
     // Return the relative permeability.
-    std::span<const FloatType> Material2D::mu_r() const noexcept
+    std::span<const FloatType> Material::mu_r() const noexcept
     {
         return m_mu_r;
     }
 
     // Return the electric conductivity.
-    std::span<const FloatType> Material2D::sigma_e() const noexcept
+    std::span<const FloatType> Material::sigma_e() const noexcept
     {
         return m_sigma_e;
     }
 
     // Return the magnetic conductivity.
-    std::span<const FloatType> Material2D::sigma_m() const noexcept
+    std::span<const FloatType> Material::sigma_m() const noexcept
     {
         return m_sigma_m;
     }
 
     // Check the settings, then grade the four profiles cell by cell, or zero them.
-    void Material2D::set_pml(std::size_t thickness, double order, double reflection)
+    void Material::set_pml(std::size_t thickness, double order, double reflection)
     {
         if (thickness == 0) {
             m_pml_thickness = 0;
@@ -217,37 +216,37 @@ namespace fdtd::TMz
     }
 
     // Return the PML thickness.
-    std::size_t Material2D::pml_thickness() const noexcept
+    std::size_t Material::pml_thickness() const noexcept
     {
         return m_pml_thickness;
     }
 
     // Return the PML electric conductivity along x.
-    std::span<const FloatType> Material2D::sigma_e_x() const noexcept
+    std::span<const FloatType> Material::sigma_e_x() const noexcept
     {
         return m_sigma_e_x;
     }
 
     // Return the PML electric conductivity along y.
-    std::span<const FloatType> Material2D::sigma_e_y() const noexcept
+    std::span<const FloatType> Material::sigma_e_y() const noexcept
     {
         return m_sigma_e_y;
     }
 
     // Return the PML magnetic conductivity along x.
-    std::span<const FloatType> Material2D::sigma_m_x() const noexcept
+    std::span<const FloatType> Material::sigma_m_x() const noexcept
     {
         return m_sigma_m_x;
     }
 
     // Return the PML magnetic conductivity along y.
-    std::span<const FloatType> Material2D::sigma_m_y() const noexcept
+    std::span<const FloatType> Material::sigma_m_y() const noexcept
     {
         return m_sigma_m_y;
     }
 
     // Write the four parameters of one cell.
-    void Material2D::set(std::size_t k, const Medium &medium) noexcept
+    void Material::set(std::size_t k, const Medium &medium) noexcept
     {
         m_eps_r[k] = medium.eps_r;
         m_mu_r[k] = medium.mu_r;

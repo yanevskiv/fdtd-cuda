@@ -20,7 +20,7 @@
 
 #include <catch2/catch_test_macros.hpp>
 
-#include "fdtd/TMz/fdtd_tmz_fields2d.h"
+#include "fdtd/TMz/fdtd_tmz_fields.h"
 #include "fdtd/TMz/fdtd_tmz_output.h"
 
 #include <filesystem>
@@ -31,8 +31,8 @@
 #include <vector>
 
 using fdtd::FloatType;
-using fdtd::TMz::Fields2D;
-using fdtd::TMz::Grid2D;
+using fdtd::TMz::Fields;
+using fdtd::TMz::Grid;
 
 namespace
 {
@@ -89,8 +89,8 @@ namespace
 TEST_CASE("Snapshots round-trip", "[unit][output]")
 {
     const TempDir dir("snapshot_round_trip");
-    const Grid2D grid(13, 7, FloatType(0.5), FloatType(0.25));
-    Fields2D fields(grid);
+    const Grid grid(13, 7, FloatType(0.5), FloatType(0.25));
+    Fields fields(grid);
     for (std::size_t j = 0; j < grid.ny(); ++j) {
         for (std::size_t i = 0; i < grid.nx(); ++i) {
             fields.ez()[grid.index(i, j)] = FloatType(i) - FloatType(0.5) * FloatType(j);
@@ -122,9 +122,9 @@ TEST_CASE("Snapshots round-trip", "[unit][output]")
 TEST_CASE("Snapshot reader rejects bad files", "[unit][output]")
 {
     const TempDir dir("snapshot_bad");
-    const Grid2D grid(4, 3);
+    const Grid grid(4, 3);
     const auto good = dir.path() / "good.bin";
-    fdtd::TMz::write_snapshot(good, Fields2D(grid), 0, 1);
+    fdtd::TMz::write_snapshot(good, Fields(grid), 0, 1);
     const std::string bytes = read_text(good);
 
     const auto bad = dir.path() / "bad.bin";

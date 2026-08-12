@@ -17,15 +17,15 @@
  * along with fdtd-cuda; if not, see <https://www.gnu.org/licenses/>.
  */
 
-#ifndef FDTD_TMZ_SIM2D_H
-#define FDTD_TMZ_SIM2D_H
+#ifndef FDTD_TMZ_SIMULATION_H
+#define FDTD_TMZ_SIMULATION_H
 
 #include "fdtd/TMz/fdtd_tmz_backend.h"
 #include "fdtd/TMz/fdtd_tmz_boundary.h"
 #include "fdtd/TMz/fdtd_tmz_component.h"
-#include "fdtd/TMz/fdtd_tmz_fields2d.h"
-#include "fdtd/TMz/fdtd_tmz_grid2d.h"
-#include "fdtd/TMz/fdtd_tmz_material2d.h"
+#include "fdtd/TMz/fdtd_tmz_fields.h"
+#include "fdtd/TMz/fdtd_tmz_grid.h"
+#include "fdtd/TMz/fdtd_tmz_material.h"
 #include "fdtd/TMz/fdtd_tmz_omp_options.h"
 #include "fdtd/TMz/fdtd_tmz_waveform.h"
 #include "fdtd/fdtd_float.h"
@@ -46,7 +46,7 @@ namespace fdtd
          * The material starts as vacuum and the fields at zero. The coefficients for the
          * material and time step are uploaded to the backend on construction.
          */
-        class Sim2D
+        class Simulation
         {
         public:
             /** Copy of the fields taken after a number of steps. */
@@ -56,7 +56,7 @@ namespace fdtd
                 std::size_t step;
 
                 /** The fields at that step. */
-                Fields2D fields;
+                Fields fields;
             };
 
             /** Settings of a simulation, each with a usable default. */
@@ -103,7 +103,7 @@ namespace fdtd
              * @param ny Cells along y, at least 1.
              * @throws std::invalid_argument On a bad grid.
              */
-            Sim2D(std::size_t nx, std::size_t ny);
+            Simulation(std::size_t nx, std::size_t ny);
 
             /**
              * Create a simulation.
@@ -114,10 +114,10 @@ namespace fdtd
              * @throws std::invalid_argument On a bad grid, a Courant number outside (0, 1],
              *         a negative or non-finite dt, or, with check_stability, an explicit
              *         dt above the Courant limit, or, with an active PML, PML settings that
-             *         Material2D::set_pml() rejects, or backend settings the backend rejects.
+             *         Material::set_pml() rejects, or backend settings the backend rejects.
              * @throws std::runtime_error When the backend is not compiled in.
              */
-            Sim2D(std::size_t nx, std::size_t ny, const Options &options);
+            Simulation(std::size_t nx, std::size_t ny, const Options &options);
 
             /**
              * Settings the simulation was created with.
@@ -131,7 +131,7 @@ namespace fdtd
              *
              * @return The grid.
              */
-            const Grid2D &grid() const noexcept;
+            const Grid &grid() const noexcept;
 
             /**
              * Time step in use.
@@ -145,7 +145,7 @@ namespace fdtd
              *
              * @return The material.
              */
-            const Material2D &material() const noexcept;
+            const Material &material() const noexcept;
 
             /**
              * Replace the material and upload the coefficients rebuilt from it.
@@ -156,7 +156,7 @@ namespace fdtd
              * @param material New material, on a grid with the same size and cells.
              * @throws std::invalid_argument When the material's grid does not match.
              */
-            void set_material(const Material2D &material);
+            void set_material(const Material &material);
 
             /**
              * Thickness of the active PML.
@@ -290,7 +290,7 @@ namespace fdtd
              *
              * @return The fields.
              */
-            const Fields2D &fields() const noexcept;
+            const Fields &fields() const noexcept;
 
             /** Copy the fields from the backend into the host copy. */
             void download();
@@ -317,16 +317,16 @@ namespace fdtd
             Options m_options;
 
             /** Grid of the simulation. */
-            Grid2D m_grid;
+            Grid m_grid;
 
             /** Time step in seconds. */
             double m_dt;
 
             /** Per-cell material, holding the PML profiles. */
-            Material2D m_material;
+            Material m_material;
 
             /** Host copy of the fields. */
-            Fields2D m_fields;
+            Fields m_fields;
 
             /** Backend that owns the working fields and steps them. */
             std::unique_ptr<Backend> m_backend;

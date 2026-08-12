@@ -22,8 +22,8 @@
 #include <catch2/matchers/catch_matchers_floating_point.hpp>
 
 // Project headers under test.
-#include "fdtd/TMz/fdtd_tmz_coeffs2d.h"
-#include "fdtd/TMz/fdtd_tmz_grid2d.h"
+#include "fdtd/TMz/fdtd_tmz_coeffs.h"
+#include "fdtd/TMz/fdtd_tmz_grid.h"
 #include "fdtd/fdtd_constants.h"
 
 // Standard library for limits and errors.
@@ -34,21 +34,21 @@
 // Shorthand for the types under test.
 using Catch::Matchers::WithinAbs;
 using Catch::Matchers::WithinRel;
-using fdtd::TMz::Coeffs2D;
+using fdtd::TMz::Coeffs;
 using fdtd::TMz::courant_dt;
-using fdtd::TMz::Grid2D;
-using fdtd::TMz::Material2D;
+using fdtd::TMz::Grid;
+using fdtd::TMz::Material;
 
 // Relative tolerance that holds in single precision.
 static constexpr double TOL = 1e-6;
 
 // Verify that vacuum gives no decay and curl factors dt/EPS_0 and dt/MU_0.
-TEST_CASE("Coeffs2D in vacuum", "[unit][coeffs2d]")
+TEST_CASE("Coeffs in vacuum", "[unit][coeffs]")
 {
-    const Grid2D grid(5, 4, 1e-3F, 2e-3F);
-    const Material2D material(grid);
+    const Grid grid(5, 4, 1e-3F, 2e-3F);
+    const Material material(grid);
     const double dt = courant_dt(grid, 0.9);
-    const Coeffs2D coeffs(material, dt);
+    const Coeffs coeffs(material, dt);
 
     REQUIRE(coeffs.grid().nx() == 5);
     REQUIRE(coeffs.grid().ny() == 4);
@@ -69,14 +69,14 @@ TEST_CASE("Coeffs2D in vacuum", "[unit][coeffs2d]")
 }
 
 // Verify a lossy dielectric and magnetic cell against hand values, its neighbours vacuum.
-TEST_CASE("Coeffs2D in a lossy medium", "[unit][coeffs2d]")
+TEST_CASE("Coeffs in a lossy medium", "[unit][coeffs]")
 {
-    const Grid2D grid(3, 3);
-    Material2D material(grid);
-    const Material2D::Medium lossy{4, 2, 0.5, 300};
+    const Grid grid(3, 3);
+    Material material(grid);
+    const Material::Medium lossy{4, 2, 0.5, 300};
     material.fill_rect(1, 1, 2, 2, lossy);
     const double dt = 1e-12;
-    const Coeffs2D coeffs(material, dt);
+    const Coeffs coeffs(material, dt);
 
     const double eps = 4 * fdtd::EPS_0;
     const double mu = 2 * fdtd::MU_0;
@@ -97,14 +97,14 @@ TEST_CASE("Coeffs2D in a lossy medium", "[unit][coeffs2d]")
 }
 
 // Verify that without a PML the x and y copies equal the single pre-split pair bit for bit.
-TEST_CASE("Coeffs2D without a PML matches the isotropic coefficients", "[unit][coeffs2d]")
+TEST_CASE("Coeffs without a PML matches the isotropic coefficients", "[unit][coeffs]")
 {
-    const Grid2D grid(6, 5);
-    Material2D material(grid);
+    const Grid grid(6, 5);
+    Material material(grid);
     material.fill_rect(1, 1, 4, 3, {4, 2, 0.5F, 300});
     material.fill_circle(3, 2, 1.5, {2.5F, 1, 0.01F, 0});
     const double dt = courant_dt(grid, 0.9);
-    const Coeffs2D coeffs(material, dt);
+    const Coeffs coeffs(material, dt);
 
     for (std::size_t k = 0; k < grid.size(); ++k) {
         const double eps = double(material.eps_r()[k]) * fdtd::EPS_0;
@@ -128,13 +128,13 @@ TEST_CASE("Coeffs2D without a PML matches the isotropic coefficients", "[unit][c
 }
 
 // Verify that each coefficient pair takes the PML profile of its own direction only.
-TEST_CASE("Coeffs2D follows the PML profiles by direction", "[unit][coeffs2d][pml]")
+TEST_CASE("Coeffs follows the PML profiles by direction", "[unit][coeffs][pml]")
 {
-    const Grid2D grid(20, 16);
-    Material2D material(grid);
+    const Grid grid(20, 16);
+    Material material(grid);
     material.set_pml(4, 3, 1e-6);
     const double dt = courant_dt(grid, 0.9);
-    const Coeffs2D coeffs(material, dt);
+    const Coeffs coeffs(material, dt);
     CHECK(coeffs.pml_thickness() == 4);
 
     for (std::size_t k = 0; k < grid.size(); ++k) {
@@ -176,16 +176,16 @@ TEST_CASE("Coeffs2D follows the PML profiles by direction", "[unit][coeffs2d][pm
 }
 
 // Verify that the PML scales with eps_r and mu_r, leaving the decay factors those of vacuum.
-TEST_CASE("Coeffs2D scales the PML by the medium", "[unit][coeffs2d][pml]")
+TEST_CASE("Coeffs scales the PML by the medium", "[unit][coeffs][pml]")
 {
-    const Grid2D grid(20, 16);
-    Material2D vacuum(grid);
+    const Grid grid(20, 16);
+    Material vacuum(grid);
     vacuum.set_pml(4, 3, 1e-6);
-    Material2D medium = vacuum;
+    Material medium = vacuum;
     medium.fill({4, 2, 0, 0});
     const double dt = courant_dt(grid, 0.5);
-    const Coeffs2D inVacuum(vacuum, dt);
-    const Coeffs2D inMedium(medium, dt);
+    const Coeffs inVacuum(vacuum, dt);
+    const Coeffs inMedium(medium, dt);
 
     for (const std::size_t k : {grid.index(0, 8), grid.index(10, 0), grid.index(1, 1)}) {
         CHECK_THAT(double(inMedium.coeff_ez_x1()[k]),
@@ -208,26 +208,26 @@ TEST_CASE("Coeffs2D scales the PML by the medium", "[unit][coeffs2d][pml]")
 }
 
 // Verify that a perfect-conductor limit drives the Ez decay to -1, its curl factor near zero.
-TEST_CASE("Coeffs2D approaches a conductor", "[unit][coeffs2d]")
+TEST_CASE("Coeffs approaches a conductor", "[unit][coeffs]")
 {
-    const Grid2D grid(1, 1);
-    Material2D material(grid);
+    const Grid grid(1, 1);
+    Material material(grid);
     material.fill({1, 1, 1e12F, 0});
-    const Coeffs2D coeffs(material, 1e-12);
+    const Coeffs coeffs(material, 1e-12);
 
     CHECK_THAT(double(coeffs.coeff_ez_x1()[0]), WithinAbs(-1.0, 1e-6));
     CHECK(double(coeffs.coeff_ez_x2()[0]) < 1e-9 * (1e-12 / fdtd::EPS_0));
 }
 
 // Verify that time steps that are not positive and finite are rejected.
-TEST_CASE("Coeffs2D rejects invalid time steps", "[unit][coeffs2d]")
+TEST_CASE("Coeffs rejects invalid time steps", "[unit][coeffs]")
 {
-    const Material2D material(Grid2D(2, 2));
+    const Material material(Grid(2, 2));
 
-    CHECK_THROWS_AS(Coeffs2D(material, 0.0), std::invalid_argument);
-    CHECK_THROWS_AS(Coeffs2D(material, -1e-12), std::invalid_argument);
-    CHECK_THROWS_AS(Coeffs2D(material, std::numeric_limits<double>::infinity()),
+    CHECK_THROWS_AS(Coeffs(material, 0.0), std::invalid_argument);
+    CHECK_THROWS_AS(Coeffs(material, -1e-12), std::invalid_argument);
+    CHECK_THROWS_AS(Coeffs(material, std::numeric_limits<double>::infinity()),
                     std::invalid_argument);
-    CHECK_THROWS_AS(Coeffs2D(material, std::numeric_limits<double>::quiet_NaN()),
+    CHECK_THROWS_AS(Coeffs(material, std::numeric_limits<double>::quiet_NaN()),
                     std::invalid_argument);
 }

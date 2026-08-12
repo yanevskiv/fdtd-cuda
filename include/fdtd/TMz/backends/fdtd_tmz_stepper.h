@@ -17,14 +17,14 @@
  * along with fdtd-cuda; if not, see <https://www.gnu.org/licenses/>.
  */
 
-#ifndef FDTD_TMZ_STEPPER2D_H
-#define FDTD_TMZ_STEPPER2D_H
+#ifndef FDTD_TMZ_STEPPER_H
+#define FDTD_TMZ_STEPPER_H
 
-#include "fdtd/TMz/backends/fdtd_tmz_block2d.h"
-#include "fdtd/TMz/backends/fdtd_tmz_partition2d.h"
+#include "fdtd/TMz/backends/fdtd_tmz_block.h"
+#include "fdtd/TMz/backends/fdtd_tmz_partition.h"
 #include "fdtd/TMz/fdtd_tmz_backend.h"
 #include "fdtd/TMz/fdtd_tmz_boundary.h"
-#include "fdtd/TMz/fdtd_tmz_fields2d.h"
+#include "fdtd/TMz/fdtd_tmz_fields.h"
 #include "fdtd/fdtd_float.h"
 
 #include <cstddef>
@@ -46,9 +46,9 @@ namespace fdtd
          * Whoever runs a phase owns the part's cells for that phase, so sources and probes
          * need no lock: a backend only has to finish the H phase of a part's neighbours
          * before its E phase, and the E phase of the neighbours before the next H phase.
-         * The serial backend runs the one part of Partition2D::whole.
+         * The serial backend runs the one part of Partition::whole.
          */
-        class Stepper2D
+        class Stepper
         {
         public:
             /**
@@ -65,10 +65,10 @@ namespace fdtd
              * @param records Space for one value per probe per step, step-major: step n of
              *        probe k goes to records[n * probes.size() + k].
              */
-            Stepper2D(Fields2D &fields, CoeffsView coeffs, std::size_t pml, Boundary boundary,
-                      const Partition2D &partition, std::span<const PointInjection> sources,
-                      std::span<const FloatType> values, std::span<const PointProbe> probes,
-                      FloatType *records);
+            Stepper(Fields &fields, CoeffsView coeffs, std::size_t pml, Boundary boundary,
+                    const Partition &partition, std::span<const PointInjection> sources,
+                    std::span<const FloatType> values, std::span<const PointProbe> probes,
+                    FloatType *records);
 
             /**
              * Run the H phase of a part in step n: its H, then the H sources on its cells.
@@ -80,7 +80,7 @@ namespace fdtd
             template <bool Simd = false>
             inline void h_phase(std::size_t part, std::size_t n) const noexcept
             {
-                for (const Block2D &block : m_partition.blocks(part)) {
+                for (const Block &block : m_partition.blocks(part)) {
                     update_h_block<Simd>(m_fields, m_coeffs, block);
                 }
                 add_sources(part, n, true);
@@ -97,7 +97,7 @@ namespace fdtd
             template <bool Simd = false>
             inline void e_phase(std::size_t part, std::size_t n) const noexcept
             {
-                for (const Block2D &block : m_partition.blocks(part)) {
+                for (const Block &block : m_partition.blocks(part)) {
                     update_e_block<Simd>(m_fields, m_coeffs, block, m_pml, m_boundary);
                 }
                 add_sources(part, n, false);
@@ -123,7 +123,7 @@ namespace fdtd
             void record_probes(std::size_t part, std::size_t n) const noexcept;
 
             /** Fields being advanced. */
-            Fields2D &m_fields;
+            Fields &m_fields;
 
             /** Coefficient arrays. */
             CoeffsView m_coeffs;
@@ -135,7 +135,7 @@ namespace fdtd
             Boundary m_boundary;
 
             /** Parts of the grid. */
-            const Partition2D &m_partition;
+            const Partition &m_partition;
 
             /** Source cells. */
             std::span<const PointInjection> m_sources;

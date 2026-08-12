@@ -21,7 +21,7 @@
 #ifndef FDTD_TMZ_OUTPUT_H
 #define FDTD_TMZ_OUTPUT_H
 
-#include "fdtd/TMz/fdtd_tmz_fields2d.h"
+#include "fdtd/TMz/fdtd_tmz_fields.h"
 #include "fdtd/fdtd_float.h"
 
 #include <cstddef>
@@ -85,7 +85,7 @@ namespace fdtd
          * @param dt Time step in seconds.
          * @throws std::runtime_error When the file cannot be written.
          */
-        void write_snapshot(const std::filesystem::path &path, const Fields2D &fields,
+        void write_snapshot(const std::filesystem::path &path, const Fields &fields,
                             std::size_t step, double dt);
 
         /**

@@ -108,10 +108,10 @@ namespace fdtd::TMz
     }
 
     // Write the header and Ez row by row, without the padding.
-    void write_snapshot(const std::filesystem::path &path, const Fields2D &fields, std::size_t step,
+    void write_snapshot(const std::filesystem::path &path, const Fields &fields, std::size_t step,
                         double dt)
     {
-        const Grid2D &grid = fields.grid();
+        const Grid &grid = fields.grid();
         std::vector<char> header;
         header.reserve(SNAPSHOT_HEADER_SIZE);
         header.insert(header.end(), std::begin(SNAPSHOT_MAGIC), std::end(SNAPSHOT_MAGIC));

@@ -21,10 +21,10 @@
 #define FDTD_TMZ_BACKEND_H
 
 #include "fdtd/TMz/fdtd_tmz_boundary.h"
-#include "fdtd/TMz/fdtd_tmz_coeffs2d.h"
+#include "fdtd/TMz/fdtd_tmz_coeffs.h"
 #include "fdtd/TMz/fdtd_tmz_component.h"
-#include "fdtd/TMz/fdtd_tmz_fields2d.h"
-#include "fdtd/TMz/fdtd_tmz_grid2d.h"
+#include "fdtd/TMz/fdtd_tmz_fields.h"
+#include "fdtd/TMz/fdtd_tmz_grid.h"
 #include "fdtd/TMz/fdtd_tmz_omp_options.h"
 #include "fdtd/fdtd_float.h"
 
@@ -65,7 +65,7 @@ namespace fdtd
             /** Component the value is added to. */
             Component component;
 
-            /** Flat index of the cell, as given by Grid2D::index. */
+            /** Flat index of the cell, as given by Grid::index. */
             std::size_t index;
         };
 
@@ -75,7 +75,7 @@ namespace fdtd
             /** Component the value is read from. */
             Component component;
 
-            /** Flat index of the cell, as given by Grid2D::index. */
+            /** Flat index of the cell, as given by Grid::index. */
             std::size_t index;
         };
 
@@ -112,7 +112,7 @@ namespace fdtd
              *
              * @return The grid.
              */
-            virtual const Grid2D &grid() const noexcept = 0;
+            virtual const Grid &grid() const noexcept = 0;
 
             /**
              * Copy fields into the backend, Ezx and Ezy included.
@@ -120,7 +120,7 @@ namespace fdtd
              * @param fields Fields on the backend's grid.
              * @throws std::invalid_argument When the grids differ.
              */
-            virtual void upload(const Fields2D &fields) = 0;
+            virtual void upload(const Fields &fields) = 0;
 
             /**
              * Copy the backend's fields out, Ezx and Ezy included.
@@ -128,7 +128,7 @@ namespace fdtd
              * @param fields Destination on the backend's grid.
              * @throws std::invalid_argument When the grids differ.
              */
-            virtual void download(Fields2D &fields) const = 0;
+            virtual void download(Fields &fields) const = 0;
 
             /**
              * Copy update coefficients into the backend, replacing any before.
@@ -136,7 +136,7 @@ namespace fdtd
              * @param coeffs Coefficients on the backend's grid.
              * @throws std::invalid_argument When the grids differ.
              */
-            virtual void upload(const Coeffs2D &coeffs) = 0;
+            virtual void upload(const Coeffs &coeffs) = 0;
 
             /**
              * Set the outer boundary condition for the steps that follow.
@@ -285,7 +285,7 @@ namespace fdtd
          * @return The new backend.
          * @throws std::runtime_error When the backend is not compiled in.
          */
-        std::unique_ptr<Backend> make_backend(BackendType type, const Grid2D &grid);
+        std::unique_ptr<Backend> make_backend(BackendType type, const Grid &grid);
 
         /**
          * Create a backend with zeroed fields and its settings.
@@ -297,7 +297,7 @@ namespace fdtd
          * @throws std::runtime_error When the backend is not compiled in.
          * @throws std::invalid_argument When the backend's settings are invalid.
          */
-        std::unique_ptr<Backend> make_backend(BackendType type, const Grid2D &grid,
+        std::unique_ptr<Backend> make_backend(BackendType type, const Grid &grid,
                                               const BackendOptions &options);
     }
 }

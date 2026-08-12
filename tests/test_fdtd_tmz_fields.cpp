@@ -22,7 +22,7 @@
 #include <catch2/generators/catch_generators.hpp>
 
 // Project headers under test.
-#include "fdtd/TMz/fdtd_tmz_fields2d.h"
+#include "fdtd/TMz/fdtd_tmz_fields.h"
 #include "fdtd/fdtd_aligned_buffer.h"
 
 // Standard library for algorithms and integer pointers.
@@ -47,11 +47,11 @@ static bool is_aligned(const void *pointer)
 }
 
 // Verify that each array has the grid's size, is aligned and starts zeroed.
-TEST_CASE("Fields2D allocates aligned zeroed arrays", "[unit][fields2d]")
+TEST_CASE("Fields allocates aligned zeroed arrays", "[unit][fields]")
 {
     const auto [nx, ny] =
         GENERATE(table<std::size_t, std::size_t>({{1, 1}, {7, 5}, {64, 64}, {13, 31}}));
-    const fdtd::TMz::Fields2D fields(fdtd::TMz::Grid2D(nx, ny));
+    const fdtd::TMz::Fields fields(fdtd::TMz::Grid(nx, ny));
 
     CHECK(fields.grid().nx() == nx);
     CHECK(fields.grid().ny() == ny);
@@ -67,9 +67,9 @@ TEST_CASE("Fields2D allocates aligned zeroed arrays", "[unit][fields2d]")
 }
 
 // Verify that zero() clears values written through the views.
-TEST_CASE("Fields2D zero clears every field", "[unit][fields2d]")
+TEST_CASE("Fields zero clears every field", "[unit][fields]")
 {
-    fdtd::TMz::Fields2D fields(fdtd::TMz::Grid2D(9, 4));
+    fdtd::TMz::Fields fields(fdtd::TMz::Grid(9, 4));
     const auto &grid = fields.grid();
 
     fields.ez()[grid.index(3, 2)] = 1;

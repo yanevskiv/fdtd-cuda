@@ -18,7 +18,7 @@
  */
 
 // Class and function declarations.
-#include "fdtd/TMz/fdtd_tmz_grid2d.h"
+#include "fdtd/TMz/fdtd_tmz_grid.h"
 
 // Project constants for the speed of light.
 #include "fdtd/fdtd_constants.h"
@@ -32,7 +32,7 @@
 namespace fdtd::TMz
 {
     // Validate the geometry and store it.
-    Grid2D::Grid2D(std::size_t nx, std::size_t ny, FloatType dx, FloatType dy)
+    Grid::Grid(std::size_t nx, std::size_t ny, FloatType dx, FloatType dy)
         : m_nx(nx)
         , m_ny(ny)
         , m_dx(dx)
@@ -40,54 +40,54 @@ namespace fdtd::TMz
         , m_pitch(nx)
     {
         if (nx == 0 || ny == 0) {
-            throw std::invalid_argument("Grid2D: cell counts must be at least 1");
+            throw std::invalid_argument("Grid: cell counts must be at least 1");
         }
         if (!(dx > 0) || !(dy > 0)) {
-            throw std::invalid_argument("Grid2D: cell sizes must be positive");
+            throw std::invalid_argument("Grid: cell sizes must be positive");
         }
         if (ny > std::numeric_limits<std::size_t>::max() / nx) {
-            throw std::invalid_argument("Grid2D: nx * ny does not fit std::size_t");
+            throw std::invalid_argument("Grid: nx * ny does not fit std::size_t");
         }
     }
 
     // Return the cells along x.
-    std::size_t Grid2D::nx() const noexcept
+    std::size_t Grid::nx() const noexcept
     {
         return m_nx;
     }
 
     // Return the cells along y.
-    std::size_t Grid2D::ny() const noexcept
+    std::size_t Grid::ny() const noexcept
     {
         return m_ny;
     }
 
     // Return the cell size along x.
-    FloatType Grid2D::dx() const noexcept
+    FloatType Grid::dx() const noexcept
     {
         return m_dx;
     }
 
     // Return the cell size along y.
-    FloatType Grid2D::dy() const noexcept
+    FloatType Grid::dy() const noexcept
     {
         return m_dy;
     }
 
     // Return the row pitch.
-    std::size_t Grid2D::pitch() const noexcept
+    std::size_t Grid::pitch() const noexcept
     {
         return m_pitch;
     }
 
     // Return the element count of an array over the grid.
-    std::size_t Grid2D::size() const noexcept
+    std::size_t Grid::size() const noexcept
     {
         return m_pitch * m_ny;
     }
 
     // Check the Courant number and scale the 2D stability limit by it.
-    double courant_dt(const Grid2D &grid, double courant)
+    double courant_dt(const Grid &grid, double courant)
     {
         if (!(courant > 0) || !(courant <= 1)) {
             throw std::invalid_argument("courant_dt: Courant number must be in (0, 1]");

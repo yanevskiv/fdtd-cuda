@@ -20,7 +20,7 @@
 
 // The simulation, its output files and the source waveform.
 #include "fdtd/TMz/fdtd_tmz_output.h"
-#include "fdtd/TMz/fdtd_tmz_sim2d.h"
+#include "fdtd/TMz/fdtd_tmz_simulation.h"
 #include "fdtd/TMz/fdtd_tmz_waveform.h"
 
 // Standard library for math, containers and printing.
@@ -51,14 +51,14 @@ namespace
     }
 
     // Run a pulse in a 60 x 60 interior inside a border and return Ez 5 cells from its left.
-    std::vector<fdtd::FloatType> run_trace(const fdtd::TMz::Sim2D::Options &options,
+    std::vector<fdtd::FloatType> run_trace(const fdtd::TMz::Simulation::Options &options,
                                            std::size_t border, const char *snapshot)
     {
         // Bring the library names into scope.
         using namespace fdtd;
 
         // Make the square grid of the interior and the border.
-        TMz::Sim2D sim(60 + 2 * border, 60 + 2 * border, options);
+        TMz::Simulation sim(60 + 2 * border, 60 + 2 * border, options);
 
         // Add a Gaussian pulse 8 steps wide to Ez as a soft source.
         sim.add_source(border + 20, border + 30, TMz::Component::Ez,
@@ -91,7 +91,7 @@ int main()
     using namespace fdtd;
 
     // Ask for the PML boundary with its default grading and a target reflection of 1e-6.
-    TMz::Sim2D::Options pml;
+    TMz::Simulation::Options pml;
     pml.boundary = TMz::Boundary::Pml;
     pml.pml_thickness = 20;
 
@@ -99,7 +99,7 @@ int main()
     const auto trace = run_trace(pml, 20, "pml.bin");
 
     // Record it again with PEC walls 100 cells away, which reflect too late to reach it.
-    const auto reference = run_trace(TMz::Sim2D::Options(), 100, nullptr);
+    const auto reference = run_trace(TMz::Simulation::Options(), 100, nullptr);
 
     // Find the largest value of the clean record.
     double peak = 0;

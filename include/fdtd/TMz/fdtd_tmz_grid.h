@@ -17,8 +17,8 @@
  * along with fdtd-cuda; if not, see <https://www.gnu.org/licenses/>.
  */
 
-#ifndef FDTD_TMZ_GRID2D_H
-#define FDTD_TMZ_GRID2D_H
+#ifndef FDTD_TMZ_GRID_H
+#define FDTD_TMZ_GRID_H
 
 #include "fdtd/fdtd_float.h"
 
@@ -36,7 +36,7 @@ namespace fdtd
          * Cell (i, j) is at index j * pitch + i, with x fastest. The pitch equals nx
          * on the CPU; a GPU backend may pad it for coalescing.
          */
-        class Grid2D
+        class Grid
         {
         public:
             /**
@@ -49,7 +49,7 @@ namespace fdtd
              * @throws std::invalid_argument On a zero count, a non-positive size or an
              *         index range that does not fit std::size_t.
              */
-            Grid2D(std::size_t nx, std::size_t ny, FloatType dx = 1, FloatType dy = 1);
+            Grid(std::size_t nx, std::size_t ny, FloatType dx = 1, FloatType dy = 1);
 
             /**
              * Cells along x.
@@ -133,7 +133,7 @@ namespace fdtd
          * @return Time step in seconds.
          * @throws std::invalid_argument When S is outside (0, 1].
          */
-        double courant_dt(const Grid2D &grid, double courant);
+        double courant_dt(const Grid &grid, double courant);
     }
 }
 

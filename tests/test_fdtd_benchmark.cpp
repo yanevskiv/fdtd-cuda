@@ -20,7 +20,7 @@
 
 #include <catch2/catch_test_macros.hpp>
 
-#include "fdtd/TMz/fdtd_tmz_sim2d.h"
+#include "fdtd/TMz/fdtd_tmz_simulation.h"
 #include "fdtd/TMz/fdtd_tmz_waveform.h"
 #include "fdtd/fdtd_benchmark.h"
 #include "fdtd/fdtd_float.h"
@@ -79,12 +79,12 @@ namespace
         return result;
     }
 
-    // Run the benchmark workload by hand with Sim2D and sum Ez.
+    // Run the benchmark workload by hand with Simulation and sum Ez.
     double workload_checksum(std::size_t nx, std::size_t ny, std::size_t steps, Boundary boundary)
     {
-        fdtd::TMz::Sim2D::Options options;
+        fdtd::TMz::Simulation::Options options;
         options.boundary = boundary;
-        fdtd::TMz::Sim2D sim(nx, ny, options);
+        fdtd::TMz::Simulation sim(nx, ny, options);
         sim.add_source(nx / 2, ny / 2, fdtd::TMz::Component::Ez,
                        fdtd::TMz::Gaussian::from_steps(sim.dt(), 12));
         sim.run(steps);
@@ -229,7 +229,7 @@ TEST_CASE("Benchmark writes a row per sample", "[unit][benchmark]")
 }
 
 // Verify that the checksum equals the sum of Ez of the workload run by hand.
-TEST_CASE("Benchmark checksum matches Sim2D run by hand", "[unit][benchmark]")
+TEST_CASE("Benchmark checksum matches Simulation run by hand", "[unit][benchmark]")
 {
     auto options = small();
     options.repeat = 1;

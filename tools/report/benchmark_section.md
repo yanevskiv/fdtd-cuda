@@ -1,5 +1,5 @@
 The run `$stamp` holds $samples samples of $configurations configurations. Each sample times
-`Sim2D::run` alone on a fresh simulation, after a warm-up. The tables and figures give the median
+`Simulation::run` alone on a fresh simulation, after a warm-up. The tables and figures give the median
 of the samples of each configuration, and the throughput is the number of cell updates per second
 over that median.
 

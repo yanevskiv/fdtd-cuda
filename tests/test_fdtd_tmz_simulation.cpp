@@ -22,8 +22,8 @@
 #include <catch2/matchers/catch_matchers_floating_point.hpp>
 
 // Project headers under test.
-#include "fdtd/TMz/fdtd_tmz_grid2d.h"
-#include "fdtd/TMz/fdtd_tmz_sim2d.h"
+#include "fdtd/TMz/fdtd_tmz_grid.h"
+#include "fdtd/TMz/fdtd_tmz_simulation.h"
 
 // Standard library for limits and errors.
 #include <algorithm>
@@ -38,9 +38,9 @@ using fdtd::TMz::BackendType;
 using fdtd::TMz::Boundary;
 using fdtd::TMz::Component;
 using fdtd::TMz::courant_dt;
-using fdtd::TMz::Grid2D;
-using fdtd::TMz::Material2D;
-using fdtd::TMz::Sim2D;
+using fdtd::TMz::Grid;
+using fdtd::TMz::Material;
+using fdtd::TMz::Simulation;
 
 // A waveform that returns the time it is sampled at.
 static FloatType ramp(FloatType t)
@@ -49,10 +49,10 @@ static FloatType ramp(FloatType t)
 }
 
 // Verify the defaults: millimeter cells, S = 0.99, PEC, serial, stability checked.
-TEST_CASE("Sim2D defaults", "[unit][sim2d]")
+TEST_CASE("Simulation defaults", "[unit][simulation]")
 {
-    const Sim2D sim(16, 8);
-    const Sim2D::Options opts;
+    const Simulation sim(16, 8);
+    const Simulation::Options opts;
 
     CHECK(sim.grid().nx() == 16);
     CHECK(sim.grid().ny() == 8);
@@ -72,14 +72,14 @@ TEST_CASE("Sim2D defaults", "[unit][sim2d]")
 }
 
 // Verify that the options reach the grid, the time step and the backend.
-TEST_CASE("Sim2D applies its options", "[unit][sim2d]")
+TEST_CASE("Simulation applies its options", "[unit][simulation]")
 {
-    Sim2D::Options opts;
+    Simulation::Options opts;
     opts.dx = FloatType(2e-3);
     opts.dy = FloatType(1e-3);
     opts.courant = 0.5;
     opts.boundary = Boundary::Pmc;
-    const Sim2D sim(8, 8, opts);
+    const Simulation sim(8, 8, opts);
 
     CHECK(sim.grid().dx() == FloatType(2e-3));
     CHECK(sim.grid().dy() == FloatType(1e-3));
@@ -89,118 +89,118 @@ TEST_CASE("Sim2D applies its options", "[unit][sim2d]")
 }
 
 // Verify that an explicit dt overrides the Courant number.
-TEST_CASE("Sim2D takes an explicit dt", "[unit][sim2d]")
+TEST_CASE("Simulation takes an explicit dt", "[unit][simulation]")
 {
-    Sim2D::Options opts;
+    Simulation::Options opts;
     opts.courant = 2;
     opts.dt = 1e-12;
-    const Sim2D sim(8, 8, opts);
+    const Simulation sim(8, 8, opts);
 
     CHECK(sim.dt() == 1e-12);
 }
 
 // Verify that bad options throw.
-TEST_CASE("Sim2D rejects bad options", "[unit][sim2d]")
+TEST_CASE("Simulation rejects bad options", "[unit][simulation]")
 {
-    CHECK_THROWS_AS(Sim2D(0, 8), std::invalid_argument);
+    CHECK_THROWS_AS(Simulation(0, 8), std::invalid_argument);
 
-    Sim2D::Options opts;
+    Simulation::Options opts;
     opts.dx = 0;
-    CHECK_THROWS_AS(Sim2D(8, 8, opts), std::invalid_argument);
+    CHECK_THROWS_AS(Simulation(8, 8, opts), std::invalid_argument);
 
     opts = {};
     opts.courant = 1.5;
-    CHECK_THROWS_AS(Sim2D(8, 8, opts), std::invalid_argument);
+    CHECK_THROWS_AS(Simulation(8, 8, opts), std::invalid_argument);
 
     opts = {};
     opts.dt = -1e-12;
-    CHECK_THROWS_AS(Sim2D(8, 8, opts), std::invalid_argument);
+    CHECK_THROWS_AS(Simulation(8, 8, opts), std::invalid_argument);
 
     opts = {};
     opts.dt = std::numeric_limits<double>::infinity();
-    CHECK_THROWS_AS(Sim2D(8, 8, opts), std::invalid_argument);
+    CHECK_THROWS_AS(Simulation(8, 8, opts), std::invalid_argument);
 
     opts = {};
     opts.dt = 1e-9;
-    CHECK_THROWS_AS(Sim2D(8, 8, opts), std::invalid_argument);
+    CHECK_THROWS_AS(Simulation(8, 8, opts), std::invalid_argument);
 }
 
 // Verify that check_stability = false accepts an explicit dt above the Courant limit.
-TEST_CASE("Sim2D accepts an unstable dt without the check", "[unit][sim2d]")
+TEST_CASE("Simulation accepts an unstable dt without the check", "[unit][simulation]")
 {
-    Sim2D::Options opts;
+    Simulation::Options opts;
     opts.dt = 1e-9;
     opts.check_stability = false;
-    Sim2D sim(8, 8, opts);
+    Simulation sim(8, 8, opts);
     CHECK(sim.dt() == 1e-9);
     CHECK(sim.dt() > courant_dt(sim.grid(), 1.0));
 }
 
 // Verify that the PML is active only with Boundary::Pml and a nonzero thickness.
-TEST_CASE("Sim2D activates the PML only with Boundary::Pml", "[unit][sim2d][pml]")
+TEST_CASE("Simulation activates the PML only with Boundary::Pml", "[unit][simulation][pml]")
 {
-    Sim2D::Options opts;
+    Simulation::Options opts;
     opts.boundary = Boundary::Pml;
     opts.pml_thickness = 5;
-    CHECK(Sim2D(16, 12, opts).pml_thickness() == 5);
-    CHECK(Sim2D(16, 12, opts).backend().boundary() == Boundary::Pml);
-    CHECK(Sim2D(16, 12, opts).material().pml_thickness() == 5);
+    CHECK(Simulation(16, 12, opts).pml_thickness() == 5);
+    CHECK(Simulation(16, 12, opts).backend().boundary() == Boundary::Pml);
+    CHECK(Simulation(16, 12, opts).material().pml_thickness() == 5);
 
     opts.pml_thickness = 0;
-    CHECK(Sim2D(16, 12, opts).pml_thickness() == 0);
+    CHECK(Simulation(16, 12, opts).pml_thickness() == 0);
 
     opts.boundary = Boundary::Pec;
     opts.pml_thickness = 5;
-    CHECK(Sim2D(16, 12, opts).pml_thickness() == 0);
+    CHECK(Simulation(16, 12, opts).pml_thickness() == 0);
 
     opts.boundary = Boundary::Pmc;
-    CHECK(Sim2D(16, 12, opts).pml_thickness() == 0);
+    CHECK(Simulation(16, 12, opts).pml_thickness() == 0);
 }
 
 // Verify that bad PML settings throw only when the PML is active.
-TEST_CASE("Sim2D checks the PML settings when active", "[unit][sim2d][pml]")
+TEST_CASE("Simulation checks the PML settings when active", "[unit][simulation][pml]")
 {
-    Sim2D::Options opts;
+    Simulation::Options opts;
     opts.pml_thickness = 6;
     opts.pml_order = -1;
     opts.pml_reflection = 2;
-    CHECK_NOTHROW(Sim2D(12, 12, opts));
+    CHECK_NOTHROW(Simulation(12, 12, opts));
 
     opts.boundary = Boundary::Pml;
     opts.pml_thickness = 0;
-    CHECK_NOTHROW(Sim2D(12, 12, opts));
+    CHECK_NOTHROW(Simulation(12, 12, opts));
 
     opts = {};
     opts.boundary = Boundary::Pml;
     opts.pml_thickness = 6;
-    CHECK_THROWS_AS(Sim2D(12, 20, opts), std::invalid_argument);
-    CHECK_THROWS_AS(Sim2D(20, 12, opts), std::invalid_argument);
-    CHECK_NOTHROW(Sim2D(13, 13, opts));
+    CHECK_THROWS_AS(Simulation(12, 20, opts), std::invalid_argument);
+    CHECK_THROWS_AS(Simulation(20, 12, opts), std::invalid_argument);
+    CHECK_NOTHROW(Simulation(13, 13, opts));
 
     opts.pml_order = 0;
-    CHECK_THROWS_AS(Sim2D(16, 16, opts), std::invalid_argument);
+    CHECK_THROWS_AS(Simulation(16, 16, opts), std::invalid_argument);
 
     opts = {};
     opts.boundary = Boundary::Pml;
     opts.pml_thickness = 4;
     opts.pml_reflection = 1;
-    CHECK_THROWS_AS(Sim2D(16, 16, opts), std::invalid_argument);
+    CHECK_THROWS_AS(Simulation(16, 16, opts), std::invalid_argument);
 }
 
 // Verify that set_material grades the options' PML into the material, or clears it.
-TEST_CASE("Sim2D set_material keeps the PML of the options", "[unit][sim2d][pml]")
+TEST_CASE("Simulation set_material keeps the PML of the options", "[unit][simulation][pml]")
 {
-    Sim2D::Options opts;
+    Simulation::Options opts;
     opts.boundary = Boundary::Pml;
     opts.pml_thickness = 3;
-    Sim2D sim(12, 12, opts);
-    const Material2D vacuum(sim.grid());
+    Simulation sim(12, 12, opts);
+    const Material vacuum(sim.grid());
     sim.set_material(vacuum);
     CHECK(sim.material().pml_thickness() == 3);
     CHECK(sim.material().sigma_e_x()[sim.grid().index(0, 6)] > FloatType(0));
 
-    Sim2D pec(12, 12);
-    Material2D graded(pec.grid());
+    Simulation pec(12, 12);
+    Material graded(pec.grid());
     graded.set_pml(3, 3, 1e-6);
     pec.set_material(graded);
     CHECK(pec.pml_thickness() == 0);
@@ -208,22 +208,22 @@ TEST_CASE("Sim2D set_material keeps the PML of the options", "[unit][sim2d][pml]
 }
 
 // Verify that the edge Ez takes no source with the PML, as under PEC.
-TEST_CASE("Sim2D rejects an edge Ez source with the PML", "[unit][sim2d][pml]")
+TEST_CASE("Simulation rejects an edge Ez source with the PML", "[unit][simulation][pml]")
 {
-    Sim2D::Options opts;
+    Simulation::Options opts;
     opts.boundary = Boundary::Pml;
     opts.pml_thickness = 2;
-    Sim2D sim(8, 8, opts);
+    Simulation sim(8, 8, opts);
     CHECK_THROWS_AS(sim.add_source(0, 3, Component::Ez, ramp), std::invalid_argument);
 }
 
 // Verify that sources in the PML are rejected for every component, and taken just past it.
-TEST_CASE("Sim2D rejects sources inside the PML", "[unit][sim2d][pml]")
+TEST_CASE("Simulation rejects sources inside the PML", "[unit][simulation][pml]")
 {
-    Sim2D::Options opts;
+    Simulation::Options opts;
     opts.boundary = Boundary::Pml;
     opts.pml_thickness = 3;
-    Sim2D sim(12, 12, opts);
+    Simulation sim(12, 12, opts);
     CHECK_THROWS_AS(sim.add_source(2, 6, Component::Ez, ramp), std::invalid_argument);
     CHECK_THROWS_AS(sim.add_source(6, 2, Component::Ez, ramp), std::invalid_argument);
     CHECK_THROWS_AS(sim.add_source(6, 9, Component::Hx, ramp), std::invalid_argument);
@@ -232,14 +232,14 @@ TEST_CASE("Sim2D rejects sources inside the PML", "[unit][sim2d][pml]")
     CHECK_NOTHROW(sim.add_source(8, 8, Component::Hy, ramp));
     CHECK(sim.source_count() == 2);
 
-    Sim2D pec(12, 12);
+    Simulation pec(12, 12);
     CHECK_NOTHROW(pec.add_source(2, 6, Component::Ez, ramp));
 }
 
 // Verify that run() counts steps and time, and that download() fills the host fields.
-TEST_CASE("Sim2D counts steps and time", "[unit][sim2d]")
+TEST_CASE("Simulation counts steps and time", "[unit][simulation]")
 {
-    Sim2D sim(8, 8);
+    Simulation sim(8, 8);
     CHECK(sim.step_count() == 0);
     CHECK(sim.time() == 0);
 
@@ -253,22 +253,22 @@ TEST_CASE("Sim2D counts steps and time", "[unit][sim2d]")
 }
 
 // Verify that set_material() keeps a matching material and rejects another grid.
-TEST_CASE("Sim2D replaces its material", "[unit][sim2d]")
+TEST_CASE("Simulation replaces its material", "[unit][simulation]")
 {
-    Sim2D sim(8, 8);
-    Material2D mat(sim.grid());
+    Simulation sim(8, 8);
+    Material mat(sim.grid());
     mat.fill({4, 1, 0, 0});
     sim.set_material(mat);
     CHECK(sim.material().eps_r()[0] == FloatType(4));
 
-    const Material2D other(Grid2D(4, 8, sim.grid().dx(), sim.grid().dy()));
+    const Material other(Grid(4, 8, sim.grid().dx(), sim.grid().dy()));
     CHECK_THROWS_AS(sim.set_material(other), std::invalid_argument);
 }
 
 // Verify that add_source() accepts cells that are updated and rejects the rest.
-TEST_CASE("Sim2D checks source cells", "[unit][sim2d]")
+TEST_CASE("Simulation checks source cells", "[unit][simulation]")
 {
-    Sim2D sim(8, 6);
+    Simulation sim(8, 6);
     CHECK_THROWS_AS(sim.add_source(8, 2, Component::Ez, ramp), std::invalid_argument);
     CHECK_THROWS_AS(sim.add_source(2, 6, Component::Ez, ramp), std::invalid_argument);
     CHECK_THROWS_AS(sim.add_source(0, 2, Component::Ez, ramp), std::invalid_argument);
@@ -284,16 +284,16 @@ TEST_CASE("Sim2D checks source cells", "[unit][sim2d]")
     CHECK_NOTHROW(sim.add_source(0, 5, Component::Hy, ramp));
     CHECK(sim.source_count() == 3);
 
-    Sim2D::Options opts;
+    Simulation::Options opts;
     opts.boundary = Boundary::Pmc;
-    Sim2D pmc(8, 6, opts);
+    Simulation pmc(8, 6, opts);
     CHECK_NOTHROW(pmc.add_source(0, 0, Component::Ez, ramp));
 }
 
 // Verify the sampling times: Ez at (n + 1) * dt, H at (n + 1/2) * dt.
-TEST_CASE("Sim2D samples sources at their Yee times", "[unit][sim2d]")
+TEST_CASE("Simulation samples sources at their Yee times", "[unit][simulation]")
 {
-    Sim2D sim(9, 9);
+    Simulation sim(9, 9);
     sim.add_source(4, 4, Component::Ez, ramp);
     sim.add_source(1, 1, Component::Hx, ramp);
     sim.add_source(7, 7, Component::Hy, ramp);
@@ -308,9 +308,9 @@ TEST_CASE("Sim2D samples sources at their Yee times", "[unit][sim2d]")
 }
 
 // Verify that sources on the same cell add up.
-TEST_CASE("Sim2D adds sources on the same cell", "[unit][sim2d]")
+TEST_CASE("Simulation adds sources on the same cell", "[unit][simulation]")
 {
-    Sim2D sim(9, 9);
+    Simulation sim(9, 9);
     sim.add_source(4, 4, Component::Ez, [](FloatType) {
         return FloatType(1);
     });
@@ -323,13 +323,13 @@ TEST_CASE("Sim2D adds sources on the same cell", "[unit][sim2d]")
 }
 
 // Verify that run(a) then run(b) matches run(a + b) bit for bit with a pulse running.
-TEST_CASE("Sim2D runs compose with sources", "[unit][sim2d]")
+TEST_CASE("Simulation runs compose with sources", "[unit][simulation]")
 {
-    Sim2D::Options opts;
+    Simulation::Options opts;
     opts.boundary = Boundary::Pmc;
-    Sim2D split(16, 12, opts);
-    Sim2D whole(16, 12, opts);
-    for (Sim2D *sim : {&split, &whole}) {
+    Simulation split(16, 12, opts);
+    Simulation whole(16, 12, opts);
+    for (Simulation *sim : {&split, &whole}) {
         sim->add_source(5, 6, Component::Ez, fdtd::TMz::Gaussian::from_steps(sim->dt(), 4));
         sim->add_source(9, 3, Component::Hy, fdtd::TMz::Gaussian::from_steps(sim->dt(), 6));
     }
@@ -350,9 +350,9 @@ TEST_CASE("Sim2D runs compose with sources", "[unit][sim2d]")
 }
 
 // Verify that probes record at their Yee times and match the downloaded fields.
-TEST_CASE("Sim2D probes record at their Yee times", "[unit][sim2d]")
+TEST_CASE("Simulation probes record at their Yee times", "[unit][simulation]")
 {
-    Sim2D sim(9, 9);
+    Simulation sim(9, 9);
     sim.add_source(4, 4, Component::Ez, ramp);
     sim.add_source(1, 1, Component::Hx, ramp);
     const std::size_t ez = sim.add_probe(4, 4, Component::Ez);
@@ -379,11 +379,11 @@ TEST_CASE("Sim2D probes record at their Yee times", "[unit][sim2d]")
 }
 
 // Verify that probe records from run(a) then run(b) match run(a + b) bit for bit.
-TEST_CASE("Sim2D probe records compose", "[unit][sim2d]")
+TEST_CASE("Simulation probe records compose", "[unit][simulation]")
 {
-    Sim2D split(16, 12);
-    Sim2D whole(16, 12);
-    for (Sim2D *sim : {&split, &whole}) {
+    Simulation split(16, 12);
+    Simulation whole(16, 12);
+    for (Simulation *sim : {&split, &whole}) {
         sim->add_source(5, 6, Component::Ez, fdtd::TMz::Gaussian::from_steps(sim->dt(), 4));
         sim->add_probe(10, 6, Component::Ez);
         sim->add_probe(10, 6, Component::Hy);
@@ -402,9 +402,9 @@ TEST_CASE("Sim2D probe records compose", "[unit][sim2d]")
 }
 
 // Verify that bad probes throw: outside the grid, after a run, or an unknown id.
-TEST_CASE("Sim2D checks probes", "[unit][sim2d]")
+TEST_CASE("Simulation checks probes", "[unit][simulation]")
 {
-    Sim2D sim(8, 6);
+    Simulation sim(8, 6);
     CHECK_THROWS_AS(sim.add_probe(8, 0, Component::Ez), std::invalid_argument);
     CHECK_THROWS_AS(sim.add_probe(0, 6, Component::Hx), std::invalid_argument);
     CHECK(sim.add_probe(7, 5, Component::Hy) == 0);
@@ -418,11 +418,11 @@ TEST_CASE("Sim2D checks probes", "[unit][sim2d]")
 }
 
 // Verify that scheduled snapshots match the fields of a simulation stopped at the same step.
-TEST_CASE("Sim2D takes scheduled snapshots", "[unit][sim2d]")
+TEST_CASE("Simulation takes scheduled snapshots", "[unit][simulation]")
 {
-    Sim2D sim(16, 12);
-    Sim2D ref(16, 12);
-    for (Sim2D *s : {&sim, &ref}) {
+    Simulation sim(16, 12);
+    Simulation ref(16, 12);
+    for (Simulation *s : {&sim, &ref}) {
         s->add_source(5, 6, Component::Ez, fdtd::TMz::Gaussian::from_steps(s->dt(), 4));
     }
     sim.add_snapshot(20);
@@ -460,9 +460,9 @@ TEST_CASE("Sim2D takes scheduled snapshots", "[unit][sim2d]")
 }
 
 // Verify that a snapshot step already passed throws.
-TEST_CASE("Sim2D checks snapshot steps", "[unit][sim2d]")
+TEST_CASE("Simulation checks snapshot steps", "[unit][simulation]")
 {
-    Sim2D sim(8, 6);
+    Simulation sim(8, 6);
     sim.run(3);
     CHECK_THROWS_AS(sim.add_snapshot(2), std::invalid_argument);
     sim.add_snapshot(3);

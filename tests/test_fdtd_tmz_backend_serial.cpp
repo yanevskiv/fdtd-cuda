@@ -23,7 +23,7 @@
 
 // Project headers under test.
 #include "fdtd/TMz/backends/fdtd_tmz_backend_serial.h"
-#include "fdtd/TMz/fdtd_tmz_grid2d.h"
+#include "fdtd/TMz/fdtd_tmz_grid.h"
 
 // Standard library for math, sizes and buffers.
 #include <algorithm>
@@ -36,17 +36,17 @@ using Catch::Matchers::WithinAbs;
 using Catch::Matchers::WithinRel;
 using fdtd::FloatType;
 using fdtd::TMz::Boundary;
-using fdtd::TMz::Coeffs2D;
+using fdtd::TMz::Coeffs;
 using fdtd::TMz::courant_dt;
-using fdtd::TMz::Fields2D;
-using fdtd::TMz::Grid2D;
-using fdtd::TMz::Material2D;
+using fdtd::TMz::Fields;
+using fdtd::TMz::Grid;
+using fdtd::TMz::Material;
 
 // Relative tolerance that holds in single precision.
 static constexpr double TOL = 1e-5;
 
 // Fill every field with distinct non-zero values.
-static void fill_distinct(Fields2D &fields)
+static void fill_distinct(Fields &fields)
 {
     for (std::size_t k = 0; k < fields.grid().size(); ++k) {
         fields.ez()[k] = FloatType(1 + k);
@@ -56,7 +56,7 @@ static void fill_distinct(Fields2D &fields)
 }
 
 // Run whole steps: H, interior E, then the boundary.
-static void run(Fields2D &fields, const Coeffs2D &coeffs, Boundary boundary, int nsteps)
+static void run(Fields &fields, const Coeffs &coeffs, Boundary boundary, int nsteps)
 {
     for (int n = 0; n < nsteps; ++n) {
         fdtd::TMz::serial_update_h(fields, coeffs);
@@ -68,10 +68,10 @@ static void run(Fields2D &fields, const Coeffs2D &coeffs, Boundary boundary, int
 // Verify one step from a unit Ez impulse at S = 1/2: the centre to 1/2, each neighbour to 1/8.
 TEST_CASE("Serial update of an Ez impulse", "[unit][serial_update]")
 {
-    const Grid2D grid(7, 7, 1e-3F, 1e-3F);
-    const Material2D material(grid);
-    const Coeffs2D coeffs(material, courant_dt(grid, 0.5));
-    Fields2D fields(grid);
+    const Grid grid(7, 7, 1e-3F, 1e-3F);
+    const Material material(grid);
+    const Coeffs coeffs(material, courant_dt(grid, 0.5));
+    Fields fields(grid);
     const std::size_t c = grid.index(3, 3);
     fields.ez()[c] = 1;
 
@@ -96,7 +96,7 @@ TEST_CASE("Serial update of an Ez impulse", "[unit][serial_update]")
 // Verify that each update reads its own coefficient arrays, with every curl factor zero.
 TEST_CASE("Serial update reads the coefficients by field", "[unit][serial_update]")
 {
-    const Grid2D grid(4, 4);
+    const Grid grid(4, 4);
     const std::vector<FloatType> zero(grid.size(), FloatType(0));
     const std::vector<FloatType> ezX(grid.size(), FloatType(0.5));
     const std::vector<FloatType> ezY(grid.size(), FloatType(8));
@@ -104,7 +104,7 @@ TEST_CASE("Serial update reads the coefficients by field", "[unit][serial_update
     const std::vector<FloatType> hy(grid.size(), FloatType(0.125));
     const fdtd::TMz::CoeffsView coeffs(ezX.data(), zero.data(), ezY.data(), zero.data(), hx.data(),
                                        zero.data(), hy.data(), zero.data());
-    Fields2D fields(grid);
+    Fields fields(grid);
     for (std::size_t k = 0; k < grid.size(); ++k) {
         fields.ez()[k] = 1;
         fields.hx()[k] = 1;
@@ -123,10 +123,10 @@ TEST_CASE("Serial update reads the coefficients by field", "[unit][serial_update
 // Verify that the update leaves the edge Ez, last-row Hx and last-column Hy untouched.
 TEST_CASE("Serial update leaves the edges alone", "[unit][serial_update]")
 {
-    const Grid2D grid(4, 3);
-    const Material2D material(grid);
-    const Coeffs2D coeffs(material, courant_dt(grid, 0.9));
-    Fields2D fields(grid);
+    const Grid grid(4, 3);
+    const Material material(grid);
+    const Coeffs coeffs(material, courant_dt(grid, 0.9));
+    Fields fields(grid);
     for (std::size_t j = 0; j < grid.ny(); ++j) {
         for (std::size_t i = 0; i < grid.nx(); ++i) {
             fields.ez()[grid.index(i, j)] = FloatType(1 + i + 10 * j);
@@ -153,10 +153,10 @@ TEST_CASE("Serial update leaves the edges alone", "[unit][serial_update]")
 // Verify that one-cell-wide grids update without touching memory outside them.
 TEST_CASE("Serial update on degenerate grids", "[unit][serial_update]")
 {
-    for (const Grid2D &grid : {Grid2D(1, 1), Grid2D(1, 5), Grid2D(5, 1), Grid2D(2, 2)}) {
-        const Material2D material(grid);
-        const Coeffs2D coeffs(material, courant_dt(grid, 0.9));
-        Fields2D fields(grid);
+    for (const Grid &grid : {Grid(1, 1), Grid(1, 5), Grid(5, 1), Grid(2, 2)}) {
+        const Material material(grid);
+        const Coeffs coeffs(material, courant_dt(grid, 0.9));
+        Fields fields(grid);
         fields.ez()[0] = 1;
 
         fdtd::TMz::serial_update_h(fields, coeffs);
@@ -169,9 +169,9 @@ TEST_CASE("Serial update on degenerate grids", "[unit][serial_update]")
 // Verify that PEC zeroes every edge cell and leaves the interior alone.
 TEST_CASE("PEC boundary zeroes the edge Ez", "[unit][boundary]")
 {
-    const Grid2D grid(5, 4);
-    const Coeffs2D coeffs(Material2D(grid), courant_dt(grid, 0.9));
-    Fields2D fields(grid);
+    const Grid grid(5, 4);
+    const Coeffs coeffs(Material(grid), courant_dt(grid, 0.9));
+    Fields fields(grid);
     fill_distinct(fields);
 
     fdtd::TMz::serial_update_boundary(fields, coeffs, Boundary::Pec);
@@ -188,9 +188,9 @@ TEST_CASE("PEC boundary zeroes the edge Ez", "[unit][boundary]")
 // Verify PMC at a corner and the right edge against hand values, H outside read as zero.
 TEST_CASE("PMC boundary reads H outside as zero", "[unit][boundary]")
 {
-    const Grid2D grid(3, 3, 1e-3F, 2e-3F);
-    const Coeffs2D coeffs(Material2D(grid), courant_dt(grid, 0.9));
-    Fields2D fields(grid);
+    const Grid grid(3, 3, 1e-3F, 2e-3F);
+    const Coeffs coeffs(Material(grid), courant_dt(grid, 0.9));
+    Fields fields(grid);
     fill_distinct(fields);
     const auto ez = [&](std::size_t i, std::size_t j) {
         return double(fields.ez()[grid.index(i, j)]);
@@ -222,10 +222,10 @@ TEST_CASE("PMC boundary reads H outside as zero", "[unit][boundary]")
 // Verify that an impulse stays symmetric under PMC on square cells and reaches the edge.
 TEST_CASE("PMC boundary keeps a centred impulse symmetric", "[unit][boundary]")
 {
-    const Grid2D grid(9, 9, 1e-3F, 1e-3F);
-    const Coeffs2D coeffs(Material2D(grid), courant_dt(grid, 0.7));
-    Fields2D pmc(grid);
-    Fields2D pec(grid);
+    const Grid grid(9, 9, 1e-3F, 1e-3F);
+    const Coeffs coeffs(Material(grid), courant_dt(grid, 0.7));
+    Fields pmc(grid);
+    Fields pec(grid);
     pmc.ez()[grid.index(4, 4)] = 1;
     pec.ez()[grid.index(4, 4)] = 1;
 
@@ -248,9 +248,9 @@ TEST_CASE("PMC boundary keeps a centred impulse symmetric", "[unit][boundary]")
 // Verify that both conditions handle grids one or two cells wide.
 TEST_CASE("Boundary on degenerate grids", "[unit][boundary]")
 {
-    for (const Grid2D &grid : {Grid2D(1, 1), Grid2D(1, 4), Grid2D(4, 1), Grid2D(2, 2)}) {
-        const Coeffs2D coeffs(Material2D(grid), courant_dt(grid, 0.9));
-        Fields2D fields(grid);
+    for (const Grid &grid : {Grid(1, 1), Grid(1, 4), Grid(4, 1), Grid(2, 2)}) {
+        const Coeffs coeffs(Material(grid), courant_dt(grid, 0.9));
+        Fields fields(grid);
         fill_distinct(fields);
 
         fdtd::TMz::serial_update_boundary(fields, coeffs, Boundary::Pmc);
@@ -266,10 +266,10 @@ TEST_CASE("Boundary on degenerate grids", "[unit][boundary]")
 TEST_CASE("Split update matches the plain update without loss", "[unit][serial_update][pml]")
 {
     const std::size_t pml = 3;
-    const Grid2D grid(12, 10);
-    const Coeffs2D coeffs(Material2D(grid), courant_dt(grid, 0.9));
-    Fields2D plain(grid);
-    Fields2D split(grid);
+    const Grid grid(12, 10);
+    const Coeffs coeffs(Material(grid), courant_dt(grid, 0.9));
+    Fields plain(grid);
+    Fields split(grid);
     fill_distinct(plain);
     fill_distinct(split);
     for (std::size_t k = 0; k < grid.size(); ++k) {
@@ -304,11 +304,11 @@ TEST_CASE("Split update matches the plain update without loss", "[unit][serial_u
 // Verify that each split part decays with the conductivity along its own direction.
 TEST_CASE("Split update damps each part along its direction", "[unit][serial_update][pml]")
 {
-    const Grid2D grid(20, 16);
-    Material2D material(grid);
+    const Grid grid(20, 16);
+    Material material(grid);
     material.set_pml(4, 3, 1e-6);
-    const Coeffs2D coeffs(material, courant_dt(grid, 0.9));
-    Fields2D fields(grid);
+    const Coeffs coeffs(material, courant_dt(grid, 0.9));
+    Fields fields(grid);
     for (std::size_t k = 0; k < grid.size(); ++k) {
         fields.ezx()[k] = 1;
         fields.ezy()[k] = 1;
@@ -316,7 +316,7 @@ TEST_CASE("Split update damps each part along its direction", "[unit][serial_upd
 
     fdtd::TMz::serial_update_pml(fields, coeffs, 4);
 
-    const Fields2D &f = fields;
+    const Fields &f = fields;
     for (const std::size_t i : {std::size_t(1), std::size_t(18)}) {
         CHECK(f.ezx()[grid.index(i, 8)] < FloatType(1));
         CHECK(f.ezy()[grid.index(i, 8)] == FloatType(1));
@@ -334,9 +334,9 @@ TEST_CASE("Split update damps each part along its direction", "[unit][serial_upd
 // Verify that PEC zeroes the split parts on the edge along with Ez.
 TEST_CASE("PEC boundary zeroes the edge split fields", "[unit][boundary][pml]")
 {
-    const Grid2D grid(6, 5);
-    const Coeffs2D coeffs(Material2D(grid), courant_dt(grid, 0.9));
-    Fields2D fields(grid);
+    const Grid grid(6, 5);
+    const Coeffs coeffs(Material(grid), courant_dt(grid, 0.9));
+    Fields fields(grid);
     for (std::size_t k = 0; k < grid.size(); ++k) {
         fields.ezx()[k] = 1;
         fields.ezy()[k] = 2;

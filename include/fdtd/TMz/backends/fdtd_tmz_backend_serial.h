@@ -20,11 +20,11 @@
 #ifndef FDTD_TMZ_BACKEND_SERIAL_H
 #define FDTD_TMZ_BACKEND_SERIAL_H
 
-#include "fdtd/TMz/backends/fdtd_tmz_block2d.h"
+#include "fdtd/TMz/backends/fdtd_tmz_block.h"
 #include "fdtd/TMz/fdtd_tmz_backend.h"
 #include "fdtd/TMz/fdtd_tmz_boundary.h"
-#include "fdtd/TMz/fdtd_tmz_coeffs2d.h"
-#include "fdtd/TMz/fdtd_tmz_fields2d.h"
+#include "fdtd/TMz/fdtd_tmz_coeffs.h"
+#include "fdtd/TMz/fdtd_tmz_fields.h"
 #include "fdtd/fdtd_aligned_buffer.h"
 
 #include <cstddef>
@@ -43,7 +43,7 @@ namespace fdtd
          * @param fields Fields to update.
          * @param coeffs Coefficient arrays on the same grid as the fields.
          */
-        void serial_update_h(Fields2D &fields, CoeffsView coeffs) noexcept;
+        void serial_update_h(Fields &fields, CoeffsView coeffs) noexcept;
 
         /**
          * Advance the Ez inside the PML over the whole grid by one step, as
@@ -53,7 +53,7 @@ namespace fdtd
          * @param coeffs Coefficient arrays on the same grid as the fields.
          * @param pml PML thickness in cells, zero for none.
          */
-        void serial_update_e(Fields2D &fields, CoeffsView coeffs, std::size_t pml) noexcept;
+        void serial_update_e(Fields &fields, CoeffsView coeffs, std::size_t pml) noexcept;
 
         /**
          * Advance the Ez in the PML over the whole grid by one step as Ezx and Ezy, as
@@ -63,7 +63,7 @@ namespace fdtd
          * @param coeffs Coefficient arrays on the same grid as the fields.
          * @param pml PML thickness in cells, with 2 pml below nx and ny; zero for none.
          */
-        void serial_update_pml(Fields2D &fields, CoeffsView coeffs, std::size_t pml) noexcept;
+        void serial_update_pml(Fields &fields, CoeffsView coeffs, std::size_t pml) noexcept;
 
         /**
          * Update the edge Ez of the whole grid, as update_boundary_block does; call it right
@@ -73,8 +73,7 @@ namespace fdtd
          * @param coeffs Coefficient arrays on the same grid as the fields.
          * @param boundary Outer boundary condition.
          */
-        void serial_update_boundary(Fields2D &fields, CoeffsView coeffs,
-                                    Boundary boundary) noexcept;
+        void serial_update_boundary(Fields &fields, CoeffsView coeffs, Boundary boundary) noexcept;
 
         /** Single-threaded reference backend, the oracle for the others. */
         class SerialBackend final : public Backend
@@ -85,7 +84,7 @@ namespace fdtd
              *
              * @param grid Grid the backend works on.
              */
-            explicit SerialBackend(const Grid2D &grid);
+            explicit SerialBackend(const Grid &grid);
 
             /**
              * Short lowercase name of the backend.
@@ -106,28 +105,28 @@ namespace fdtd
              *
              * @return The grid.
              */
-            const Grid2D &grid() const noexcept override;
+            const Grid &grid() const noexcept override;
 
             /**
              * Copy fields into the backend.
              *
              * @param fields Fields on the backend's grid.
              */
-            void upload(const Fields2D &fields) override;
+            void upload(const Fields &fields) override;
 
             /**
              * Copy the backend's fields out.
              *
              * @param fields Destination on the backend's grid.
              */
-            void download(Fields2D &fields) const override;
+            void download(Fields &fields) const override;
 
             /**
              * Copy update coefficients into the backend.
              *
              * @param coeffs Coefficients on the backend's grid.
              */
-            void upload(const Coeffs2D &coeffs) override;
+            void upload(const Coeffs &coeffs) override;
 
             /**
              * Set the outer boundary condition.
@@ -184,7 +183,7 @@ namespace fdtd
 
         private:
             /** The backend's copy of the fields. */
-            Fields2D m_fields;
+            Fields m_fields;
 
             /** Whether coefficients were uploaded. */
             bool m_has_coeffs = false;

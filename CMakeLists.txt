@@ -28,15 +28,15 @@ option(FDTD_EXACT "Build the library without contracted multiply-adds, for bit-f
 add_library(fdtd
     src/fdtd/TMz/fdtd_tmz_waveform.cpp
     src/fdtd/TMz/fdtd_tmz_backend.cpp
-    src/fdtd/TMz/fdtd_tmz_coeffs2d.cpp
-    src/fdtd/TMz/fdtd_tmz_fields2d.cpp
-    src/fdtd/TMz/fdtd_tmz_grid2d.cpp
-    src/fdtd/TMz/fdtd_tmz_material2d.cpp
+    src/fdtd/TMz/fdtd_tmz_coeffs.cpp
+    src/fdtd/TMz/fdtd_tmz_fields.cpp
+    src/fdtd/TMz/fdtd_tmz_grid.cpp
+    src/fdtd/TMz/fdtd_tmz_material.cpp
     src/fdtd/TMz/fdtd_tmz_output.cpp
-    src/fdtd/TMz/fdtd_tmz_sim2d.cpp
-    src/fdtd/TMz/backends/fdtd_tmz_block2d.cpp
-    src/fdtd/TMz/backends/fdtd_tmz_partition2d.cpp
-    src/fdtd/TMz/backends/fdtd_tmz_stepper2d.cpp
+    src/fdtd/TMz/fdtd_tmz_simulation.cpp
+    src/fdtd/TMz/backends/fdtd_tmz_block.cpp
+    src/fdtd/TMz/backends/fdtd_tmz_partition.cpp
+    src/fdtd/TMz/backends/fdtd_tmz_stepper.cpp
     src/fdtd/TMz/backends/fdtd_tmz_backend_serial.cpp)
 add_library(fdtd::fdtd ALIAS fdtd)
 target_compile_features(fdtd PUBLIC cxx_std_20)

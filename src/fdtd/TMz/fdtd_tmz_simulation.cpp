@@ -18,11 +18,11 @@
  */
 
 // Class declaration.
-#include "fdtd/TMz/fdtd_tmz_sim2d.h"
+#include "fdtd/TMz/fdtd_tmz_simulation.h"
 
 // Coefficients and the Courant limit.
-#include "fdtd/TMz/fdtd_tmz_coeffs2d.h"
-#include "fdtd/TMz/fdtd_tmz_grid2d.h"
+#include "fdtd/TMz/fdtd_tmz_coeffs.h"
+#include "fdtd/TMz/fdtd_tmz_grid.h"
 
 // Standard library for algorithms, math, errors and moves.
 #include <algorithm>
@@ -37,22 +37,22 @@ namespace fdtd::TMz
     namespace
     {
         // Return a valid explicit dt within the limit, or derive dt from the Courant number.
-        double options_dt(const Grid2D &grid, const Sim2D::Options &options)
+        double options_dt(const Grid &grid, const Simulation::Options &options)
         {
             if (options.dt == 0) {
                 return courant_dt(grid, options.courant);
             }
             if (!(options.dt > 0) || !std::isfinite(options.dt)) {
-                throw std::invalid_argument("Sim2D: dt must be positive and finite, or zero");
+                throw std::invalid_argument("Simulation: dt must be positive and finite, or zero");
             }
             if (options.check_stability && options.dt > courant_dt(grid, 1.0)) {
-                throw std::invalid_argument("Sim2D: dt is above the Courant limit");
+                throw std::invalid_argument("Simulation: dt is above the Courant limit");
             }
             return options.dt;
         }
 
         // Grade the material's PML from the options, or clear it unless the boundary is Pml.
-        void apply_pml(Material2D &material, const Sim2D::Options &options)
+        void apply_pml(Material &material, const Simulation::Options &options)
         {
             const std::size_t thickness =
                 options.boundary == Boundary::Pml ? options.pml_thickness : 0;
@@ -61,14 +61,14 @@ namespace fdtd::TMz
     }
 
     // Delegate to the full constructor with the default options.
-    Sim2D::Sim2D(std::size_t nx, std::size_t ny)
-        : Sim2D(nx, ny, Options{})
+    Simulation::Simulation(std::size_t nx, std::size_t ny)
+        : Simulation(nx, ny, Options{})
     {
         // Empty.
     }
 
     // Build the grid, the vacuum material with its PML and the backend, and upload coefficients.
-    Sim2D::Sim2D(std::size_t nx, std::size_t ny, const Options &options)
+    Simulation::Simulation(std::size_t nx, std::size_t ny, const Options &options)
         : m_options(options)
         , m_grid(nx, ny, options.dx, options.dy)
         , m_dt(options_dt(m_grid, options))
@@ -77,99 +77,100 @@ namespace fdtd::TMz
         , m_backend(make_backend(options.backend, m_grid, {.omp = options.omp}))
     {
         apply_pml(m_material, m_options);
-        m_backend->upload(Coeffs2D(m_material, m_dt));
+        m_backend->upload(Coeffs(m_material, m_dt));
         m_backend->set_boundary(options.boundary);
         m_backend->upload(m_fields);
     }
 
     // Return the active PML thickness.
-    std::size_t Sim2D::pml_thickness() const noexcept
+    std::size_t Simulation::pml_thickness() const noexcept
     {
         return m_material.pml_thickness();
     }
 
     // Return the options.
-    const Sim2D::Options &Sim2D::options() const noexcept
+    const Simulation::Options &Simulation::options() const noexcept
     {
         return m_options;
     }
 
     // Return the grid.
-    const Grid2D &Sim2D::grid() const noexcept
+    const Grid &Simulation::grid() const noexcept
     {
         return m_grid;
     }
 
     // Return the time step.
-    double Sim2D::dt() const noexcept
+    double Simulation::dt() const noexcept
     {
         return m_dt;
     }
 
     // Return the material.
-    const Material2D &Sim2D::material() const noexcept
+    const Material &Simulation::material() const noexcept
     {
         return m_material;
     }
 
     // Check the grid, keep the material with the options' PML and upload its coefficients.
-    void Sim2D::set_material(const Material2D &material)
+    void Simulation::set_material(const Material &material)
     {
-        const Grid2D &grid = material.grid();
+        const Grid &grid = material.grid();
         if (grid.nx() != m_grid.nx() || grid.ny() != m_grid.ny() || grid.dx() != m_grid.dx() ||
             grid.dy() != m_grid.dy()) {
-            throw std::invalid_argument("Sim2D: material grid does not match");
+            throw std::invalid_argument("Simulation: material grid does not match");
         }
-        Material2D next = material;
+        Material next = material;
         apply_pml(next, m_options);
         m_material = std::move(next);
-        m_backend->upload(Coeffs2D(m_material, m_dt));
+        m_backend->upload(Coeffs(m_material, m_dt));
     }
 
     // Return the backend.
-    const Backend &Sim2D::backend() const noexcept
+    const Backend &Simulation::backend() const noexcept
     {
         return *m_backend;
     }
 
     // Check that the source may drive the cell and is outside the PML, then keep it.
-    void Sim2D::add_source(std::size_t i, std::size_t j, Component component, Waveform waveform)
+    void Simulation::add_source(std::size_t i, std::size_t j, Component component,
+                                Waveform waveform)
     {
         const std::size_t nx = m_grid.nx();
         const std::size_t ny = m_grid.ny();
         if (i >= nx || j >= ny) {
-            throw std::invalid_argument("Sim2D: source outside the grid");
+            throw std::invalid_argument("Simulation: source outside the grid");
         }
         if (!waveform) {
-            throw std::invalid_argument("Sim2D: empty source waveform");
+            throw std::invalid_argument("Simulation: empty source waveform");
         }
         const bool edge = i == 0 || j == 0 || i + 1 == nx || j + 1 == ny;
         if ((component == Component::Ez && edge && m_options.boundary != Boundary::Pmc) ||
             (component == Component::Hx && j + 1 == ny) ||
             (component == Component::Hy && i + 1 == nx)) {
-            throw std::invalid_argument("Sim2D: source on a cell that is never updated");
+            throw std::invalid_argument("Simulation: source on a cell that is never updated");
         }
         const std::size_t pml = pml_thickness();
         if (i < pml || j < pml || i + pml >= nx || j + pml >= ny) {
-            throw std::invalid_argument("Sim2D: source inside the PML");
+            throw std::invalid_argument("Simulation: source inside the PML");
         }
         m_sources.push_back({{component, m_grid.index(i, j)}, std::move(waveform)});
     }
 
     // Return the number of sources.
-    std::size_t Sim2D::source_count() const noexcept
+    std::size_t Simulation::source_count() const noexcept
     {
         return m_sources.size();
     }
 
     // Check the cell and the step count, keep the probe and hand all probes to the backend.
-    std::size_t Sim2D::add_probe(std::size_t i, std::size_t j, Component component)
+    std::size_t Simulation::add_probe(std::size_t i, std::size_t j, Component component)
     {
         if (i >= m_grid.nx() || j >= m_grid.ny()) {
-            throw std::invalid_argument("Sim2D: probe outside the grid");
+            throw std::invalid_argument("Simulation: probe outside the grid");
         }
         if (m_step_count != 0) {
-            throw std::logic_error("Sim2D: probes must be added before the first run");
+            throw std::logic_error("Simulation: probes must be added before the first run");
         }
         m_probes.push_back({component, m_grid.index(i, j)});
         m_backend->set_probes(m_probes);
@@ -177,16 +178,16 @@ namespace fdtd::TMz
     }
 
     // Return the number of probes.
-    std::size_t Sim2D::probe_count() const noexcept
+    std::size_t Simulation::probe_count() const noexcept
     {
         return m_probes.size();
     }
 
     // Fetch the records and pick out one probe's column.
-    std::vector<FloatType> Sim2D::probe_data(std::size_t id) const
+    std::vector<FloatType> Simulation::probe_data(std::size_t id) const
     {
         if (id >= m_probes.size()) {
-            throw std::out_of_range("Sim2D: unknown probe id");
+            throw std::out_of_range("Simulation: unknown probe id");
         }
         const std::vector<FloatType> records = m_backend->fetch_probes();
         const std::size_t nprobes = m_probes.size();
@@ -198,10 +199,10 @@ namespace fdtd::TMz
     }
 
     // Build the Yee time of every recorded step for one probe.
-    std::vector<double> Sim2D::probe_times(std::size_t id) const
+    std::vector<double> Simulation::probe_times(std::size_t id) const
     {
         if (id >= m_probes.size()) {
-            throw std::out_of_range("Sim2D: unknown probe id");
+            throw std::out_of_range("Simulation: unknown probe id");
         }
         const double offset = m_probes[id].component == Component::Ez ? 1.0 : 0.5;
         std::vector<double> times(m_backend->probe_steps());
@@ -212,10 +213,10 @@ namespace fdtd::TMz
     }
 
     // Take the snapshot now, or keep its step in order unless it is already known.
-    void Sim2D::add_snapshot(std::size_t step)
+    void Simulation::add_snapshot(std::size_t step)
     {
         if (step < m_step_count) {
-            throw std::invalid_argument("Sim2D: snapshot step already passed");
+            throw std::invalid_argument("Simulation: snapshot step already passed");
         }
         const bool taken =
             std::any_of(m_snapshots.begin(), m_snapshots.end(), [step](const Snapshot &snap) {
@@ -233,21 +234,21 @@ namespace fdtd::TMz
     }
 
     // Download the backend's fields into a new snapshot.
-    Sim2D::Snapshot Sim2D::snapshot() const
+    Simulation::Snapshot Simulation::snapshot() const
     {
-        Snapshot snap{m_step_count, Fields2D(m_grid)};
+        Snapshot snap{m_step_count, Fields(m_grid)};
         m_backend->download(snap.fields);
         return snap;
     }
 
     // Return the snapshots taken.
-    const std::vector<Sim2D::Snapshot> &Sim2D::snapshots() const noexcept
+    const std::vector<Simulation::Snapshot> &Simulation::snapshots() const noexcept
     {
         return m_snapshots;
     }
 
     // Advance in pieces that end at the scheduled snapshots and take each one.
-    void Sim2D::run(std::size_t nsteps)
+    void Simulation::run(std::size_t nsteps)
     {
         const std::size_t end = m_step_count + nsteps;
         while (!m_snapshot_steps.empty() && m_snapshot_steps.front() <= end) {
@@ -259,7 +260,7 @@ namespace fdtd::TMz
     }
 
     // Merge sources on the same cell, sample them for the steps ahead and step the backend.
-    void Sim2D::advance(std::size_t nsteps)
+    void Simulation::advance(std::size_t nsteps)
     {
         if (nsteps == 0) {
             return;
@@ -296,25 +297,25 @@ namespace fdtd::TMz
     }
 
     // Return the step count.
-    std::size_t Sim2D::step_count() const noexcept
+    std::size_t Simulation::step_count() const noexcept
     {
         return m_step_count;
     }
 
     // Return the simulated time.
-    double Sim2D::time() const noexcept
+    double Simulation::time() const noexcept
     {
         return static_cast<double>(m_step_count) * m_dt;
     }
 
     // Return the host copy of the fields.
-    const Fields2D &Sim2D::fields() const noexcept
+    const Fields &Simulation::fields() const noexcept
     {
         return m_fields;
     }
 
     // Copy the fields from the backend.
-    void Sim2D::download()
+    void Simulation::download()
     {
         m_backend->download(m_fields);
     }

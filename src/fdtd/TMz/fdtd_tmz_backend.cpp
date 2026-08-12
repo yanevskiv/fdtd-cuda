@@ -35,7 +35,7 @@
 namespace fdtd::TMz
 {
     // Check that a flat index names a cell inside the grid, not padding.
-    static bool inside(const Grid2D &grid, std::size_t index)
+    static bool inside(const Grid &grid, std::size_t index)
     {
         return index % grid.pitch() < grid.nx() && index / grid.pitch() < grid.ny();
     }
@@ -61,7 +61,7 @@ namespace fdtd::TMz
             throw std::invalid_argument("Backend: need one source value per point per step");
         }
 
-        const Grid2D &g = grid();
+        const Grid &g = grid();
         std::vector<std::pair<int, std::size_t>> keys;
         keys.reserve(npoints);
         for (const PointInjection &point : points) {
@@ -117,13 +117,13 @@ namespace fdtd::TMz
     }
 
     // Create a backend with the default settings.
-    std::unique_ptr<Backend> make_backend(BackendType type, const Grid2D &grid)
+    std::unique_ptr<Backend> make_backend(BackendType type, const Grid &grid)
     {
         return make_backend(type, grid, BackendOptions{});
     }
 
     // Create a backend, or report that it is not compiled in.
-    std::unique_ptr<Backend> make_backend(BackendType type, const Grid2D &grid,
+    std::unique_ptr<Backend> make_backend(BackendType type, const Grid &grid,
                                           const BackendOptions &options)
     {
         static_cast<void>(options);

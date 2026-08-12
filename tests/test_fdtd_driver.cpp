@@ -21,7 +21,7 @@
 #include <catch2/catch_test_macros.hpp>
 
 #include "fdtd/TMz/fdtd_tmz_output.h"
-#include "fdtd/TMz/fdtd_tmz_sim2d.h"
+#include "fdtd/TMz/fdtd_tmz_simulation.h"
 #include "fdtd/fdtd_driver.h"
 
 #include <filesystem>
@@ -57,7 +57,7 @@ TEST_CASE("Driver defaults", "[unit][driver]")
     CHECK(options.probes.empty());
     CHECK(options.snapshot_every == 0);
     CHECK(options.boundary == Boundary::Pec);
-    const fdtd::TMz::Sim2D::Options simDefaults;
+    const fdtd::TMz::Simulation::Options simDefaults;
     CHECK(options.pml_thickness == simDefaults.pml_thickness);
     CHECK(options.pml_order == simDefaults.pml_order);
     CHECK(options.pml_reflection == simDefaults.pml_reflection);

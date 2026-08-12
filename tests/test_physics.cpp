@@ -22,10 +22,10 @@
 #include <catch2/generators/catch_generators.hpp>
 #include <catch2/matchers/catch_matchers_floating_point.hpp>
 
-#include "fdtd/TMz/fdtd_tmz_fields2d.h"
-#include "fdtd/TMz/fdtd_tmz_grid2d.h"
-#include "fdtd/TMz/fdtd_tmz_material2d.h"
-#include "fdtd/TMz/fdtd_tmz_sim2d.h"
+#include "fdtd/TMz/fdtd_tmz_fields.h"
+#include "fdtd/TMz/fdtd_tmz_grid.h"
+#include "fdtd/TMz/fdtd_tmz_material.h"
+#include "fdtd/TMz/fdtd_tmz_simulation.h"
 #include "fdtd/TMz/fdtd_tmz_waveform.h"
 #include "fdtd/fdtd_constants.h"
 
@@ -43,10 +43,10 @@ using fdtd::FloatType;
 using fdtd::TMz::Boundary;
 using fdtd::TMz::Component;
 using fdtd::TMz::courant_dt;
-using fdtd::TMz::Fields2D;
-using fdtd::TMz::Grid2D;
-using fdtd::TMz::Material2D;
-using fdtd::TMz::Sim2D;
+using fdtd::TMz::Fields;
+using fdtd::TMz::Grid;
+using fdtd::TMz::Material;
+using fdtd::TMz::Simulation;
 
 namespace
 {
@@ -74,7 +74,7 @@ namespace
     };
 
     // Check that two grids have the same size.
-    void require_same_size(const Grid2D &a, const Grid2D &b)
+    void require_same_size(const Grid &a, const Grid &b)
     {
         if (a.nx() != b.nx() || a.ny() != b.ny()) {
             throw std::invalid_argument("field_energy: grids differ in size");
@@ -82,10 +82,10 @@ namespace
     }
 
     // Sum the energy with Ez from one set of fields and the product of H from two.
-    double energy(std::span<const FloatType> ez, const Fields2D &h0, const Fields2D &h1,
-                  const Material2D &material)
+    double energy(std::span<const FloatType> ez, const Fields &h0, const Fields &h1,
+                  const Material &material)
     {
-        const Grid2D &grid = material.grid();
+        const Grid &grid = material.grid();
         const auto epsR = material.eps_r();
         const auto muR = material.mu_r();
         double sum = 0;
@@ -102,14 +102,14 @@ namespace
     }
 
     // Return the field energy per unit length in z, in J/m, summed over the cells.
-    double field_energy(const Fields2D &fields, const Material2D &material)
+    double field_energy(const Fields &fields, const Material &material)
     {
         require_same_size(fields.grid(), material.grid());
         return energy(fields.ez(), fields, fields, material);
     }
 
     // Return the energy Yee conserves, eps Ez^2 / 2 + mu H^(n-1/2) . H^(n+1/2) / 2, in J/m.
-    double field_energy(const Fields2D &fields, const Fields2D &next, const Material2D &material)
+    double field_energy(const Fields &fields, const Fields &next, const Material &material)
     {
         require_same_size(fields.grid(), material.grid());
         require_same_size(next.grid(), material.grid());
@@ -133,7 +133,7 @@ namespace
     }
 
     // Add an Ez source and probes to an unrun simulation, run it and return one trace per probe.
-    std::vector<std::vector<FloatType>> point_source_traces(Sim2D &sim, Cell source,
+    std::vector<std::vector<FloatType>> point_source_traces(Simulation &sim, Cell source,
                                                             fdtd::TMz::Waveform waveform,
                                                             std::span<const Cell> probes,
                                                             std::size_t nsteps)
@@ -154,7 +154,7 @@ namespace
     }
 
     // Return the conserved energy now, running one extra step for the later H.
-    double conserved_energy(Sim2D &sim)
+    double conserved_energy(Simulation &sim)
     {
         const auto now = sim.snapshot();
         sim.run(1);
@@ -163,7 +163,7 @@ namespace
     }
 
     // Run a centred Gaussian source and return the conserved energy after every block of steps.
-    std::vector<double> energy_history(Sim2D &sim, std::size_t blocks, std::size_t blockSteps)
+    std::vector<double> energy_history(Simulation &sim, std::size_t blocks, std::size_t blockSteps)
     {
         const std::size_t n = sim.grid().nx();
         sim.add_source(n / 2, n / 2, Component::Ez, fdtd::TMz::Gaussian::from_steps(sim.dt(), 10));
@@ -176,11 +176,11 @@ namespace
     }
 
     // Record Ez at a probe from a Gaussian source in an interior inside a border of cells.
-    std::vector<FloatType> interior_trace(const Sim2D::Options &opts, std::size_t border,
+    std::vector<FloatType> interior_trace(const Simulation::Options &opts, std::size_t border,
                                           Cell source, Cell probe)
     {
         const std::size_t n = REFLECTION_INTERIOR + 2 * border;
-        Sim2D sim(n, n, opts);
+        Simulation sim(n, n, opts);
         const std::vector<Cell> probes{{border + probe.i, border + probe.j}};
         return point_source_traces(sim, {border + source.i, border + source.j},
                                    fdtd::TMz::Gaussian::from_steps(sim.dt(), 8), probes,
@@ -190,11 +190,12 @@ namespace
     // Return a PML's reflection in dB against a PEC domain too large to reflect in time.
     double pml_reflection_db(std::size_t thickness, Cell source, Cell probe)
     {
-        Sim2D::Options opts;
+        Simulation::Options opts;
         opts.boundary = Boundary::Pml;
         opts.pml_thickness = thickness;
         const auto trace = interior_trace(opts, thickness, source, probe);
-        const auto reference = interior_trace(Sim2D::Options(), REFLECTION_MARGIN, source, probe);
+        const auto reference =
+            interior_trace(Simulation::Options(), REFLECTION_MARGIN, source, probe);
         double error = 0;
         for (std::size_t k = 0; k < trace.size(); ++k) {
             error = std::max(error, std::abs(double(trace[k]) - double(reference[k])));
@@ -203,7 +204,7 @@ namespace
     }
 
     // Check that two runs left the same Ez, Hx and Hy, bit for bit.
-    bool same_fields(const Fields2D &a, const Fields2D &b)
+    bool same_fields(const Fields &a, const Fields &b)
     {
         const auto same = [](std::span<const FloatType> x, std::span<const FloatType> y) {
             return std::ranges::equal(x, y);
@@ -228,10 +229,10 @@ namespace
 // Verify the energy of hand-set fields in a medium with eps_r and mu_r.
 TEST_CASE("field_energy sums the cell energies", "[unit][helpers]")
 {
-    const Grid2D grid(4, 3, FloatType(0.5), FloatType(0.25));
-    Material2D material(grid);
+    const Grid grid(4, 3, FloatType(0.5), FloatType(0.25));
+    Material material(grid);
     material.fill({FloatType(2), FloatType(3), FloatType(0), FloatType(0)});
-    Fields2D fields(grid);
+    Fields fields(grid);
     fields.ez()[grid.index(1, 1)] = FloatType(2);
     fields.hx()[grid.index(2, 0)] = FloatType(1);
     fields.hy()[grid.index(0, 2)] = FloatType(-1);
@@ -244,10 +245,10 @@ TEST_CASE("field_energy sums the cell energies", "[unit][helpers]")
 // Verify that the two-step energy takes Ez from the first fields and multiplies H.
 TEST_CASE("field_energy multiplies H over two half steps", "[unit][helpers]")
 {
-    const Grid2D grid(3, 3);
-    const Material2D material(grid);
-    Fields2D fields(grid);
-    Fields2D next(grid);
+    const Grid grid(3, 3);
+    const Material material(grid);
+    Fields fields(grid);
+    Fields next(grid);
     fields.ez()[grid.index(1, 1)] = FloatType(1);
     fields.hx()[grid.index(1, 1)] = FloatType(1);
     fields.hy()[grid.index(2, 1)] = FloatType(2);
@@ -257,7 +258,7 @@ TEST_CASE("field_energy multiplies H over two half steps", "[unit][helpers]")
 
     const double expected = 0.5 * (fdtd::EPS_0 * 1 + fdtd::MU_0 * (3 - 2));
     CHECK_THAT(field_energy(fields, next, material), WithinRel(expected, 1e-6));
-    CHECK_THROWS_AS(field_energy(Fields2D(Grid2D(2, 3)), material), std::invalid_argument);
+    CHECK_THROWS_AS(field_energy(Fields(Grid(2, 3)), material), std::invalid_argument);
 }
 
 // Verify that find_peak finds the first largest magnitude.
@@ -273,7 +274,7 @@ TEST_CASE("find_peak finds the largest magnitude", "[unit][helpers]")
 // Verify that point_source_traces returns one full trace per probe.
 TEST_CASE("point_source_traces records every probe", "[unit][helpers]")
 {
-    Sim2D sim(16, 16);
+    Simulation sim(16, 16);
     const std::vector<Cell> probes{{8, 8}, {12, 8}};
     const auto traces =
         point_source_traces(sim, {8, 8}, fdtd::TMz::Gaussian::from_steps(sim.dt(), 4), probes, 20);
@@ -287,9 +288,9 @@ TEST_CASE("point_source_traces records every probe", "[unit][helpers]")
 // Verify that S = 0.99 keeps the energy of a PEC box bounded once the source is off.
 TEST_CASE("S = 0.99 stays bounded", "[physics][stability]")
 {
-    Sim2D::Options opts;
+    Simulation::Options opts;
     opts.courant = 0.99;
-    Sim2D sim(64, 64, opts);
+    Simulation sim(64, 64, opts);
     const auto history = energy_history(sim, 20, 100);
     for (const double e : history) {
         const double ratio = e / history.front();
@@ -303,10 +304,10 @@ TEST_CASE("S = 0.99 stays bounded", "[physics][stability]")
 // Verify that S = 1.01 with the stability check off grows without bound.
 TEST_CASE("S = 1.01 grows with check_stability off", "[physics][stability]")
 {
-    Sim2D::Options opts;
+    Simulation::Options opts;
     opts.check_stability = false;
-    opts.dt = 1.01 * courant_dt(Grid2D(64, 64, opts.dx, opts.dy), 1.0);
-    Sim2D sim(64, 64, opts);
+    opts.dt = 1.01 * courant_dt(Grid(64, 64, opts.dx, opts.dy), 1.0);
+    Simulation sim(64, 64, opts);
     const auto history = energy_history(sim, 20, 100);
     const double growth = history.back() / history.front();
     CAPTURE(growth);
@@ -316,7 +317,7 @@ TEST_CASE("S = 1.01 grows with check_stability off", "[physics][stability]")
 // Verify the speed C_0 within 1% along an axis and the diagonal, the axis being slower.
 TEST_CASE("Pulses travel at the speed of light", "[physics][speed]")
 {
-    Sim2D sim(256, 256);
+    Simulation sim(256, 256);
     const std::vector<Cell> probes{{168, 128}, {218, 128}, {156, 156}, {191, 191}};
     const auto traces = point_source_traces(
         sim, {128, 128}, fdtd::TMz::Gaussian::from_steps(sim.dt(), 8), probes, 220);
@@ -335,7 +336,7 @@ TEST_CASE("Pulses travel at the speed of light", "[physics][speed]")
 // Verify that a cylindrical wave's peak falls off as 1 / sqrt(r) in the far field within 3%.
 TEST_CASE("Far-field peak follows 1 / sqrt(r)", "[physics][falloff]")
 {
-    Sim2D sim(256, 256);
+    Simulation sim(256, 256);
     const std::size_t distances[] = {30, 50, 70, 90, 110};
     std::vector<Cell> probes;
     for (const std::size_t r : distances) {
@@ -357,10 +358,10 @@ TEST_CASE("Far-field peak follows 1 / sqrt(r)", "[physics][falloff]")
 TEST_CASE("Closed box conserves energy", "[physics][energy]")
 {
     const Boundary boundary = GENERATE(Boundary::Pec, Boundary::Pmc);
-    Sim2D::Options opts;
+    Simulation::Options opts;
     opts.boundary = boundary;
-    Sim2D sim(128, 128, opts);
-    Material2D material(sim.grid());
+    Simulation sim(128, 128, opts);
+    Material material(sim.grid());
     material.fill_circle(80, 70, 15, {FloatType(4), FloatType(1), FloatType(0), FloatType(0)});
     sim.set_material(material);
     sim.add_source(40, 50, Component::Ez, fdtd::TMz::Gaussian::from_steps(sim.dt(), 8));
@@ -387,17 +388,17 @@ TEST_CASE("Closed box conserves energy", "[physics][energy]")
 TEST_CASE("PML off reproduces the closed box bit for bit", "[physics][pml]")
 {
     const Boundary boundary = GENERATE(Boundary::Pml, Boundary::Pec, Boundary::Pmc);
-    Sim2D::Options opts;
+    Simulation::Options opts;
     opts.boundary = boundary;
     opts.pml_thickness = boundary == Boundary::Pml ? 0 : 12;
     opts.pml_order = 2;
     opts.pml_reflection = 1e-3;
-    Sim2D::Options plain;
+    Simulation::Options plain;
     plain.boundary = boundary == Boundary::Pmc ? Boundary::Pmc : Boundary::Pec;
 
-    const auto run = [](const Sim2D::Options &options) {
-        Sim2D sim(48, 40, options);
-        Material2D material(sim.grid());
+    const auto run = [](const Simulation::Options &options) {
+        Simulation sim(48, 40, options);
+        Material material(sim.grid());
         material.fill_circle(30, 22, 8, {FloatType(3), FloatType(1), FloatType(2), FloatType(0)});
         sim.set_material(material);
         sim.add_source(10, 12, Component::Ez, fdtd::TMz::Gaussian::from_steps(sim.dt(), 8));
@@ -433,10 +434,10 @@ TEST_CASE("PML reflects below the threshold", "[physics][pml]")
 // Verify that a PML box loses five orders of magnitude of energy in a thousand steps.
 TEST_CASE("PML box loses its energy", "[physics][pml]")
 {
-    Sim2D::Options opts;
+    Simulation::Options opts;
     opts.boundary = Boundary::Pml;
     opts.pml_thickness = 10;
-    Sim2D sim(64, 64, opts);
+    Simulation sim(64, 64, opts);
     sim.add_source(32, 32, Component::Ez, fdtd::TMz::Gaussian::from_steps(sim.dt(), 10));
     sim.run(60);
     const double start = conserved_energy(sim);
@@ -450,10 +451,10 @@ TEST_CASE("PML box loses its energy", "[physics][pml]")
 // Verify that a PML box's energy keeps falling over three thousand steps, with no late growth.
 TEST_CASE("PML box does not grow", "[physics][pml][stability]")
 {
-    Sim2D::Options opts;
+    Simulation::Options opts;
     opts.boundary = Boundary::Pml;
     opts.pml_thickness = 10;
-    Sim2D sim(64, 64, opts);
+    Simulation sim(64, 64, opts);
     const auto history = energy_history(sim, 30, 99);
     for (std::size_t b = 1; b < history.size(); ++b) {
         const double ratio = history[b] / history[b - 1];

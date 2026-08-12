@@ -17,10 +17,10 @@
  * along with fdtd-cuda; if not, see <https://www.gnu.org/licenses/>.
  */
 
-#ifndef FDTD_TMZ_MATERIAL2D_H
-#define FDTD_TMZ_MATERIAL2D_H
+#ifndef FDTD_TMZ_MATERIAL_H
+#define FDTD_TMZ_MATERIAL_H
 
-#include "fdtd/TMz/fdtd_tmz_grid2d.h"
+#include "fdtd/TMz/fdtd_tmz_grid.h"
 #include "fdtd/fdtd_float.h"
 
 #include <cstddef>
@@ -36,7 +36,7 @@ namespace fdtd
         /**
          * Per-cell material parameters over a grid, vacuum by default.
          *
-         * Each array has grid().size() elements, indexed with Grid2D::index. Permittivity
+         * Each array has grid().size() elements, indexed with Grid::index. Permittivity
          * and permeability are relative; the conductivities are in SI units.
          *
          * Besides the isotropic media, the material holds the directional conductivities of
@@ -44,7 +44,7 @@ namespace fdtd
          * vacuum profiles: the coefficients scale them by eps_r and mu_r, so the media and
          * the PML can be set in any order, and the fill functions leave them alone.
          */
-        class Material2D
+        class Material
         {
         public:
             /** Parameters of a homogeneous medium. */
@@ -68,14 +68,14 @@ namespace fdtd
              *
              * @param grid Grid the material lives on.
              */
-            explicit Material2D(const Grid2D &grid);
+            explicit Material(const Grid &grid);
 
             /**
              * Grid the material lives on.
              *
              * @return The grid.
              */
-            const Grid2D &grid() const noexcept;
+            const Grid &grid() const noexcept;
 
             /**
              * Medium of one cell.
@@ -219,7 +219,7 @@ namespace fdtd
             void set(std::size_t k, const Medium &medium) noexcept;
 
             /** Grid the material lives on. */
-            Grid2D m_grid;
+            Grid m_grid;
 
             /** Relative permittivity per cell. */
             std::vector<FloatType> m_eps_r;

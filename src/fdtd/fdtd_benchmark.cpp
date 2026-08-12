@@ -25,7 +25,7 @@
 #include "fdtd/fdtd_args.h"
 
 // The simulation and the source waveform.
-#include "fdtd/TMz/fdtd_tmz_sim2d.h"
+#include "fdtd/TMz/fdtd_tmz_simulation.h"
 #include "fdtd/TMz/fdtd_tmz_waveform.h"
 #include "fdtd/fdtd_float.h"
 
@@ -133,10 +133,10 @@ namespace fdtd
                                 TMz::BackendType backend, const std::string &variant,
                                 std::size_t threads, std::size_t repeat)
         {
-            TMz::Sim2D::Options simOptions;
+            TMz::Simulation::Options simOptions;
             simOptions.boundary = options.boundary;
             simOptions.backend = backend;
-            TMz::Sim2D sim(options.nx, ny, simOptions);
+            TMz::Simulation sim(options.nx, ny, simOptions);
             sim.add_source(options.nx / 2, ny / 2, TMz::Component::Ez,
                            TMz::Gaussian::from_steps(sim.dt(), PULSE_WIDTH_STEPS));
 

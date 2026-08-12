@@ -22,7 +22,7 @@
 
 // Project headers under test.
 #include "fdtd/TMz/fdtd_tmz_omp_options.h"
-#include "fdtd/TMz/fdtd_tmz_sim2d.h"
+#include "fdtd/TMz/fdtd_tmz_simulation.h"
 
 // Shorthand for the types under test.
 using fdtd::TMz::OmpOptions;
@@ -43,12 +43,12 @@ TEST_CASE("OpenMP options defaults", "[unit][omp_options]")
 }
 
 // Verify that a simulation carries the OpenMP options it was given.
-TEST_CASE("Sim2D keeps the OpenMP options", "[unit][omp_options]")
+TEST_CASE("Simulation keeps the OpenMP options", "[unit][omp_options]")
 {
-    fdtd::TMz::Sim2D::Options opts;
+    fdtd::TMz::Simulation::Options opts;
     opts.omp.schedule = OmpSchedule::Tiles;
     opts.omp.tile_x = 16;
-    const fdtd::TMz::Sim2D sim(8, 8, opts);
+    const fdtd::TMz::Simulation sim(8, 8, opts);
 
     CHECK(sim.options().omp.schedule == OmpSchedule::Tiles);
     CHECK(sim.options().omp.tile_x == 16);

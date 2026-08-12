@@ -18,7 +18,7 @@
  */
 
 // Class declaration.
-#include "fdtd/TMz/fdtd_tmz_coeffs2d.h"
+#include "fdtd/TMz/fdtd_tmz_coeffs.h"
 
 // Project constants for the vacuum permittivity and permeability.
 #include "fdtd/fdtd_constants.h"
@@ -45,7 +45,7 @@ namespace fdtd::TMz
     }
 
     // Check dt, then fill the arrays cell by cell, adding the PML profiles to the conductivities.
-    Coeffs2D::Coeffs2D(const Material2D &material, double dt)
+    Coeffs::Coeffs(const Material &material, double dt)
         : m_grid(material.grid())
         , m_dt(dt)
         , m_pml_thickness(material.pml_thickness())
@@ -59,7 +59,7 @@ namespace fdtd::TMz
         , m_coeff_hy_2(m_grid.size())
     {
         if (!std::isfinite(dt) || !(dt > 0)) {
-            throw std::invalid_argument("Coeffs2D: time step must be positive and finite");
+            throw std::invalid_argument("Coeffs: time step must be positive and finite");
         }
 
         const auto epsR = material.eps_r();
@@ -86,67 +86,67 @@ namespace fdtd::TMz
     }
 
     // Return the grid.
-    const Grid2D &Coeffs2D::grid() const noexcept
+    const Grid &Coeffs::grid() const noexcept
     {
         return m_grid;
     }
 
     // Return the time step.
-    double Coeffs2D::dt() const noexcept
+    double Coeffs::dt() const noexcept
     {
         return m_dt;
     }
 
     // Return the PML thickness.
-    std::size_t Coeffs2D::pml_thickness() const noexcept
+    std::size_t Coeffs::pml_thickness() const noexcept
     {
         return m_pml_thickness;
     }
 
     // Return a read-only view of the Ez decay factor along x.
-    std::span<const FloatType> Coeffs2D::coeff_ez_x1() const noexcept
+    std::span<const FloatType> Coeffs::coeff_ez_x1() const noexcept
     {
         return {m_coeff_ez_x1.data(), m_coeff_ez_x1.size()};
     }
 
     // Return a read-only view of the Ez curl factor along x.
-    std::span<const FloatType> Coeffs2D::coeff_ez_x2() const noexcept
+    std::span<const FloatType> Coeffs::coeff_ez_x2() const noexcept
     {
         return {m_coeff_ez_x2.data(), m_coeff_ez_x2.size()};
     }
 
     // Return a read-only view of the Ez decay factor along y.
-    std::span<const FloatType> Coeffs2D::coeff_ez_y1() const noexcept
+    std::span<const FloatType> Coeffs::coeff_ez_y1() const noexcept
     {
         return {m_coeff_ez_y1.data(), m_coeff_ez_y1.size()};
     }
 
     // Return a read-only view of the Ez curl factor along y.
-    std::span<const FloatType> Coeffs2D::coeff_ez_y2() const noexcept
+    std::span<const FloatType> Coeffs::coeff_ez_y2() const noexcept
     {
         return {m_coeff_ez_y2.data(), m_coeff_ez_y2.size()};
     }
 
     // Return a read-only view of the Hx decay factor.
-    std::span<const FloatType> Coeffs2D::coeff_hx_1() const noexcept
+    std::span<const FloatType> Coeffs::coeff_hx_1() const noexcept
     {
         return {m_coeff_hx_1.data(), m_coeff_hx_1.size()};
     }
 
     // Return a read-only view of the Hx curl factor.
-    std::span<const FloatType> Coeffs2D::coeff_hx_2() const noexcept
+    std::span<const FloatType> Coeffs::coeff_hx_2() const noexcept
     {
         return {m_coeff_hx_2.data(), m_coeff_hx_2.size()};
     }
 
     // Return a read-only view of the Hy decay factor.
-    std::span<const FloatType> Coeffs2D::coeff_hy_1() const noexcept
+    std::span<const FloatType> Coeffs::coeff_hy_1() const noexcept
     {
         return {m_coeff_hy_1.data(), m_coeff_hy_1.size()};
     }
 
     // Return a read-only view of the Hy curl factor.
-    std::span<const FloatType> Coeffs2D::coeff_hy_2() const noexcept
+    std::span<const FloatType> Coeffs::coeff_hy_2() const noexcept
     {
         return {m_coeff_hy_2.data(), m_coeff_hy_2.size()};
     }

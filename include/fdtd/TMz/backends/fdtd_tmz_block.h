@@ -17,13 +17,13 @@
  * along with fdtd-cuda; if not, see <https://www.gnu.org/licenses/>.
  */
 
-#ifndef FDTD_TMZ_BLOCK2D_H
-#define FDTD_TMZ_BLOCK2D_H
+#ifndef FDTD_TMZ_BLOCK_H
+#define FDTD_TMZ_BLOCK_H
 
 #include "fdtd/TMz/fdtd_tmz_boundary.h"
-#include "fdtd/TMz/fdtd_tmz_coeffs2d.h"
-#include "fdtd/TMz/fdtd_tmz_fields2d.h"
-#include "fdtd/TMz/fdtd_tmz_grid2d.h"
+#include "fdtd/TMz/fdtd_tmz_coeffs.h"
+#include "fdtd/TMz/fdtd_tmz_fields.h"
+#include "fdtd/TMz/fdtd_tmz_grid.h"
 #include "fdtd/fdtd_float.h"
 
 #include <algorithm>
@@ -38,8 +38,8 @@ namespace fdtd
         /**
          * Pointers to the eight coefficient arrays the update kernels read.
          *
-         * The kernels take these rather than a Coeffs2D so a backend can keep its own
-         * arrays, as a GPU backend keeps device arrays. A Coeffs2D converts implicitly.
+         * The kernels take these rather than a Coeffs so a backend can keep its own
+         * arrays, as a GPU backend keeps device arrays. A Coeffs converts implicitly.
          */
         struct CoeffsView
         {
@@ -48,10 +48,10 @@ namespace fdtd
              *
              * @param coeffs Coefficients to view.
              */
-            CoeffsView(const Coeffs2D &coeffs) noexcept; // NOLINT(google-explicit-constructor)
+            CoeffsView(const Coeffs &coeffs) noexcept; // NOLINT(google-explicit-constructor)
 
             /**
-             * View eight arrays over the same grid, laid out as in Coeffs2D.
+             * View eight arrays over the same grid, laid out as in Coeffs.
              *
              * @param ezX1 Ez decay factors along x.
              * @param ezX2 Ez curl factors along x.
@@ -92,7 +92,7 @@ namespace fdtd
         };
 
         /** A half-open rectangle of cells, i0 <= i < i1 and j0 <= j < j1. */
-        struct Block2D
+        struct Block
         {
             /** First column. */
             std::size_t i0;
@@ -123,7 +123,7 @@ namespace fdtd
          * @param grid Grid to cover.
          * @return The block from (0, 0) to (nx, ny).
          */
-        inline Block2D whole_block(const Grid2D &grid) noexcept
+        inline Block whole_block(const Grid &grid) noexcept
         {
             return {
                 .i0 = 0,
@@ -140,7 +140,7 @@ namespace fdtd
          * @param b Second block.
          * @return The intersection, empty() when they share none.
          */
-        inline Block2D intersect(const Block2D &a, const Block2D &b) noexcept
+        inline Block intersect(const Block &a, const Block &b) noexcept
         {
             return {
                 .i0 = std::max(a.i0, b.i0),
@@ -194,10 +194,9 @@ namespace fdtd
          * @param block Cells to update, inside the grid.
          */
         template <bool Simd = false>
-        inline void update_h_block(Fields2D &fields, CoeffsView coeffs,
-                                   const Block2D &block) noexcept
+        inline void update_h_block(Fields &fields, CoeffsView coeffs, const Block &block) noexcept
         {
-            const Grid2D &grid = fields.grid();
+            const Grid &grid = fields.grid();
             const std::size_t pitch = grid.pitch();
             const std::size_t hxEnd = std::min(block.j1, grid.ny() - 1);
             const std::size_t hyEnd = std::min(block.i1, grid.nx() - 1);
@@ -236,7 +235,7 @@ namespace fdtd
          * @param pml PML thickness in cells, zero for none.
          * @return max(pml, 1) <= i < nx - max(pml, 1), and the same along j.
          */
-        inline Block2D interior_block(const Grid2D &grid, std::size_t pml) noexcept
+        inline Block interior_block(const Grid &grid, std::size_t pml) noexcept
         {
             const std::size_t lo = std::max<std::size_t>(pml, 1);
             return {
@@ -264,11 +263,11 @@ namespace fdtd
          * @param pml PML thickness in cells, zero for none.
          */
         template <bool Simd = false>
-        inline void update_e_interior_block(Fields2D &fields, CoeffsView coeffs,
-                                            const Block2D &block, std::size_t pml) noexcept
+        inline void update_e_interior_block(Fields &fields, CoeffsView coeffs, const Block &block,
+                                            std::size_t pml) noexcept
         {
-            const Grid2D &grid = fields.grid();
-            const Block2D cells = intersect(block, interior_block(grid, pml));
+            const Grid &grid = fields.grid();
+            const Block cells = intersect(block, interior_block(grid, pml));
             if (cells.empty()) {
                 return;
             }
@@ -302,13 +301,13 @@ namespace fdtd
          * @param cells Cells to update, off the edge.
          */
         template <bool Simd = false>
-        inline void update_split_rect(Fields2D &fields, CoeffsView coeffs,
-                                      const Block2D &cells) noexcept
+        inline void update_split_rect(Fields &fields, CoeffsView coeffs,
+                                      const Block &cells) noexcept
         {
             if (cells.empty()) {
                 return;
             }
-            const Grid2D &grid = fields.grid();
+            const Grid &grid = fields.grid();
             const std::size_t pitch = grid.pitch();
             const FloatType invDx = FloatType(1) / grid.dx();
             const FloatType invDy = FloatType(1) / grid.dy();
@@ -355,7 +354,7 @@ namespace fdtd
          * @param pml PML thickness in cells, with 2 pml below nx and ny; zero for none.
          */
         template <bool Simd = false>
-        inline void update_pml_block(Fields2D &fields, CoeffsView coeffs, const Block2D &block,
+        inline void update_pml_block(Fields &fields, CoeffsView coeffs, const Block &block,
                                      std::size_t pml) noexcept
         {
             if (pml < 2) {
@@ -363,10 +362,10 @@ namespace fdtd
             }
             const std::size_t nx = fields.grid().nx();
             const std::size_t ny = fields.grid().ny();
-            const Block2D bottom{.i0 = 1, .i1 = nx - 1, .j0 = 1, .j1 = pml};
-            const Block2D top{.i0 = 1, .i1 = nx - 1, .j0 = ny - pml, .j1 = ny - 1};
-            const Block2D left{.i0 = 1, .i1 = pml, .j0 = pml, .j1 = ny - pml};
-            const Block2D right{.i0 = nx - pml, .i1 = nx - 1, .j0 = pml, .j1 = ny - pml};
+            const Block bottom{.i0 = 1, .i1 = nx - 1, .j0 = 1, .j1 = pml};
+            const Block top{.i0 = 1, .i1 = nx - 1, .j0 = ny - pml, .j1 = ny - 1};
+            const Block left{.i0 = 1, .i1 = pml, .j0 = pml, .j1 = ny - pml};
+            const Block right{.i0 = nx - pml, .i1 = nx - 1, .j0 = pml, .j1 = ny - pml};
             update_split_rect<Simd>(fields, coeffs, intersect(block, bottom));
             update_split_rect<Simd>(fields, coeffs, intersect(block, top));
             update_split_rect<Simd>(fields, coeffs, intersect(block, left));
@@ -387,7 +386,7 @@ namespace fdtd
          * @param block Cells to update, inside the grid; only its edge cells change.
          * @param boundary Outer boundary condition.
          */
-        void update_boundary_block(Fields2D &fields, CoeffsView coeffs, const Block2D &block,
+        void update_boundary_block(Fields &fields, CoeffsView coeffs, const Block &block,
                                    Boundary boundary) noexcept;
 
         /**
@@ -401,7 +400,7 @@ namespace fdtd
          * @param boundary Outer boundary condition.
          */
         template <bool Simd = false>
-        inline void update_e_block(Fields2D &fields, CoeffsView coeffs, const Block2D &block,
+        inline void update_e_block(Fields &fields, CoeffsView coeffs, const Block &block,
                                    std::size_t pml, Boundary boundary) noexcept
         {
             update_e_interior_block<Simd>(fields, coeffs, block, pml);

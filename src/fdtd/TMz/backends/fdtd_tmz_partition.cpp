@@ -18,7 +18,7 @@
  */
 
 // Class declaration.
-#include "fdtd/TMz/backends/fdtd_tmz_partition2d.h"
+#include "fdtd/TMz/backends/fdtd_tmz_partition.h"
 
 // Standard library for searches, sizes and errors.
 #include <algorithm>
@@ -29,7 +29,7 @@
 namespace fdtd::TMz
 {
     // Start with no parts.
-    Partition2D::Partition2D(const Grid2D &grid)
+    Partition::Partition(const Grid &grid)
         : m_nx(grid.nx())
         , m_offsets{0}
     {
@@ -37,18 +37,18 @@ namespace fdtd::TMz
     }
 
     // Cut into one tile as large as the grid.
-    Partition2D Partition2D::whole(const Grid2D &grid)
+    Partition Partition::whole(const Grid &grid)
     {
         return tiles(grid, grid.nx(), grid.ny());
     }
 
     // Cut into tiles row by row of tiles, clipping the last column and row.
-    Partition2D Partition2D::tiles(const Grid2D &grid, std::size_t tileX, std::size_t tileY)
+    Partition Partition::tiles(const Grid &grid, std::size_t tileX, std::size_t tileY)
     {
         if (tileX == 0 || tileY == 0) {
-            throw std::invalid_argument("Partition2D: tile sides must be positive");
+            throw std::invalid_argument("Partition: tile sides must be positive");
         }
-        Partition2D partition(grid);
+        Partition partition(grid);
         partition.m_tile_x = tileX;
         partition.m_tile_y = tileY;
         partition.m_tiles_x = (grid.nx() + tileX - 1) / tileX;
@@ -68,14 +68,14 @@ namespace fdtd::TMz
     }
 
     // Cut the row-major cells into even ranges, each a partial row, whole rows and a partial row.
-    Partition2D Partition2D::ranges(const Grid2D &grid, std::size_t parts)
+    Partition Partition::ranges(const Grid &grid, std::size_t parts)
     {
         if (parts == 0) {
-            throw std::invalid_argument("Partition2D: the part count must be positive");
+            throw std::invalid_argument("Partition: the part count must be positive");
         }
         const std::size_t nx = grid.nx();
         const std::size_t cells = nx * grid.ny();
-        Partition2D partition(grid);
+        Partition partition(grid);
         for (std::size_t p = 0; p < parts; ++p) {
             const std::size_t begin = p * cells / parts;
             const std::size_t end = (p + 1) * cells / parts;
@@ -110,26 +110,26 @@ namespace fdtd::TMz
     }
 
     // Mark the end of the current part's blocks.
-    void Partition2D::close_part()
+    void Partition::close_part()
     {
         m_offsets.push_back(m_blocks.size());
     }
 
     // Return the number of parts.
-    std::size_t Partition2D::size() const noexcept
+    std::size_t Partition::size() const noexcept
     {
         return m_offsets.size() - 1;
     }
 
     // Return the blocks between the part's offsets.
-    std::span<const Block2D> Partition2D::blocks(std::size_t part) const noexcept
+    std::span<const Block> Partition::blocks(std::size_t part) const noexcept
     {
         const std::size_t first = m_offsets[part];
         return std::span(m_blocks).subspan(first, m_offsets[part + 1] - first);
     }
 
     // Find the tile of the cell, or the last range that starts at or before it.
-    std::size_t Partition2D::owner(std::size_t i, std::size_t j) const noexcept
+    std::size_t Partition::owner(std::size_t i, std::size_t j) const noexcept
     {
         if (m_tile_x > 0) {
             return (j / m_tile_y) * m_tiles_x + i / m_tile_x;
@@ -140,13 +140,13 @@ namespace fdtd::TMz
     }
 
     // Return the tile column count.
-    std::size_t Partition2D::tiles_x() const noexcept
+    std::size_t Partition::tiles_x() const noexcept
     {
         return m_tiles_x;
     }
 
     // Return the tile row count.
-    std::size_t Partition2D::tiles_y() const noexcept
+    std::size_t Partition::tiles_y() const noexcept
     {
         return m_tiles_y;
     }

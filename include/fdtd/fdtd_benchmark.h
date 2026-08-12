@@ -62,7 +62,7 @@ namespace fdtd
         /** Thread counts to measure, ignored by serial; none means 1. */
         std::vector<std::size_t> threads;
 
-        /** Outer boundary condition; the PML takes the default settings of Sim2D. */
+        /** Outer boundary condition; the PML takes the default settings of Simulation. */
         TMz::Boundary boundary = TMz::Boundary::Pml;
 
         /** File the CSV is written to, or empty for the output stream. */
@@ -105,7 +105,7 @@ namespace fdtd
         /** Index of the sample in its configuration, from zero. */
         std::size_t repeat;
 
-        /** Wall time of Sim2D::run in seconds. */
+        /** Wall time of Simulation::run in seconds. */
         double seconds;
 
         /** Sum of Ez over the grid after the run, accumulated in double. */
@@ -155,7 +155,7 @@ namespace fdtd
      * The workload is a grid of vacuum at Courant number 0.99 with a Gaussian Ez source
      * 12 steps wide at the centre. A configuration is a backend, a variant and a thread
      * count. Each one is warmed up with untimed runs, then measured repeat times; every
-     * sample builds a new Sim2D and times only Sim2D::run. A summary line per
+     * sample builds a new Simulation and times only Simulation::run. A summary line per
      * configuration goes to the log.
      *
      * @param options Settings of the run.

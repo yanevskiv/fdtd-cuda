@@ -23,7 +23,7 @@
 #include <catch2/matchers/catch_matchers_floating_point.hpp>
 
 // Project headers under test.
-#include "fdtd/TMz/fdtd_tmz_material2d.h"
+#include "fdtd/TMz/fdtd_tmz_material.h"
 #include "fdtd/fdtd_constants.h"
 
 // Standard library for math, limits and errors.
@@ -34,16 +34,16 @@
 
 // Shorthand for the types under test.
 using Catch::Matchers::WithinRel;
-using fdtd::TMz::Grid2D;
-using fdtd::TMz::Material2D;
+using fdtd::TMz::Grid;
+using fdtd::TMz::Material;
 
 // Medium used to mark filled cells.
-static const Material2D::Medium GLASS{4, 1, 0.5, 0};
+static const Material::Medium GLASS{4, 1, 0.5, 0};
 
 // Verify that a new material is vacuum everywhere.
-TEST_CASE("Material2D starts as vacuum", "[unit][material2d]")
+TEST_CASE("Material starts as vacuum", "[unit][material]")
 {
-    const Material2D mat(Grid2D(7, 5));
+    const Material mat(Grid(7, 5));
     REQUIRE(mat.eps_r().size() == mat.grid().size());
 
     for (std::size_t k = 0; k < mat.grid().size(); ++k) {
@@ -55,9 +55,9 @@ TEST_CASE("Material2D starts as vacuum", "[unit][material2d]")
 }
 
 // Verify that fill_rect sets exactly the half-open rectangle.
-TEST_CASE("Material2D fill_rect sets the half-open rectangle", "[unit][material2d]")
+TEST_CASE("Material fill_rect sets the half-open rectangle", "[unit][material]")
 {
-    Material2D mat(Grid2D(8, 6));
+    Material mat(Grid(8, 6));
     mat.fill_rect(2, 1, 5, 4, GLASS);
 
     for (std::size_t j = 0; j < 6; ++j) {
@@ -71,9 +71,9 @@ TEST_CASE("Material2D fill_rect sets the half-open rectangle", "[unit][material2
 }
 
 // Verify that rectangles are clipped to the grid and empty ones change nothing.
-TEST_CASE("Material2D fill_rect clips to the grid", "[unit][material2d]")
+TEST_CASE("Material fill_rect clips to the grid", "[unit][material]")
 {
-    Material2D mat(Grid2D(4, 4));
+    Material mat(Grid(4, 4));
     mat.fill_rect(3, 3, 100, 100, GLASS);
     mat.fill_rect(2, 0, 1, 4, GLASS);
     mat.fill_rect(10, 10, 20, 20, GLASS);
@@ -87,9 +87,9 @@ TEST_CASE("Material2D fill_rect clips to the grid", "[unit][material2d]")
 }
 
 // Verify that fill sets every cell.
-TEST_CASE("Material2D fill sets every cell", "[unit][material2d]")
+TEST_CASE("Material fill sets every cell", "[unit][material]")
 {
-    Material2D mat(Grid2D(3, 2));
+    Material mat(Grid(3, 2));
     mat.fill(GLASS);
 
     for (std::size_t k = 0; k < mat.grid().size(); ++k) {
@@ -99,12 +99,12 @@ TEST_CASE("Material2D fill sets every cell", "[unit][material2d]")
 }
 
 // Verify fill_circle against the cell-center test, including a center off the grid.
-TEST_CASE("Material2D fill_circle sets the cells within the radius", "[unit][material2d]")
+TEST_CASE("Material fill_circle sets the cells within the radius", "[unit][material]")
 {
     const double ci = GENERATE(4.0, 4.5, -1.0, 8.5);
     const double cj = 3.0;
     const double r = 2.5;
-    Material2D mat(Grid2D(9, 7));
+    Material mat(Grid(9, 7));
     mat.fill_circle(ci, cj, r, GLASS);
 
     for (std::size_t j = 0; j < 7; ++j) {
@@ -118,9 +118,9 @@ TEST_CASE("Material2D fill_circle sets the cells within the radius", "[unit][mat
 }
 
 // Verify that a zero radius sets only the cell at the center.
-TEST_CASE("Material2D fill_circle with zero radius sets one cell", "[unit][material2d]")
+TEST_CASE("Material fill_circle with zero radius sets one cell", "[unit][material]")
 {
-    Material2D mat(Grid2D(5, 5));
+    Material mat(Grid(5, 5));
     mat.fill_circle(2, 3, 0, GLASS);
 
     std::size_t filled = 0;
@@ -132,9 +132,9 @@ TEST_CASE("Material2D fill_circle with zero radius sets one cell", "[unit][mater
 }
 
 // Verify that unphysical media, bad circles and out-of-range cells are rejected.
-TEST_CASE("Material2D rejects invalid input", "[unit][material2d]")
+TEST_CASE("Material rejects invalid input", "[unit][material]")
 {
-    Material2D mat(Grid2D(4, 4));
+    Material mat(Grid(4, 4));
     const auto nan = std::numeric_limits<fdtd::FloatType>::quiet_NaN();
     const auto inf = std::numeric_limits<double>::infinity();
 
@@ -161,9 +161,9 @@ static double pml_max(double cellSize)
 }
 
 // Verify that a new material has no PML and that the media leave the profiles alone.
-TEST_CASE("Material2D starts without a PML", "[unit][material2d][pml]")
+TEST_CASE("Material starts without a PML", "[unit][material][pml]")
 {
-    Material2D mat(Grid2D(7, 5));
+    Material mat(Grid(7, 5));
     mat.fill(GLASS);
     CHECK(mat.pml_thickness() == 0);
     REQUIRE(mat.sigma_e_x().size() == mat.grid().size());
@@ -176,12 +176,12 @@ TEST_CASE("Material2D starts without a PML", "[unit][material2d][pml]")
 }
 
 // Verify the PML checks, that a rejected call changes nothing, and that thickness 0 is off.
-TEST_CASE("Material2D set_pml rejects bad settings", "[unit][material2d][pml]")
+TEST_CASE("Material set_pml rejects bad settings", "[unit][material][pml]")
 {
-    Material2D mat(Grid2D(21, 21));
+    Material mat(Grid(21, 21));
     CHECK_NOTHROW(mat.set_pml(10, 3, 1e-6));
-    CHECK_THROWS_AS(Material2D(Grid2D(20, 21)).set_pml(10, 3, 1e-6), std::invalid_argument);
-    CHECK_THROWS_AS(Material2D(Grid2D(21, 20)).set_pml(10, 3, 1e-6), std::invalid_argument);
+    CHECK_THROWS_AS(Material(Grid(20, 21)).set_pml(10, 3, 1e-6), std::invalid_argument);
+    CHECK_THROWS_AS(Material(Grid(21, 20)).set_pml(10, 3, 1e-6), std::invalid_argument);
     CHECK_THROWS_AS(mat.set_pml(4, 0, 1e-6), std::invalid_argument);
     CHECK_THROWS_AS(mat.set_pml(4, std::numeric_limits<double>::infinity(), 1e-6),
                     std::invalid_argument);
@@ -201,10 +201,10 @@ TEST_CASE("Material2D set_pml rejects bad settings", "[unit][material2d][pml]")
 }
 
 // Verify the electric profiles: sigma_max at the walls, graded inside, zero past, mirrored.
-TEST_CASE("Material2D set_pml grades the electric profiles", "[unit][material2d][pml]")
+TEST_CASE("Material set_pml grades the electric profiles", "[unit][material][pml]")
 {
-    const Grid2D grid(40, 30, fdtd::FloatType(1e-3), fdtd::FloatType(2e-3));
-    Material2D mat(grid);
+    const Grid grid(40, 30, fdtd::FloatType(1e-3), fdtd::FloatType(2e-3));
+    Material mat(grid);
     mat.set_pml(8, 3, 1e-6);
     const double maxX = pml_max(double(grid.dx()));
     const double maxY = pml_max(double(grid.dy()));
@@ -242,10 +242,10 @@ TEST_CASE("Material2D set_pml grades the electric profiles", "[unit][material2d]
 }
 
 // Verify that the normal-incidence round trip gives back the target reflection.
-TEST_CASE("Material2D set_pml reaches the target reflection", "[unit][material2d][pml]")
+TEST_CASE("Material set_pml reaches the target reflection", "[unit][material][pml]")
 {
-    const Grid2D grid(40, 30, fdtd::FloatType(1e-3), fdtd::FloatType(1e-3));
-    Material2D mat(grid);
+    const Grid grid(40, 30, fdtd::FloatType(1e-3), fdtd::FloatType(1e-3));
+    Material mat(grid);
     mat.set_pml(8, 3, 1e-6);
     const double sigmaMax = double(mat.sigma_e_x()[grid.index(0, 15)]);
     const double integral = sigmaMax * 8 * double(grid.dx()) / 4;
@@ -253,10 +253,10 @@ TEST_CASE("Material2D set_pml reaches the target reflection", "[unit][material2d
 }
 
 // Verify that the magnetic profiles sit half a cell further, scaled by mu0 / eps0.
-TEST_CASE("Material2D set_pml grades the magnetic profiles", "[unit][material2d][pml]")
+TEST_CASE("Material set_pml grades the magnetic profiles", "[unit][material][pml]")
 {
-    const Grid2D grid(40, 30, fdtd::FloatType(1e-3), fdtd::FloatType(2e-3));
-    Material2D mat(grid);
+    const Grid grid(40, 30, fdtd::FloatType(1e-3), fdtd::FloatType(2e-3));
+    Material mat(grid);
     mat.set_pml(8, 3, 1e-6);
     const double match = fdtd::MU_0 / fdtd::EPS_0;
     const double maxX = pml_max(double(grid.dx()));
