@@ -26,11 +26,13 @@
 // OpenMP runtime for the default thread count.
 #include <omp.h>
 
-// Standard library for sizes, views and errors.
+// Standard library for bounds, sizes, views, errors and the dependence tokens.
+#include <algorithm>
 #include <cstddef>
 #include <span>
 #include <stdexcept>
 #include <string_view>
+#include <vector>
 
 // Namespace for the 2D TMz module.
 namespace fdtd::TMz
@@ -38,14 +40,17 @@ namespace fdtd::TMz
     // Helpers private to this file.
     namespace
     {
+        // Tasks made before the producer waits for them, so the tasks in flight stay bounded.
+        constexpr std::size_t TASK_WINDOW = 4096;
+
         // Check the options before anything is built from them.
         const OmpOptions &checked(const OmpOptions &options)
         {
             if (options.tile_x == 0 || options.tile_y == 0) {
                 throw std::invalid_argument("OpenMPBackend: tile sides must be positive");
             }
-            if (options.schedule == OmpSchedule::Tasks) {
-                throw std::invalid_argument("OpenMPBackend: the Tasks schedule is not built");
+            if (options.schedule == OmpSchedule::Tasks && options.region == OmpRegion::Phase) {
+                throw std::invalid_argument("OpenMPBackend: Tasks run in one region per run");
             }
             return options;
         }
@@ -107,6 +112,40 @@ namespace fdtd::TMz
                 run_loops<Simd, OmpRegion::Phase>(stepper, parts, nsteps, threads);
             }
         }
+
+        // Make one task per tile per phase, each waiting for the phases of the tiles it reads.
+        template <bool Simd>
+        void run_tasks(const Stepper &stepper, const Partition &partition, std::size_t nsteps,
+                       int threads)
+        {
+            const std::size_t parts = partition.size();
+            const std::size_t columns = partition.tiles_x();
+            const std::size_t rows = partition.tiles_y();
+            const std::size_t window = std::max<std::size_t>(1, TASK_WINDOW / (2 * parts));
+            std::vector<char> hTokens(parts);
+            std::vector<char> eTokens(parts);
+            char *h = hTokens.data();
+            char *e = eTokens.data();
+#pragma omp parallel num_threads(threads)
+#pragma omp single
+            for (std::size_t n = 0; n < nsteps; ++n) {
+                for (std::size_t p = 0; p < parts; ++p) {
+                    const std::size_t right = p % columns + 1 < columns ? p + 1 : p;
+                    const std::size_t up = p / columns + 1 < rows ? p + columns : p;
+#pragma omp task depend(in : e[p], e[right], e[up]) depend(out : h[p])
+                    stepper.h_phase<Simd>(p, n);
+                }
+                for (std::size_t p = 0; p < parts; ++p) {
+                    const std::size_t left = p % columns > 0 ? p - 1 : p;
+                    const std::size_t down = p / columns > 0 ? p - columns : p;
+#pragma omp task depend(in : h[p], h[left], h[down]) depend(out : e[p])
+                    stepper.e_phase<Simd>(p, n);
+                }
+                if ((n + 1) % window == 0) {
+#pragma omp taskwait
+                }
+            }
+        }
     }
 
     // Check the options, fix the thread count and cut the grid for the schedule.
@@ -144,7 +183,7 @@ namespace fdtd::TMz
         return m_threads;
     }
 
-    // Build the stepper and hand its parts to the threads, with or without SIMD.
+    // Build the stepper and hand its parts to the threads as loops or tasks, with or without SIMD.
     void OpenMPBackend::advance(std::size_t nsteps, std::span<const PointInjection> points,
                                 std::span<const FloatType> values)
     {
@@ -154,7 +193,12 @@ namespace fdtd::TMz
                               values, probes(), records);
         const int threads = static_cast<int>(m_threads);
         const std::size_t parts = m_partition.size();
-        if (m_options.simd) {
+        const bool tasks = m_options.schedule == OmpSchedule::Tasks;
+        if (tasks && m_options.simd) {
+            run_tasks<true>(stepper, m_partition, nsteps, threads);
+        } else if (tasks) {
+            run_tasks<false>(stepper, m_partition, nsteps, threads);
+        } else if (m_options.simd) {
             run_loops<true>(stepper, parts, nsteps, threads, m_options.region);
         } else {
             run_loops<false>(stepper, parts, nsteps, threads, m_options.region);

@@ -58,7 +58,7 @@ namespace
 
     // Schedules built so far.
     constexpr OmpSchedule SCHEDULES[] = {OmpSchedule::Rows, OmpSchedule::Collapse2,
-                                         OmpSchedule::Tiles};
+                                         OmpSchedule::Tiles, OmpSchedule::Tasks};
 
     // Result of a run: the fields and every probe's record.
     struct Run
@@ -236,7 +236,7 @@ TEST_CASE("OpenMP runs are deterministic", "[backend][openmp]")
     }
 }
 
-// Verify the extremes: more threads than cells for Collapse2, a tile larger than the grid.
+// Verify the extremes: more threads than cells, a tile larger than the grid, one-cell tasks.
 TEST_CASE("OpenMP handles more parts than cells and tiles past the grid", "[backend][openmp]")
 {
     require_openmp();
@@ -258,6 +258,15 @@ TEST_CASE("OpenMP handles more parts than cells and tiles past the grid", "[back
     const Run one = run(BackendType::OpenMP, tiles, size, Boundary::Pec);
     CHECK(relative_difference(serial.fields, one.fields) <= bound());
     CHECK(relative_difference(serial.probes, one.probes) <= bound());
+
+    OmpOptions cells;
+    cells.schedule = OmpSchedule::Tasks;
+    cells.threads = 4;
+    cells.tile_x = 1;
+    cells.tile_y = 1;
+    const Run tiny = run(BackendType::OpenMP, cells, size, Boundary::Pec);
+    CHECK(relative_difference(serial.fields, tiny.fields) <= bound());
+    CHECK(relative_difference(serial.probes, tiny.probes) <= bound());
 }
 
 // Verify that the backend has its name and rejects options with no meaning.
@@ -275,6 +284,11 @@ TEST_CASE("OpenMP backend checks its options", "[unit][backend][openmp]")
                     std::invalid_argument);
     options.omp.tile_x = 8;
     options.omp.tile_y = 0;
+    CHECK_THROWS_AS(fdtd::TMz::make_backend(BackendType::OpenMP, grid, options),
+                    std::invalid_argument);
+    options.omp.tile_y = 8;
+    options.omp.schedule = OmpSchedule::Tasks;
+    options.omp.region = OmpRegion::Phase;
     CHECK_THROWS_AS(fdtd::TMz::make_backend(BackendType::OpenMP, grid, options),
                     std::invalid_argument);
 }

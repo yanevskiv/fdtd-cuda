@@ -39,8 +39,10 @@ namespace fdtd
          * Multi-threaded CPU backend: the serial stencil, its parts shared among threads.
          *
          * The schedule of the options picks the partition and how its parts reach the
-         * threads; the region and SIMD settings are compiled in as template instances and
-         * picked when the run starts. The arithmetic per cell is the serial backend's.
+         * threads: static loops over rows, ranges or tiles, or tasks over tiles that wait for
+         * their neighbours instead of a barrier. The region and SIMD settings are compiled in as
+         * template instances and picked when the run starts. The arithmetic per cell is the serial
+         * backend's.
          */
         class OpenMPBackend final : public CpuBackend
         {
