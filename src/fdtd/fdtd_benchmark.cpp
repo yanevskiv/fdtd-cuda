@@ -135,6 +135,7 @@ namespace fdtd
             TMz::Simulation::Options simOptions;
             simOptions.boundary = options.boundary;
             simOptions.backend = backend;
+            simOptions.omp.threads = threads;
             TMz::Simulation sim(options.nx, ny, simOptions);
             sim.add_source(options.nx / 2, ny / 2, TMz::Component::Ez,
                            TMz::Gaussian::from_steps(sim.dt(), PULSE_WIDTH_STEPS));

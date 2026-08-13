@@ -20,16 +20,16 @@
 #ifndef FDTD_TMZ_BACKEND_SERIAL_H
 #define FDTD_TMZ_BACKEND_SERIAL_H
 
+#include "fdtd/TMz/backends/fdtd_tmz_backend_cpu.h"
 #include "fdtd/TMz/backends/fdtd_tmz_block.h"
 #include "fdtd/TMz/fdtd_tmz_backend.h"
 #include "fdtd/TMz/fdtd_tmz_boundary.h"
 #include "fdtd/TMz/fdtd_tmz_coeffs.h"
 #include "fdtd/TMz/fdtd_tmz_fields.h"
-#include "fdtd/fdtd_aligned_buffer.h"
 
 #include <cstddef>
 #include <span>
-#include <vector>
+#include <string_view>
 
 /** Namespace for the fdtd library. */
 namespace fdtd
@@ -76,7 +76,7 @@ namespace fdtd
         void serial_update_boundary(Fields &fields, CoeffsView coeffs, Boundary boundary) noexcept;
 
         /** Single-threaded reference backend, the oracle for the others. */
-        class SerialBackend final : public Backend
+        class SerialBackend final : public CpuBackend
         {
         public:
             /**
@@ -100,72 +100,9 @@ namespace fdtd
              */
             BackendType type() const noexcept override;
 
-            /**
-             * Grid the backend was made for.
-             *
-             * @return The grid.
-             */
-            const Grid &grid() const noexcept override;
-
-            /**
-             * Copy fields into the backend.
-             *
-             * @param fields Fields on the backend's grid.
-             */
-            void upload(const Fields &fields) override;
-
-            /**
-             * Copy the backend's fields out.
-             *
-             * @param fields Destination on the backend's grid.
-             */
-            void download(Fields &fields) const override;
-
-            /**
-             * Copy update coefficients into the backend.
-             *
-             * @param coeffs Coefficients on the backend's grid.
-             */
-            void upload(const Coeffs &coeffs) override;
-
-            /**
-             * Set the outer boundary condition.
-             *
-             * @param boundary Outer boundary condition.
-             */
-            void set_boundary(Boundary boundary) override;
-
-            /**
-             * Outer boundary condition.
-             *
-             * @return The boundary.
-             */
-            Boundary boundary() const noexcept override;
-
-            /**
-             * Number of probes set.
-             *
-             * @return The probe count.
-             */
-            std::size_t probe_count() const noexcept override;
-
-            /**
-             * Number of steps recorded since the probes were set.
-             *
-             * @return The recorded step count.
-             */
-            std::size_t probe_steps() const noexcept override;
-
-            /**
-             * Copy the probe records out, step-major.
-             *
-             * @return The records.
-             */
-            std::vector<FloatType> fetch_probes() const override;
-
         protected:
             /**
-             * Advance the fields and add the sources.
+             * Advance the fields and add the sources, the whole grid as one part.
              *
              * @param nsteps Number of time steps.
              * @param points Distinct cells inside the grid.
@@ -173,56 +110,6 @@ namespace fdtd
              */
             void advance(std::size_t nsteps, std::span<const PointInjection> points,
                          std::span<const FloatType> values) override;
-
-            /**
-             * Replace the probes and clear the records.
-             *
-             * @param points Cells inside the grid.
-             */
-            void reset_probes(std::span<const PointProbe> points) override;
-
-        private:
-            /** The backend's copy of the fields. */
-            Fields m_fields;
-
-            /** Whether coefficients were uploaded. */
-            bool m_has_coeffs = false;
-
-            /** PML thickness the uploaded coefficients carry, used under Boundary::Pml. */
-            std::size_t m_pml_thickness = 0;
-
-            /** The backend's copy of the Ez decay factors along x. */
-            AlignedBuffer<FloatType> m_coeff_ez_x1;
-
-            /** The backend's copy of the Ez curl factors along x. */
-            AlignedBuffer<FloatType> m_coeff_ez_x2;
-
-            /** The backend's copy of the Ez decay factors along y. */
-            AlignedBuffer<FloatType> m_coeff_ez_y1;
-
-            /** The backend's copy of the Ez curl factors along y. */
-            AlignedBuffer<FloatType> m_coeff_ez_y2;
-
-            /** The backend's copy of the Hx decay factors. */
-            AlignedBuffer<FloatType> m_coeff_hx_1;
-
-            /** The backend's copy of the Hx curl factors. */
-            AlignedBuffer<FloatType> m_coeff_hx_2;
-
-            /** The backend's copy of the Hy decay factors. */
-            AlignedBuffer<FloatType> m_coeff_hy_1;
-
-            /** The backend's copy of the Hy curl factors. */
-            AlignedBuffer<FloatType> m_coeff_hy_2;
-
-            /** Outer boundary condition. */
-            Boundary m_boundary = Boundary::Pec;
-
-            /** Probe cells. */
-            std::vector<PointProbe> m_probes;
-
-            /** Probe records, step-major. */
-            std::vector<FloatType> m_records;
         };
     }
 }

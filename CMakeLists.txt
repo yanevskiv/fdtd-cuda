@@ -34,6 +34,7 @@ add_library(fdtd
     src/fdtd/TMz/fdtd_tmz_material.cpp
     src/fdtd/TMz/fdtd_tmz_output.cpp
     src/fdtd/TMz/fdtd_tmz_simulation.cpp
+    src/fdtd/TMz/backends/fdtd_tmz_backend_cpu.cpp
     src/fdtd/TMz/backends/fdtd_tmz_block.cpp
     src/fdtd/TMz/backends/fdtd_tmz_partition.cpp
     src/fdtd/TMz/backends/fdtd_tmz_stepper.cpp
@@ -50,6 +51,7 @@ target_compile_definitions(fdtd PUBLIC
     FDTD_EXACT=$<BOOL:${FDTD_EXACT}>)
 target_link_libraries(fdtd PRIVATE $<BUILD_INTERFACE:fdtd_warnings>)
 if(FDTD_WITH_OPENMP)
+    target_sources(fdtd PRIVATE src/fdtd/TMz/backends/fdtd_tmz_backend_openmp.cpp)
     target_link_libraries(fdtd PRIVATE OpenMP::OpenMP_CXX)
 endif()
 

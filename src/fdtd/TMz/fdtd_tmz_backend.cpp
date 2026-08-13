@@ -22,6 +22,9 @@
 
 // Backend implementations.
 #include "fdtd/TMz/backends/fdtd_tmz_backend_serial.h"
+#if FDTD_WITH_OPENMP
+#include "fdtd/TMz/backends/fdtd_tmz_backend_openmp.h"
+#endif
 
 // Standard library for algorithms, limits, errors and string building.
 #include <algorithm>
@@ -106,7 +109,11 @@ namespace fdtd::TMz
     // List the backends compiled into this build.
     std::vector<BackendType> available_backends()
     {
-        return {BackendType::Serial};
+        std::vector<BackendType> types{BackendType::Serial};
+        if (FDTD_WITH_OPENMP) {
+            types.push_back(BackendType::OpenMP);
+        }
+        return types;
     }
 
     // Check whether a backend is compiled into this build.
@@ -124,13 +131,17 @@ namespace fdtd::TMz
 
     // Create a backend, or report that it is not compiled in.
     std::unique_ptr<Backend> make_backend(BackendType type, const Grid &grid,
-                                          const BackendOptions &options)
+                                          [[maybe_unused]] const BackendOptions &options)
     {
-        static_cast<void>(options);
         switch (type) {
             case BackendType::Serial:
                 return std::make_unique<SerialBackend>(grid);
             case BackendType::OpenMP:
+#if FDTD_WITH_OPENMP
+                return std::make_unique<OpenMPBackend>(grid, options.omp);
+#else
+                break;
+#endif
             case BackendType::Cuda:
                 break;
         }

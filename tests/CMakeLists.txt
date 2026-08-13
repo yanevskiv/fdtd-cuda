@@ -16,6 +16,7 @@ add_executable(fdtd_tests
     test_fdtd_constants.cpp
     test_fdtd_driver.cpp
     test_fdtd_tmz_backend.cpp
+    test_fdtd_tmz_backend_openmp.cpp
     test_fdtd_tmz_backend_serial.cpp
     test_fdtd_tmz_block.cpp
     test_fdtd_tmz_coeffs.cpp
@@ -40,8 +41,10 @@ target_compile_definitions(fdtd_tests PRIVATE
     FDTD_TEST_PROJECT_VERSION_MINOR=${PROJECT_VERSION_MINOR}
     FDTD_TEST_PROJECT_VERSION_PATCH=${PROJECT_VERSION_PATCH})
 
-# Catch tags such as [unit] and [physics] become CTest labels.
-catch_discover_tests(fdtd_tests ADD_TAGS_AS_LABELS)
+# Catch tags such as [unit] and [physics] become CTest labels. OpenMP threads sleep at a
+# barrier instead of spinning, since parallel tests share the cores.
+catch_discover_tests(fdtd_tests ADD_TAGS_AS_LABELS
+    PROPERTIES ENVIRONMENT "OMP_WAIT_POLICY=passive")
 
 # The fdtd program end to end: help, a bad option, and a small run.
 add_test(NAME "fdtd program help" COMMAND fdtd_cli --help)
