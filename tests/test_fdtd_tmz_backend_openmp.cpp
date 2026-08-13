@@ -57,7 +57,8 @@ namespace
     constexpr double TOLERANCE = FDTD_TEST_TOLERANCE;
 
     // Schedules built so far.
-    constexpr OmpSchedule SCHEDULES[] = {OmpSchedule::Rows};
+    constexpr OmpSchedule SCHEDULES[] = {OmpSchedule::Rows, OmpSchedule::Collapse2,
+                                         OmpSchedule::Tiles};
 
     // Result of a run: the fields and every probe's record.
     struct Run
@@ -233,6 +234,30 @@ TEST_CASE("OpenMP runs are deterministic", "[backend][openmp]")
         CHECK(first.fields == second.fields);
         CHECK(first.probes == second.probes);
     }
+}
+
+// Verify the extremes: more threads than cells for Collapse2, a tile larger than the grid.
+TEST_CASE("OpenMP handles more parts than cells and tiles past the grid", "[backend][openmp]")
+{
+    require_openmp();
+    const Size size{9, 7};
+    const Run serial = run(BackendType::Serial, {}, size, Boundary::Pec);
+
+    OmpOptions ranges;
+    ranges.schedule = OmpSchedule::Collapse2;
+    ranges.threads = 80;
+    const Run many = run(BackendType::OpenMP, ranges, size, Boundary::Pec);
+    CHECK(relative_difference(serial.fields, many.fields) <= bound());
+    CHECK(relative_difference(serial.probes, many.probes) <= bound());
+
+    OmpOptions tiles;
+    tiles.schedule = OmpSchedule::Tiles;
+    tiles.threads = 3;
+    tiles.tile_x = 100;
+    tiles.tile_y = 100;
+    const Run one = run(BackendType::OpenMP, tiles, size, Boundary::Pec);
+    CHECK(relative_difference(serial.fields, one.fields) <= bound());
+    CHECK(relative_difference(serial.probes, one.probes) <= bound());
 }
 
 // Verify that the backend has its name and rejects options with no meaning.

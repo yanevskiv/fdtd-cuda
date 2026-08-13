@@ -44,20 +44,29 @@ namespace fdtd::TMz
             if (options.tile_x == 0 || options.tile_y == 0) {
                 throw std::invalid_argument("OpenMPBackend: tile sides must be positive");
             }
-            if (options.schedule != OmpSchedule::Rows) {
-                throw std::invalid_argument("OpenMPBackend: only the Rows schedule is built");
+            if (options.schedule == OmpSchedule::Tasks) {
+                throw std::invalid_argument("OpenMPBackend: the Tasks schedule is not built");
             }
             return options;
         }
 
-        // Cut the grid into the parts of the schedule.
-        Partition partition_for(const Grid &grid, const OmpOptions &options)
+        // Cut the grid into the parts of the schedule: rows, one range per thread, or tiles.
+        Partition partition_for(const Grid &grid, const OmpOptions &options, std::size_t threads)
         {
-            static_cast<void>(options);
-            return Partition::tiles(grid, grid.nx(), 1);
+            switch (options.schedule) {
+                case OmpSchedule::Rows:
+                    return Partition::tiles(grid, grid.nx(), 1);
+                case OmpSchedule::Collapse2:
+                    return Partition::ranges(grid, threads);
+                case OmpSchedule::Tiles:
+                case OmpSchedule::Tasks:
+                    break;
+            }
+            return Partition::tiles(grid, options.tile_x, options.tile_y);
         }
 
-        // Run every step as an omp for over the parts per phase, in one region or one per phase.
+        // Run every step as a static omp for over the parts per phase, in one region or one per
+        // phase.
         template <bool Simd, OmpRegion Region>
         void run_loops(const Stepper &stepper, std::size_t parts, std::size_t nsteps, int threads)
         {
@@ -106,7 +115,7 @@ namespace fdtd::TMz
         , m_options(checked(options))
         , m_threads(options.threads > 0 ? options.threads
                                         : static_cast<std::size_t>(omp_get_max_threads()))
-        , m_partition(partition_for(grid, options))
+        , m_partition(partition_for(grid, options, m_threads))
     {
         // Empty.
     }
