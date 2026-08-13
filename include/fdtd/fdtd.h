@@ -1,5 +1,5 @@
 /*
- * C++ header that includes the whole fdtd library.
+ * C++ header for the umbrella header of the whole fdtd library.
  *
  * Copyright (C) 2026 Ivan Janevski
  *

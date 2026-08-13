@@ -1,5 +1,5 @@
 /*
- * C++ tests for source waveforms.
+ * C++ file for the source waveform tests.
  *
  * Copyright (C) 2026 Ivan Janevski
  *

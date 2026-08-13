@@ -1,7 +1,6 @@
 /*
  * C++ file for the point source sample.
  *
- *
  * Copyright (C) 2026 Ivan Janevski
  *
  * fdtd-cuda  is free software; you can redistribute it and/or modify it

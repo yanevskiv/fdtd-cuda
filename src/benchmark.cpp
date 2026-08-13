@@ -1,7 +1,6 @@
 /*
  * C++ file for the benchmark program.
  *
- *
  * Copyright (C) 2026 Ivan Janevski
  *
  * fdtd-cuda  is free software; you can redistribute it and/or modify it
