@@ -55,7 +55,7 @@ namespace fdtd
         /** Backends to measure in order; none means every compiled backend. */
         std::vector<TMz::BackendType> backends;
 
-        /** Variants of the backend options to measure; none means "default". */
+        /** OpenMP variant names (see TMz::parse_omp_variant) to measure; none means "default". */
         std::vector<std::string> variants;
 
         /** Thread counts to measure, ignored by serial; none means 1. */
@@ -86,7 +86,7 @@ namespace fdtd
         /** Backend the run was on. */
         TMz::BackendType backend;
 
-        /** Variant of the backend options. */
+        /** Canonical OpenMP variant name, or "default" for the other backends. */
         std::string variant;
 
         /** Threads the run used, 1 for serial. */
@@ -153,16 +153,16 @@ namespace fdtd
      *
      * The workload is a grid of vacuum at Courant number 0.99 with a Gaussian Ez source
      * 12 steps wide at the centre. A configuration is a backend, a variant and a thread
-     * count. Each one is warmed up with untimed runs, then measured repeat times; every
-     * sample builds a new Simulation and times only Simulation::run. A summary line per
-     * configuration goes to the log.
+     * count; serial runs once per size, as "default" with one thread. Each one is warmed up with
+     * untimed runs, then measured repeat times; every sample builds a new Simulation and times only
+     * Simulation::run. A summary line per configuration goes to the log.
      *
      * @param options Settings of the run.
      * @param out Stream for the CSV when no output file is set.
      * @param log Stream for the summary lines.
      * @return The samples in the order written.
      * @throws std::invalid_argument On zero steps or repeats, a backend that is not
-     *         compiled in, an unknown variant, or settings the simulation rejects.
+     *         compiled in, a malformed variant, or settings the simulation rejects.
      * @throws std::runtime_error When the output file cannot be written.
      */
     std::vector<BenchmarkSample> run_benchmark(const BenchmarkOptions &options, std::ostream &out,

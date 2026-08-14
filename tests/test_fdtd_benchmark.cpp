@@ -269,6 +269,31 @@ TEST_CASE("Benchmark resolves ny and serial threads", "[unit][benchmark]")
     CHECK(samples[0].threads == 1);
 }
 
+// Verify one row set per OpenMP variant under its canonical name, serial once as default.
+TEST_CASE("Benchmark runs each OpenMP variant", "[unit][benchmark][openmp]")
+{
+    if (!fdtd::TMz::is_backend_available(BackendType::OpenMP)) {
+        SKIP("the OpenMP backend is not compiled in");
+    }
+    auto options = small();
+    options.repeat = 1;
+    options.backends = {BackendType::Serial, BackendType::OpenMP};
+    options.variants = {"default", "tiles:16x8+simd", "tasks:8x8+simd"};
+    options.threads = {2};
+    std::string csv;
+    const auto samples = run(options, csv);
+    REQUIRE(samples.size() == 4);
+    CHECK(samples[0].backend == BackendType::Serial);
+    CHECK(samples[0].variant == "default");
+    CHECK(samples[1].variant == "rows");
+    CHECK(samples[2].variant == "tiles:16x8+simd");
+    CHECK(samples[3].variant == "tasks:8x8+simd");
+    for (const BenchmarkSample &sample : samples) {
+        CHECK(sample.checksum == samples[0].checksum);
+    }
+    CHECK(samples[3].threads == 2);
+}
+
 // Verify --header-only and --no-header.
 TEST_CASE("Benchmark header flags", "[unit][benchmark]")
 {
@@ -300,6 +325,8 @@ TEST_CASE("Benchmark rejects bad settings", "[unit][benchmark]")
     CHECK_THROWS_AS(run(options, csv), std::invalid_argument);
     options = small();
     options.variants = {"fast"};
+    CHECK_THROWS_AS(run(options, csv), std::invalid_argument);
+    options.variants = {"tiles:0x4"};
     CHECK_THROWS_AS(run(options, csv), std::invalid_argument);
     options = small();
     options.nx = 0;

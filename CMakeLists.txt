@@ -32,6 +32,7 @@ add_library(fdtd
     src/fdtd/TMz/fdtd_tmz_fields.cpp
     src/fdtd/TMz/fdtd_tmz_grid.cpp
     src/fdtd/TMz/fdtd_tmz_material.cpp
+    src/fdtd/TMz/fdtd_tmz_omp_options.cpp
     src/fdtd/TMz/fdtd_tmz_output.cpp
     src/fdtd/TMz/fdtd_tmz_simulation.cpp
     src/fdtd/TMz/backends/fdtd_tmz_backend_cpu.cpp

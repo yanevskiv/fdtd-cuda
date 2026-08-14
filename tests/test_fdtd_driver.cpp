@@ -61,6 +61,8 @@ TEST_CASE("Driver defaults", "[unit][driver]")
     CHECK(options.pml_order == simDefaults.pml_order);
     CHECK(options.pml_reflection == simDefaults.pml_reflection);
     CHECK(options.backend == BackendType::Serial);
+    CHECK(options.threads == 0);
+    CHECK(options.variant == "default");
     CHECK(options.output == "out");
     CHECK_FALSE(options.help);
 }
@@ -113,6 +115,16 @@ TEST_CASE("Driver parses the PML options", "[unit][driver]")
     CHECK(parse({"--pml-thickness=0"}).pml_thickness == 0);
 }
 
+// Verify the OpenMP thread count and variant.
+TEST_CASE("Driver parses the OpenMP options", "[unit][driver]")
+{
+    const auto options =
+        parse({"--backend", "openmp", "--threads", "3", "--variant=tiles:16x8+simd"});
+    CHECK(options.backend == BackendType::OpenMP);
+    CHECK(options.threads == 3);
+    CHECK(options.variant == "tiles:16x8+simd");
+}
+
 // Verify that bad arguments throw.
 TEST_CASE("Driver rejects bad arguments", "[unit][driver]")
 {
@@ -130,6 +142,9 @@ TEST_CASE("Driver rejects bad arguments", "[unit][driver]")
     CHECK_THROWS_AS(parse({"--pml-order", "0"}), std::invalid_argument);
     CHECK_THROWS_AS(parse({"--pml-reflection=nan"}), std::invalid_argument);
     CHECK_THROWS_AS(parse({"--backend", "gpu"}), std::invalid_argument);
+    CHECK_THROWS_AS(parse({"--threads", "two"}), std::invalid_argument);
+    CHECK_THROWS_AS(parse({"--variant", "fast"}), std::invalid_argument);
+    CHECK_THROWS_AS(parse({"--variant", "rows:4x4"}), std::invalid_argument);
     CHECK_THROWS_AS(parse({"--output="}), std::invalid_argument);
     CHECK_THROWS_AS(parse({"--frobnicate", "1"}), std::invalid_argument);
     CHECK_THROWS_AS(parse({"stray"}), std::invalid_argument);
@@ -194,6 +209,34 @@ TEST_CASE("Driver smoke run with the PML", "[unit][driver]")
     CHECK(edgeZero);
     CHECK(last.ez[20 * 48 + 24] != 0);
     CHECK(log.str().find("boundary pml (8 cells)") != std::string::npos);
+    std::filesystem::remove_all(dir);
+}
+
+// Verify that an OpenMP run logs its variant and writes the same probe as a serial run.
+TEST_CASE("Driver smoke run on OpenMP", "[unit][driver][openmp]")
+{
+    if (!fdtd::TMz::is_backend_available(BackendType::OpenMP)) {
+        SKIP("the OpenMP backend is not compiled in");
+    }
+    const auto dir = std::filesystem::temp_directory_path() / "fdtd_test_driver_openmp";
+    std::filesystem::remove_all(dir);
+    auto options = parse({"--nx", "32", "--steps", "20", "--probe", "20,16"});
+    options.output = dir / "serial";
+    std::ostringstream log;
+    fdtd::run_driver(options, log);
+    options = parse({"--nx", "32", "--steps", "20", "--probe", "20,16", "--backend", "openmp",
+                     "--threads", "2", "--variant", "tasks:8x8"});
+    options.output = dir / "openmp";
+    fdtd::run_driver(options, log);
+
+    CHECK(log.str().find("on openmp (tasks:8x8, 2 threads)") != std::string::npos);
+    std::ifstream serial(dir / "serial" / "probe_0.csv");
+    std::ifstream openmp(dir / "openmp" / "probe_0.csv");
+    std::ostringstream a;
+    std::ostringstream b;
+    a << serial.rdbuf();
+    b << openmp.rdbuf();
+    CHECK(a.str() == b.str());
     std::filesystem::remove_all(dir);
 }
 

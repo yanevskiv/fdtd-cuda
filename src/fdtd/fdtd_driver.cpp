@@ -23,7 +23,8 @@
 // Shared argument parsing.
 #include "fdtd/fdtd_args.h"
 
-// The simulation, its output files and the source waveform.
+// The simulation, its output files, the OpenMP variants and the source waveform.
+#include "fdtd/TMz/fdtd_tmz_omp_options.h"
 #include "fdtd/TMz/fdtd_tmz_output.h"
 #include "fdtd/TMz/fdtd_tmz_simulation.h"
 #include "fdtd/TMz/fdtd_tmz_waveform.h"
@@ -117,6 +118,11 @@ namespace fdtd
                 options.pml_reflection = parse_positive_arg(name, value);
             } else if (name == "--backend") {
                 options.backend = parse_backend_arg(name, value);
+            } else if (name == "--threads") {
+                options.threads = parse_size_arg(name, value);
+            } else if (name == "--variant") {
+                TMz::parse_omp_variant(value);
+                options.variant = std::string(value);
             } else if (name == "--output") {
                 if (value.empty()) {
                     throw std::invalid_argument("--output: empty directory");
@@ -201,6 +207,9 @@ namespace fdtd
         usage << "  --pml-reflection R    Target PML reflection at normal incidence, in\n";
         usage << "                        (0, 1) (default: 1e-6)\n";
         usage << "  --backend B           Backend, serial, openmp or cuda (default: serial)\n";
+        usage << "  --threads N           OpenMP threads, 0 for the OpenMP default (default: 0)\n";
+        usage << "  --variant V           OpenMP variant, SCHEDULE[:WxH][+simd][+phase] with\n";
+        usage << "                        rows, collapse2, tiles or tasks (default: default)\n";
         usage << "  --output DIR          Directory for the files (default: out)\n";
         usage << "  -h, --help            Show this message and exit\n";
         usage << "  -v, --version         Show the version and exit\n";
@@ -224,6 +233,8 @@ namespace fdtd
         simOptions.pml_order = options.pml_order;
         simOptions.pml_reflection = options.pml_reflection;
         simOptions.backend = options.backend;
+        simOptions.omp = TMz::parse_omp_variant(options.variant);
+        simOptions.omp.threads = options.threads;
         const std::size_t ny = options.ny > 0 ? options.ny : options.nx;
         TMz::Simulation sim(options.nx, ny, simOptions);
 
@@ -250,6 +261,16 @@ namespace fdtd
         log << options.steps;
         log << " steps on ";
         log << TMz::backend_name(options.backend);
+        if (options.backend == TMz::BackendType::OpenMP) {
+            log << " (";
+            log << TMz::omp_variant_name(simOptions.omp);
+            if (options.threads > 0) {
+                log << ", ";
+                log << options.threads;
+                log << " threads";
+            }
+            log << ")";
+        }
         log << ", boundary ";
         log << describe_boundary(options);
         log << '\n';

@@ -21,6 +21,8 @@
 #define FDTD_TMZ_OMP_OPTIONS_H
 
 #include <cstddef>
+#include <string>
+#include <string_view>
 
 /** Namespace for the fdtd library. */
 namespace fdtd
@@ -73,6 +75,31 @@ namespace fdtd
             /** Where the parallel regions open; Tasks takes Run only. */
             OmpRegion region = OmpRegion::Run;
         };
+
+        /**
+         * Read OpenMP options from a variant name, `<schedule>[:<W>x<H>][+simd][+phase]`.
+         *
+         * The schedule is `rows`, `collapse2`, `tiles` or `tasks`; `:WxH` sets the tile size,
+         * for `tiles` and `tasks` only; `+simd` and `+phase` turn on SIMD and a region per
+         * phase, each once, in either order. `default` names the default options. The thread
+         * count is not part of the name and stays 0.
+         *
+         * @param name Variant name, as `tiles:64x16+simd`.
+         * @return The options.
+         * @throws std::invalid_argument When the name is malformed.
+         */
+        OmpOptions parse_omp_variant(std::string_view name);
+
+        /**
+         * Canonical variant name of OpenMP options, which parse_omp_variant() reads back.
+         *
+         * The tile size is written for `tiles` and `tasks` only, then `+simd`, then `+phase`;
+         * the thread count is left out.
+         *
+         * @param options Options to name.
+         * @return The name, as `tasks:128x32+simd`.
+         */
+        std::string omp_variant_name(const OmpOptions &options);
     }
 }
 

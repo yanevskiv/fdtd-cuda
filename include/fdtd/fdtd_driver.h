@@ -102,6 +102,12 @@ namespace fdtd
         /** Backend to run on. */
         TMz::BackendType backend = TMz::BackendType::Serial;
 
+        /** Thread count of the OpenMP backend, 0 for the OpenMP default. */
+        std::size_t threads = 0;
+
+        /** OpenMP variant name, as TMz::parse_omp_variant reads it. */
+        std::string variant = "default";
+
         /** Directory the files are written to. */
         std::filesystem::path output = "out";
 

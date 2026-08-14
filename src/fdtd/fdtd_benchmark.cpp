@@ -23,7 +23,8 @@
 // Shared argument parsing.
 #include "fdtd/fdtd_args.h"
 
-// The simulation and the source waveform.
+// The simulation, the OpenMP variants and the source waveform.
+#include "fdtd/TMz/fdtd_tmz_omp_options.h"
 #include "fdtd/TMz/fdtd_tmz_simulation.h"
 #include "fdtd/TMz/fdtd_tmz_waveform.h"
 #include "fdtd/fdtd_float.h"
@@ -118,10 +119,12 @@ namespace fdtd
                 }
             }
             for (const std::string &variant : variants) {
-                if (variant != "default") {
+                try {
+                    TMz::parse_omp_variant(variant);
+                } catch (const std::invalid_argument &error) {
                     std::ostringstream message;
-                    message << "run_benchmark: unknown variant: ";
-                    message << variant;
+                    message << "run_benchmark: ";
+                    message << error.what();
                     throw std::invalid_argument(message.str());
                 }
             }
@@ -135,6 +138,7 @@ namespace fdtd
             TMz::Simulation::Options simOptions;
             simOptions.boundary = options.boundary;
             simOptions.backend = backend;
+            simOptions.omp = TMz::parse_omp_variant(variant);
             simOptions.omp.threads = threads;
             TMz::Simulation sim(options.nx, ny, simOptions);
             sim.add_source(options.nx / 2, ny / 2, TMz::Component::Ez,
@@ -152,7 +156,9 @@ namespace fdtd
             const double seconds = std::chrono::duration<double>(stop - start).count();
             return {
                 .backend = backend,
-                .variant = variant,
+                .variant = backend == TMz::BackendType::OpenMP
+                               ? TMz::omp_variant_name(simOptions.omp)
+                               : std::string("default"),
                 .threads = threads,
                 .nx = options.nx,
                 .ny = ny,
@@ -273,8 +279,9 @@ namespace fdtd
         usage << "                        (default: 0.1)\n";
         usage << "  --backend B           Backend, serial, openmp, cuda or all; repeatable\n";
         usage << "                        (default: all)\n";
-        usage << "  --variant V           Variant of the backend options; repeatable\n";
-        usage << "                        (default: default)\n";
+        usage << "  --variant V           OpenMP variant, SCHEDULE[:WxH][+simd][+phase] with\n";
+        usage << "                        rows, collapse2, tiles or tasks, or default;\n";
+        usage << "                        repeatable, ignored by serial (default: default)\n";
         usage << "  --threads N           Thread count, ignored by serial; repeatable\n";
         usage << "                        (default: 1)\n";
         usage << "  --boundary B          Outer boundary, pec, pmc or pml (default: pml)\n";
@@ -338,6 +345,7 @@ namespace fdtd
         const std::vector<std::size_t> threadCounts =
             options.threads.empty() ? std::vector<std::size_t>{1} : options.threads;
         const std::vector<std::size_t> serialThreads{1};
+        const std::vector<std::string> serialVariants{"default"};
         const std::size_t ny = options.ny > 0 ? options.ny : options.nx;
         if (!options.header_only) {
             check(options, backends, variants);
@@ -366,7 +374,9 @@ namespace fdtd
         for (const auto backend : backends) {
             const std::vector<std::size_t> &counts =
                 backend == TMz::BackendType::Serial ? serialThreads : threadCounts;
-            for (const std::string &variant : variants) {
+            const std::vector<std::string> &names =
+                backend == TMz::BackendType::Serial ? serialVariants : variants;
+            for (const std::string &variant : names) {
                 for (const std::size_t threads : counts) {
                     warm_up(options, ny, backend, variant, threads);
                     const std::size_t first = samples.size();
