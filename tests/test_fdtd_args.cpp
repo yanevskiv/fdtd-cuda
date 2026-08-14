@@ -22,16 +22,28 @@
 #include "fdtd/fdtd_args.h"
 
 #include <stdexcept>
+#include <string>
 #include <string_view>
 #include <vector>
 
 using fdtd::Argument;
 using fdtd::split_arguments;
+using fdtd::TMz::BackendType;
 using fdtd::TMz::Boundary;
-using fdtd::TMz::backends::BackendType;
+using fdtd::TMz::OmpRegion;
+using fdtd::TMz::OmpSchedule;
+using fdtd::TMz::Simulation;
 
 namespace
 {
+    // Parse a variant name into default options.
+    Simulation::Options variant(std::string_view text)
+    {
+        Simulation::Options options;
+        fdtd::parse_omp_variant_arg("--variant", text, options);
+        return options;
+    }
+
     // Split a list of arguments with -h and --quiet as the flags.
     std::vector<Argument> split(std::vector<std::string_view> args)
     {
@@ -111,4 +123,58 @@ TEST_CASE("Argument names parse boundaries and backends", "[unit][args]")
     CHECK(fdtd::parse_backend_arg("--b", "openmp") == BackendType::OpenMP);
     CHECK(fdtd::parse_backend_arg("--b", "cuda") == BackendType::Cuda);
     CHECK_THROWS_AS(fdtd::parse_backend_arg("--b", "gpu"), std::invalid_argument);
+}
+
+// Verify that names read into options and canonical names read back to the same options.
+TEST_CASE("OpenMP variant names round-trip", "[unit][args]")
+{
+    const Simulation::Options rows = variant("default");
+    CHECK(rows.omp_schedule == OmpSchedule::Rows);
+    CHECK(fdtd::omp_variant_name(rows) == "rows+simd");
+
+    const Simulation::Options tiles = variant("tiles:64x16+phase+simd");
+    CHECK(tiles.omp_schedule == OmpSchedule::Tiles);
+    CHECK(tiles.omp_tile_x == 64);
+    CHECK(tiles.omp_tile_y == 16);
+    CHECK(tiles.omp_simd);
+    CHECK(tiles.omp_region == OmpRegion::Phase);
+    CHECK(tiles.omp_threads == 0);
+    CHECK(fdtd::omp_variant_name(tiles) == "tiles:64x16+simd+phase");
+
+    for (const std::string name : {"rows", "rows+simd", "collapse2+phase", "tiles:128x32",
+                                   "tasks:8x4+simd", "collapse2+simd+phase"}) {
+        CAPTURE(name);
+        CHECK(fdtd::omp_variant_name(variant(name)) == name);
+    }
+    CHECK(fdtd::omp_variant_name(variant("tasks")) == "tasks:128x32");
+}
+
+// Verify that a variant sets the omp_ fields but the thread count and the other settings.
+TEST_CASE("OpenMP variant names leave the other options alone", "[unit][args]")
+{
+    Simulation::Options options;
+    options.omp_threads = 3;
+    options.boundary = Boundary::Pml;
+    options.omp_tile_x = 7;
+    fdtd::parse_omp_variant_arg("--variant", "rows", options);
+    CHECK(options.omp_threads == 3);
+    CHECK(options.boundary == Boundary::Pml);
+    CHECK(options.omp_tile_x == 128);
+    CHECK_FALSE(options.omp_simd);
+}
+
+// Verify that malformed names throw and leave the options unchanged.
+TEST_CASE("OpenMP variant names reject malformed text", "[unit][args]")
+{
+    for (const char *name :
+         {"", "fast", "Rows", "rows:", "rows:4x4", "collapse2:4x4", "tiles:", "tiles:4",
+          "tiles:0x4", "tiles:4x0", "tiles:4x-1", "tiles:4x4x4", "tiles:ax4", "rows+", "rows+fast",
+          "rows+simd+simd", "rows+phase+phase", "+simd", "default+simd"}) {
+        CAPTURE(name);
+        Simulation::Options options;
+        options.omp_schedule = OmpSchedule::Tasks;
+        CHECK_THROWS_AS(fdtd::parse_omp_variant_arg("--variant", name, options),
+                        std::invalid_argument);
+        CHECK(options.omp_schedule == OmpSchedule::Tasks);
+    }
 }

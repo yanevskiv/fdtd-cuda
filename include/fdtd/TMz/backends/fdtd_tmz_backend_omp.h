@@ -22,8 +22,8 @@
 
 #include "fdtd/TMz/backends/cpu/fdtd_tmz_backend_cpu_base.h"
 #include "fdtd/TMz/backends/cpu/fdtd_tmz_backend_cpu_partition.h"
-#include "fdtd/TMz/backends/fdtd_tmz_backend.h"
-#include "fdtd/TMz/fdtd_tmz_omp_options.h"
+#include "fdtd/TMz/fdtd_tmz_backend.h"
+#include "fdtd/TMz/fdtd_tmz_simulation.h"
 
 #include <cstddef>
 #include <span>
@@ -54,11 +54,11 @@ namespace fdtd
                  * Create the backend with zeroed fields.
                  *
                  * @param grid Grid the backend works on.
-                 * @param options Settings of the backend.
+                 * @param options Settings of a simulation; the backend reads the omp_ fields.
                  * @throws std::invalid_argument When a tile side is zero, or the schedule is
                  *         Tasks with a region per phase.
                  */
-                OmpBackend(const Grid &grid, const OmpOptions &options);
+                OmpBackend(const Grid &grid, const Simulation::Options &options);
 
                 /**
                  * Short lowercase name of the backend.
@@ -79,7 +79,7 @@ namespace fdtd
                  *
                  * @return The options it was made with.
                  */
-                const OmpOptions &options() const noexcept;
+                const Simulation::Options &options() const noexcept;
 
                 /**
                  * Thread count the runs ask for: the option, or the OpenMP default for 0.
@@ -101,7 +101,7 @@ namespace fdtd
 
             private:
                 /** Settings of the backend. */
-                OmpOptions m_options;
+                Simulation::Options m_options;
 
                 /** Thread count of the runs. */
                 std::size_t m_threads;

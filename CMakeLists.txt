@@ -26,15 +26,14 @@ option(FDTD_EXACT "Build the library without contracted multiply-adds, for bit-f
 
 # The library.
 add_library(fdtd
+    src/fdtd/TMz/fdtd_tmz_backend.cpp
     src/fdtd/TMz/fdtd_tmz_coeffs.cpp
     src/fdtd/TMz/fdtd_tmz_fields.cpp
     src/fdtd/TMz/fdtd_tmz_grid.cpp
     src/fdtd/TMz/fdtd_tmz_material.cpp
-    src/fdtd/TMz/fdtd_tmz_omp_options.cpp
     src/fdtd/TMz/fdtd_tmz_output.cpp
     src/fdtd/TMz/fdtd_tmz_simulation.cpp
     src/fdtd/TMz/fdtd_tmz_waveform.cpp
-    src/fdtd/TMz/backends/fdtd_tmz_backend.cpp
     src/fdtd/TMz/backends/fdtd_tmz_backend_serial.cpp
     src/fdtd/TMz/backends/cpu/fdtd_tmz_backend_cpu_base.cpp
     src/fdtd/TMz/backends/cpu/fdtd_tmz_backend_cpu_block.cpp
@@ -154,9 +153,7 @@ endif()
 
 # Installation and package export.
 install(DIRECTORY include/ DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}
-    PATTERN cpu EXCLUDE
-    PATTERN fdtd_tmz_backend_omp.h EXCLUDE
-    PATTERN fdtd_tmz_backend_serial.h EXCLUDE
+    PATTERN backends EXCLUDE
     PATTERN fdtd_args.h EXCLUDE
     PATTERN fdtd_benchmark.h EXCLUDE
     PATTERN fdtd_driver.h EXCLUDE)

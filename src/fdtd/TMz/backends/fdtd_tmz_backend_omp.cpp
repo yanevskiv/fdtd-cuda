@@ -44,22 +44,23 @@ namespace fdtd::TMz::backends
         constexpr std::size_t TASK_WINDOW = 4096;
 
         // Check the options before anything is built from them.
-        const OmpOptions &checked(const OmpOptions &options)
+        const Simulation::Options &checked(const Simulation::Options &options)
         {
-            if (options.tile_x == 0 || options.tile_y == 0) {
+            if (options.omp_tile_x == 0 || options.omp_tile_y == 0) {
                 throw std::invalid_argument("OmpBackend: tile sides must be positive");
             }
-            if (options.schedule == OmpSchedule::Tasks && options.region == OmpRegion::Phase) {
+            if (options.omp_schedule == OmpSchedule::Tasks &&
+                options.omp_region == OmpRegion::Phase) {
                 throw std::invalid_argument("OmpBackend: Tasks run in one region per run");
             }
             return options;
         }
 
         // Cut the grid into the parts of the schedule: rows, one range per thread, or tiles.
-        cpu::Partition partition_for(const Grid &grid, const OmpOptions &options,
+        cpu::Partition partition_for(const Grid &grid, const Simulation::Options &options,
                                      std::size_t threads)
         {
-            switch (options.schedule) {
+            switch (options.omp_schedule) {
                 case OmpSchedule::Rows:
                     return cpu::Partition::tiles(grid, grid.nx(), 1);
                 case OmpSchedule::Collapse2:
@@ -68,7 +69,7 @@ namespace fdtd::TMz::backends
                 case OmpSchedule::Tasks:
                     break;
             }
-            return cpu::Partition::tiles(grid, options.tile_x, options.tile_y);
+            return cpu::Partition::tiles(grid, options.omp_tile_x, options.omp_tile_y);
         }
 
         // Run every step as a static omp for over the parts per phase, in one region or one per
@@ -151,11 +152,11 @@ namespace fdtd::TMz::backends
     }
 
     // Check the options, fix the thread count and cut the grid for the schedule.
-    OmpBackend::OmpBackend(const Grid &grid, const OmpOptions &options)
+    OmpBackend::OmpBackend(const Grid &grid, const Simulation::Options &options)
         : cpu::CpuBase(grid)
         , m_options(checked(options))
-        , m_threads(options.threads > 0 ? options.threads
-                                        : static_cast<std::size_t>(omp_get_max_threads()))
+        , m_threads(options.omp_threads > 0 ? options.omp_threads
+                                            : static_cast<std::size_t>(omp_get_max_threads()))
         , m_partition(partition_for(grid, options, m_threads))
     {
         // Empty.
@@ -174,7 +175,7 @@ namespace fdtd::TMz::backends
     }
 
     // Return the options.
-    const OmpOptions &OmpBackend::options() const noexcept
+    const Simulation::Options &OmpBackend::options() const noexcept
     {
         return m_options;
     }
@@ -195,15 +196,15 @@ namespace fdtd::TMz::backends
                                    points, values, probes(), records);
         const int threads = static_cast<int>(m_threads);
         const std::size_t parts = m_partition.size();
-        const bool tasks = m_options.schedule == OmpSchedule::Tasks;
-        if (tasks && m_options.simd) {
+        const bool tasks = m_options.omp_schedule == OmpSchedule::Tasks;
+        if (tasks && m_options.omp_simd) {
             run_tasks<true>(stepper, m_partition, nsteps, threads);
         } else if (tasks) {
             run_tasks<false>(stepper, m_partition, nsteps, threads);
-        } else if (m_options.simd) {
-            run_loops<true>(stepper, parts, nsteps, threads, m_options.region);
+        } else if (m_options.omp_simd) {
+            run_loops<true>(stepper, parts, nsteps, threads, m_options.omp_region);
         } else {
-            run_loops<false>(stepper, parts, nsteps, threads, m_options.region);
+            run_loops<false>(stepper, parts, nsteps, threads, m_options.omp_region);
         }
     }
 }

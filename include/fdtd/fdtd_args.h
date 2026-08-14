@@ -20,11 +20,13 @@
 #ifndef FDTD_ARGS_H
 #define FDTD_ARGS_H
 
-#include "fdtd/TMz/backends/fdtd_tmz_backend.h"
+#include "fdtd/TMz/fdtd_tmz_backend.h"
 #include "fdtd/TMz/fdtd_tmz_boundary.h"
+#include "fdtd/TMz/fdtd_tmz_simulation.h"
 
 #include <cstddef>
 #include <span>
+#include <string>
 #include <string_view>
 #include <vector>
 
@@ -111,7 +113,35 @@ namespace fdtd
      * @return The backend type.
      * @throws std::invalid_argument On another name.
      */
-    TMz::backends::BackendType parse_backend_arg(std::string_view name, std::string_view text);
+    TMz::BackendType parse_backend_arg(std::string_view name, std::string_view text);
+
+    /**
+     * Parse an OpenMP variant name, `<schedule>[:<W>x<H>][+simd][+phase]`, into omp_ fields.
+     *
+     * The schedule is `rows`, `collapse2`, `tiles` or `tasks`; `:WxH` sets the tile size,
+     * for `tiles` and `tasks` only; `+simd` and `+phase` turn on SIMD and a region per
+     * phase, each once, in either order. `default` names the default settings. The thread
+     * count is not part of the name: omp_threads is left as it is.
+     *
+     * @param name Option name for the error message.
+     * @param text Variant name, as `tiles:64x16+simd`.
+     * @param options Options whose omp_ fields are set; unchanged on an error.
+     * @throws std::invalid_argument When the name is malformed.
+     */
+    void parse_omp_variant_arg(std::string_view name, std::string_view text,
+                               TMz::Simulation::Options &options);
+
+    /**
+     * Canonical OpenMP variant name of simulation options, which parse_omp_variant_arg() reads
+     * back.
+     *
+     * The tile size is written for `tiles` and `tasks` only, then `+simd`, then `+phase`;
+     * the thread count is left out.
+     *
+     * @param options Options to name.
+     * @return The name, as `tasks:128x32+simd`.
+     */
+    std::string omp_variant_name(const TMz::Simulation::Options &options);
 }
 
 #endif

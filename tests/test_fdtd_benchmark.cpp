@@ -34,8 +34,8 @@
 
 using fdtd::BenchmarkOptions;
 using fdtd::BenchmarkSample;
+using fdtd::TMz::BackendType;
 using fdtd::TMz::Boundary;
-using fdtd::TMz::backends::BackendType;
 
 namespace
 {
@@ -163,9 +163,9 @@ TEST_CASE("Benchmark parses every option", "[unit][benchmark]")
 // Verify that "all" adds every compiled backend once, after any given before it.
 TEST_CASE("Benchmark backend all lists the registry", "[unit][benchmark]")
 {
-    CHECK(parse({"--backend", "all"}).backends == fdtd::TMz::backends::available_backends());
+    CHECK(parse({"--backend", "all"}).backends == fdtd::TMz::available_backends());
     CHECK(parse({"--backend", "all", "--backend", "serial"}).backends ==
-          fdtd::TMz::backends::available_backends());
+          fdtd::TMz::available_backends());
     CHECK(parse({"--backend", "serial", "--backend", "all"}).backends.front() ==
           BackendType::Serial);
 }
@@ -272,7 +272,7 @@ TEST_CASE("Benchmark resolves ny and serial threads", "[unit][benchmark]")
 // Verify one row set per OpenMP variant under its canonical name, serial once as default.
 TEST_CASE("Benchmark runs each OpenMP variant", "[unit][benchmark][openmp]")
 {
-    if (!fdtd::TMz::backends::is_backend_available(BackendType::OpenMP)) {
+    if (!fdtd::TMz::is_backend_available(BackendType::OpenMP)) {
         SKIP("the OpenMP backend is not compiled in");
     }
     auto options = small();
@@ -308,7 +308,7 @@ TEST_CASE("Benchmark header flags", "[unit][benchmark]")
     options.no_header = true;
     options.repeat = 1;
     const auto samples = run(options, csv);
-    REQUIRE(samples.size() == fdtd::TMz::backends::available_backends().size());
+    REQUIRE(samples.size() == fdtd::TMz::available_backends().size());
     CHECK(lines(csv).size() == samples.size());
     CHECK(lines(csv).front() == fdtd::format_benchmark_row(samples.front()));
 }
@@ -335,7 +335,7 @@ TEST_CASE("Benchmark rejects bad settings", "[unit][benchmark]")
     options.nx = 30;
     CHECK_THROWS_AS(run(options, csv), std::invalid_argument);
     for (const auto type : {BackendType::OpenMP, BackendType::Cuda}) {
-        if (!fdtd::TMz::backends::is_backend_available(type)) {
+        if (!fdtd::TMz::is_backend_available(type)) {
             options = small();
             options.backends = {type};
             CHECK_THROWS_AS(run(options, csv), std::invalid_argument);

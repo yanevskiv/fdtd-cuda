@@ -40,8 +40,8 @@ using fdtd::TMz::Component;
 using fdtd::TMz::Fields;
 using fdtd::TMz::Grid;
 using fdtd::TMz::Material;
-using fdtd::TMz::backends::PointInjection;
-using fdtd::TMz::backends::PointProbe;
+using fdtd::TMz::PointInjection;
+using fdtd::TMz::PointProbe;
 using fdtd::TMz::backends::cpu::Partition;
 using fdtd::TMz::backends::cpu::Stepper;
 

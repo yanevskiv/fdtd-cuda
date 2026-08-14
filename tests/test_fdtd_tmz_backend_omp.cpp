@@ -22,8 +22,7 @@
 #include <catch2/generators/catch_generators.hpp>
 
 // Project headers under test.
-#include "fdtd/TMz/backends/fdtd_tmz_backend.h"
-#include "fdtd/TMz/fdtd_tmz_omp_options.h"
+#include "fdtd/TMz/fdtd_tmz_backend.h"
 #include "fdtd/TMz/fdtd_tmz_simulation.h"
 #include "fdtd/TMz/fdtd_tmz_waveform.h"
 
@@ -39,13 +38,12 @@
 
 // Shorthand for the types under test.
 using fdtd::FloatType;
+using fdtd::TMz::BackendType;
 using fdtd::TMz::Boundary;
 using fdtd::TMz::Component;
-using fdtd::TMz::OmpOptions;
 using fdtd::TMz::OmpRegion;
 using fdtd::TMz::OmpSchedule;
 using fdtd::TMz::Simulation;
-using fdtd::TMz::backends::BackendType;
 
 // Helpers private to this file.
 namespace
@@ -87,11 +85,9 @@ namespace
     }
 
     // Run a pulse with an H source and probes on a backend, and collect the fields and records.
-    Run run(BackendType backend, const OmpOptions &omp, Size size, Boundary boundary)
+    Run run(BackendType backend, Simulation::Options opts, Size size, Boundary boundary)
     {
-        Simulation::Options opts;
         opts.backend = backend;
-        opts.omp = omp;
         opts.boundary = boundary;
         opts.pml_thickness = 6;
         Simulation sim(size.nx, size.ny, opts);
@@ -148,22 +144,22 @@ namespace
     }
 
     // Every combination of schedule, SIMD and region at a thread count, as options.
-    std::vector<OmpOptions> combinations(std::size_t threads)
+    std::vector<Simulation::Options> combinations(std::size_t threads)
     {
-        std::vector<OmpOptions> all;
+        std::vector<Simulation::Options> all;
         for (const OmpSchedule schedule : SCHEDULES) {
             for (const bool simd : {false, true}) {
                 for (const OmpRegion region : {OmpRegion::Run, OmpRegion::Phase}) {
                     if (schedule == OmpSchedule::Tasks && region == OmpRegion::Phase) {
                         continue;
                     }
-                    OmpOptions omp;
-                    omp.schedule = schedule;
-                    omp.simd = simd;
-                    omp.region = region;
-                    omp.threads = threads;
-                    omp.tile_x = 16;
-                    omp.tile_y = 8;
+                    Simulation::Options omp;
+                    omp.omp_schedule = schedule;
+                    omp.omp_simd = simd;
+                    omp.omp_region = region;
+                    omp.omp_threads = threads;
+                    omp.omp_tile_x = 16;
+                    omp.omp_tile_y = 8;
                     all.push_back(omp);
                 }
             }
@@ -174,7 +170,7 @@ namespace
     // Skip the test when the OpenMP backend is not compiled in.
     void require_openmp()
     {
-        if (!fdtd::TMz::backends::is_backend_available(BackendType::OpenMP)) {
+        if (!fdtd::TMz::is_backend_available(BackendType::OpenMP)) {
             SKIP("the OpenMP backend is not compiled in");
         }
     }
@@ -189,9 +185,9 @@ TEST_CASE("OpenMP matches serial", "[backend][openmp]")
     const Run serial = run(BackendType::Serial, {}, size, boundary);
 
     for (const std::size_t threads : thread_counts()) {
-        for (const OmpOptions &omp : combinations(threads)) {
-            INFO("schedule " << int(omp.schedule) << ", simd " << omp.simd << ", region "
-                             << int(omp.region) << ", threads " << threads);
+        for (const Simulation::Options &omp : combinations(threads)) {
+            INFO("schedule " << int(omp.omp_schedule) << ", simd " << omp.omp_simd << ", region "
+                             << int(omp.omp_region) << ", threads " << threads);
             const Run openmp = run(BackendType::OpenMP, omp, size, boundary);
             CHECK(relative_difference(serial.fields, openmp.fields) <= bound());
             CHECK(relative_difference(serial.probes, openmp.probes) <= bound());
@@ -211,9 +207,9 @@ TEST_CASE("OpenMP matches serial bit for bit", "[backend][openmp][exact]")
     const Run serial = run(BackendType::Serial, {}, size, boundary);
 
     for (const std::size_t threads : thread_counts()) {
-        for (const OmpOptions &omp : combinations(threads)) {
-            INFO("schedule " << int(omp.schedule) << ", simd " << omp.simd << ", region "
-                             << int(omp.region) << ", threads " << threads);
+        for (const Simulation::Options &omp : combinations(threads)) {
+            INFO("schedule " << int(omp.omp_schedule) << ", simd " << omp.omp_simd << ", region "
+                             << int(omp.omp_region) << ", threads " << threads);
             const Run openmp = run(BackendType::OpenMP, omp, size, boundary);
             CHECK(serial.fields == openmp.fields);
             CHECK(serial.probes == openmp.probes);
@@ -226,9 +222,9 @@ TEST_CASE("OpenMP runs are deterministic", "[backend][openmp]")
 {
     require_openmp();
     const Size size{67, 45};
-    for (const OmpOptions &omp : combinations(thread_counts().back())) {
-        INFO("schedule " << int(omp.schedule) << ", simd " << omp.simd << ", region "
-                         << int(omp.region));
+    for (const Simulation::Options &omp : combinations(thread_counts().back())) {
+        INFO("schedule " << int(omp.omp_schedule) << ", simd " << omp.omp_simd << ", region "
+                         << int(omp.omp_region));
         const Run first = run(BackendType::OpenMP, omp, size, Boundary::Pml);
         const Run second = run(BackendType::OpenMP, omp, size, Boundary::Pml);
         CHECK(first.fields == second.fields);
@@ -243,27 +239,27 @@ TEST_CASE("OpenMP handles more parts than cells and tiles past the grid", "[back
     const Size size{9, 7};
     const Run serial = run(BackendType::Serial, {}, size, Boundary::Pec);
 
-    OmpOptions ranges;
-    ranges.schedule = OmpSchedule::Collapse2;
-    ranges.threads = 80;
+    Simulation::Options ranges;
+    ranges.omp_schedule = OmpSchedule::Collapse2;
+    ranges.omp_threads = 80;
     const Run many = run(BackendType::OpenMP, ranges, size, Boundary::Pec);
     CHECK(relative_difference(serial.fields, many.fields) <= bound());
     CHECK(relative_difference(serial.probes, many.probes) <= bound());
 
-    OmpOptions tiles;
-    tiles.schedule = OmpSchedule::Tiles;
-    tiles.threads = 3;
-    tiles.tile_x = 100;
-    tiles.tile_y = 100;
+    Simulation::Options tiles;
+    tiles.omp_schedule = OmpSchedule::Tiles;
+    tiles.omp_threads = 3;
+    tiles.omp_tile_x = 100;
+    tiles.omp_tile_y = 100;
     const Run one = run(BackendType::OpenMP, tiles, size, Boundary::Pec);
     CHECK(relative_difference(serial.fields, one.fields) <= bound());
     CHECK(relative_difference(serial.probes, one.probes) <= bound());
 
-    OmpOptions cells;
-    cells.schedule = OmpSchedule::Tasks;
-    cells.threads = 4;
-    cells.tile_x = 1;
-    cells.tile_y = 1;
+    Simulation::Options cells;
+    cells.omp_schedule = OmpSchedule::Tasks;
+    cells.omp_threads = 4;
+    cells.omp_tile_x = 1;
+    cells.omp_tile_y = 1;
     const Run tiny = run(BackendType::OpenMP, cells, size, Boundary::Pec);
     CHECK(relative_difference(serial.fields, tiny.fields) <= bound());
     CHECK(relative_difference(serial.probes, tiny.probes) <= bound());
@@ -274,21 +270,21 @@ TEST_CASE("OpenMP backend checks its options", "[unit][backend][openmp]")
 {
     require_openmp();
     const fdtd::TMz::Grid grid(16, 16);
-    fdtd::TMz::backends::BackendOptions options;
-    const auto backend = fdtd::TMz::backends::make_backend(BackendType::OpenMP, grid, options);
+    Simulation::Options options;
+    const auto backend = fdtd::TMz::make_backend(BackendType::OpenMP, grid, options);
     CHECK(backend->name() == "openmp");
     CHECK(backend->type() == BackendType::OpenMP);
 
-    options.omp.tile_x = 0;
-    CHECK_THROWS_AS(fdtd::TMz::backends::make_backend(BackendType::OpenMP, grid, options),
+    options.omp_tile_x = 0;
+    CHECK_THROWS_AS(fdtd::TMz::make_backend(BackendType::OpenMP, grid, options),
                     std::invalid_argument);
-    options.omp.tile_x = 8;
-    options.omp.tile_y = 0;
-    CHECK_THROWS_AS(fdtd::TMz::backends::make_backend(BackendType::OpenMP, grid, options),
+    options.omp_tile_x = 8;
+    options.omp_tile_y = 0;
+    CHECK_THROWS_AS(fdtd::TMz::make_backend(BackendType::OpenMP, grid, options),
                     std::invalid_argument);
-    options.omp.tile_y = 8;
-    options.omp.schedule = OmpSchedule::Tasks;
-    options.omp.region = OmpRegion::Phase;
-    CHECK_THROWS_AS(fdtd::TMz::backends::make_backend(BackendType::OpenMP, grid, options),
+    options.omp_tile_y = 8;
+    options.omp_schedule = OmpSchedule::Tasks;
+    options.omp_region = OmpRegion::Phase;
+    CHECK_THROWS_AS(fdtd::TMz::make_backend(BackendType::OpenMP, grid, options),
                     std::invalid_argument);
 }

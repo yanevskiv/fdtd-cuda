@@ -34,13 +34,15 @@
 // Shorthand for the types under test.
 using Catch::Matchers::WithinRel;
 using fdtd::FloatType;
+using fdtd::TMz::BackendType;
 using fdtd::TMz::Boundary;
 using fdtd::TMz::Component;
 using fdtd::TMz::courant_dt;
 using fdtd::TMz::Grid;
 using fdtd::TMz::Material;
+using fdtd::TMz::OmpRegion;
+using fdtd::TMz::OmpSchedule;
 using fdtd::TMz::Simulation;
-using fdtd::TMz::backends::BackendType;
 
 // A waveform that returns the time it is sampled at.
 static FloatType ramp(FloatType t)
@@ -86,6 +88,31 @@ TEST_CASE("Simulation applies its options", "[unit][simulation]")
     CHECK_THAT(sim.dt(), WithinRel(courant_dt(sim.grid(), 0.5), 1e-12));
     CHECK(sim.backend().boundary() == Boundary::Pmc);
     CHECK(sim.options().courant == 0.5);
+}
+
+// Verify the OpenMP defaults: rows, the OpenMP thread count, 128 by 32 tiles, SIMD, one region.
+TEST_CASE("Simulation OpenMP defaults", "[unit][simulation]")
+{
+    const Simulation::Options opts;
+
+    CHECK(opts.omp_schedule == OmpSchedule::Rows);
+    CHECK(opts.omp_threads == 0);
+    CHECK(opts.omp_tile_x == 128);
+    CHECK(opts.omp_tile_y == 32);
+    CHECK(opts.omp_simd);
+    CHECK(opts.omp_region == OmpRegion::Run);
+}
+
+// Verify that a simulation carries the OpenMP settings it was given.
+TEST_CASE("Simulation keeps the OpenMP settings", "[unit][simulation]")
+{
+    Simulation::Options opts;
+    opts.omp_schedule = OmpSchedule::Tiles;
+    opts.omp_tile_x = 16;
+    const Simulation sim(8, 8, opts);
+
+    CHECK(sim.options().omp_schedule == OmpSchedule::Tiles);
+    CHECK(sim.options().omp_tile_x == 16);
 }
 
 // Verify that an explicit dt overrides the Courant number.

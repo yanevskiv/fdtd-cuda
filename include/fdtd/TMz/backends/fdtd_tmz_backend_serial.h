@@ -22,7 +22,7 @@
 
 #include "fdtd/TMz/backends/cpu/fdtd_tmz_backend_cpu_base.h"
 #include "fdtd/TMz/backends/cpu/fdtd_tmz_backend_cpu_block.h"
-#include "fdtd/TMz/backends/fdtd_tmz_backend.h"
+#include "fdtd/TMz/fdtd_tmz_backend.h"
 #include "fdtd/TMz/fdtd_tmz_boundary.h"
 #include "fdtd/TMz/fdtd_tmz_coeffs.h"
 #include "fdtd/TMz/fdtd_tmz_fields.h"

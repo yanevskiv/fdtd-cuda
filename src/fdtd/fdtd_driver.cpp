@@ -24,7 +24,6 @@
 #include "fdtd/fdtd_args.h"
 
 // The simulation, its output files, the OpenMP variants and the source waveform.
-#include "fdtd/TMz/fdtd_tmz_omp_options.h"
 #include "fdtd/TMz/fdtd_tmz_output.h"
 #include "fdtd/TMz/fdtd_tmz_simulation.h"
 #include "fdtd/TMz/fdtd_tmz_waveform.h"
@@ -121,7 +120,8 @@ namespace fdtd
             } else if (name == "--threads") {
                 options.threads = parse_size_arg(name, value);
             } else if (name == "--variant") {
-                TMz::parse_omp_variant(value);
+                TMz::Simulation::Options check;
+                parse_omp_variant_arg(name, value, check);
                 options.variant = std::string(value);
             } else if (name == "--output") {
                 if (value.empty()) {
@@ -233,8 +233,8 @@ namespace fdtd
         simOptions.pml_order = options.pml_order;
         simOptions.pml_reflection = options.pml_reflection;
         simOptions.backend = options.backend;
-        simOptions.omp = TMz::parse_omp_variant(options.variant);
-        simOptions.omp.threads = options.threads;
+        parse_omp_variant_arg("--variant", options.variant, simOptions);
+        simOptions.omp_threads = options.threads;
         const std::size_t ny = options.ny > 0 ? options.ny : options.nx;
         TMz::Simulation sim(options.nx, ny, simOptions);
 
@@ -260,10 +260,10 @@ namespace fdtd
         log << " s, ";
         log << options.steps;
         log << " steps on ";
-        log << TMz::backends::backend_name(options.backend);
-        if (options.backend == TMz::backends::BackendType::OpenMP) {
+        log << TMz::backend_name(options.backend);
+        if (options.backend == TMz::BackendType::OpenMP) {
             log << " (";
-            log << TMz::omp_variant_name(simOptions.omp);
+            log << omp_variant_name(simOptions);
             if (options.threads > 0) {
                 log << ", ";
                 log << options.threads;

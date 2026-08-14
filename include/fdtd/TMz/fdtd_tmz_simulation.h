@@ -20,13 +20,12 @@
 #ifndef FDTD_TMZ_SIMULATION_H
 #define FDTD_TMZ_SIMULATION_H
 
-#include "fdtd/TMz/backends/fdtd_tmz_backend.h"
+#include "fdtd/TMz/fdtd_tmz_backend.h"
 #include "fdtd/TMz/fdtd_tmz_boundary.h"
 #include "fdtd/TMz/fdtd_tmz_component.h"
 #include "fdtd/TMz/fdtd_tmz_fields.h"
 #include "fdtd/TMz/fdtd_tmz_grid.h"
 #include "fdtd/TMz/fdtd_tmz_material.h"
-#include "fdtd/TMz/fdtd_tmz_omp_options.h"
 #include "fdtd/TMz/fdtd_tmz_waveform.h"
 #include "fdtd/fdtd_float.h"
 
@@ -40,6 +39,30 @@ namespace fdtd
     /** Namespace for the 2D TMz module. */
     namespace TMz
     {
+        /** How the OpenMP backend shares the cells of a phase among its threads. */
+        enum class OmpSchedule {
+            /** A static `omp for` over the rows, the baseline. The default. */
+            Rows,
+
+            /** One contiguous range of cells in row-major order per thread. */
+            Collapse2,
+
+            /** A static `omp for` over tiles of omp_tile_x by omp_tile_y cells. */
+            Tiles,
+
+            /** One task per tile per phase, ordered by dependences on the neighbouring tiles. */
+            Tasks
+        };
+
+        /** Where the OpenMP backend opens its parallel regions. */
+        enum class OmpRegion {
+            /** One region around the whole run, with the phases as work-sharing loops. */
+            Run,
+
+            /** One region per phase of every step. */
+            Phase
+        };
+
         /**
          * A 2D TMz simulation: grid, material, fields and the backend that steps them.
          *
@@ -87,10 +110,26 @@ namespace fdtd
                 double pml_reflection = 1e-6;
 
                 /** Backend to run on. */
-                backends::BackendType backend = backends::BackendType::Serial;
+                BackendType backend = BackendType::Serial;
 
-                /** Settings of the OpenMP backend, ignored by the others. */
-                OmpOptions omp;
+                /** How the OpenMP backend shares the cells among its threads. */
+                OmpSchedule omp_schedule = OmpSchedule::Rows;
+
+                /** Thread count of the OpenMP backend, 0 for the OpenMP default. */
+                std::size_t omp_threads = 0;
+
+                /** Tile width in cells for the Tiles and Tasks schedules, positive. */
+                std::size_t omp_tile_x = 128;
+
+                /** Tile height in cells for the Tiles and Tasks schedules, positive. */
+                std::size_t omp_tile_y = 32;
+
+                /** Whether the OpenMP backend's inner loops carry `omp simd`; on by default,
+                 * the fastest on the M5 sweep. */
+                bool omp_simd = true;
+
+                /** Where the OpenMP backend opens its parallel regions; Tasks takes Run only. */
+                OmpRegion omp_region = OmpRegion::Run;
 
                 /** Whether an explicit dt above the Courant limit is rejected. */
                 bool check_stability = true;
@@ -170,7 +209,7 @@ namespace fdtd
              *
              * @return The backend.
              */
-            const backends::Backend &backend() const noexcept;
+            const Backend &backend() const noexcept;
 
             /**
              * Add a soft point source: the waveform is added to one cell every step.
@@ -307,7 +346,7 @@ namespace fdtd
             struct Source
             {
                 /** Component and cell. */
-                backends::PointInjection point;
+                PointInjection point;
 
                 /** Value at a time in seconds. */
                 Waveform waveform;
@@ -329,7 +368,7 @@ namespace fdtd
             Fields m_fields;
 
             /** Backend that owns the working fields and steps them. */
-            std::unique_ptr<backends::Backend> m_backend;
+            std::unique_ptr<Backend> m_backend;
 
             /** Time steps run so far. */
             std::size_t m_step_count = 0;
@@ -338,7 +377,7 @@ namespace fdtd
             std::vector<Source> m_sources;
 
             /** Probe cells, in the order added. */
-            std::vector<backends::PointProbe> m_probes;
+            std::vector<PointProbe> m_probes;
 
             /** Steps of the snapshots still to take, in increasing order. */
             std::vector<std::size_t> m_snapshot_steps;
@@ -346,6 +385,29 @@ namespace fdtd
             /** Snapshots taken, in step order. */
             std::vector<Snapshot> m_snapshots;
         };
+
+        /**
+         * Create a backend with zeroed fields and the default settings.
+         *
+         * @param type Backend type.
+         * @param grid Grid the backend works on.
+         * @return The new backend.
+         * @throws std::runtime_error When the backend is not compiled in.
+         */
+        std::unique_ptr<Backend> make_backend(BackendType type, const Grid &grid);
+
+        /**
+         * Create a backend with zeroed fields and the settings of a simulation.
+         *
+         * @param type Backend type.
+         * @param grid Grid the backend works on.
+         * @param options Settings; a backend reads only its own, as the omp_ fields.
+         * @return The new backend.
+         * @throws std::runtime_error When the backend is not compiled in.
+         * @throws std::invalid_argument When the backend's settings are invalid.
+         */
+        std::unique_ptr<Backend> make_backend(BackendType type, const Grid &grid,
+                                              const Simulation::Options &options);
     }
 }
 

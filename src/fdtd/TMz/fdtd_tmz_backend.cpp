@@ -18,24 +18,16 @@
  */
 
 // Interface declaration.
-#include "fdtd/TMz/backends/fdtd_tmz_backend.h"
+#include "fdtd/TMz/fdtd_tmz_backend.h"
 
-// Backend implementations.
-#include "fdtd/TMz/backends/fdtd_tmz_backend_serial.h"
-#if FDTD_WITH_OPENMP
-#include "fdtd/TMz/backends/fdtd_tmz_backend_omp.h"
-#endif
-
-// Standard library for algorithms, limits, errors and string building.
+// Standard library for algorithms, limits, errors and pairs.
 #include <algorithm>
 #include <limits>
-#include <sstream>
 #include <stdexcept>
-#include <string>
 #include <utility>
 
-// Namespace for the 2D TMz backends.
-namespace fdtd::TMz::backends
+// Namespace for the 2D TMz module.
+namespace fdtd::TMz
 {
     // Check that a flat index names a cell inside the grid, not padding.
     static bool inside(const Grid &grid, std::size_t index)
@@ -121,34 +113,5 @@ namespace fdtd::TMz::backends
     {
         const auto types = available_backends();
         return std::find(types.begin(), types.end(), type) != types.end();
-    }
-
-    // Create a backend with the default settings.
-    std::unique_ptr<Backend> make_backend(BackendType type, const Grid &grid)
-    {
-        return make_backend(type, grid, BackendOptions{});
-    }
-
-    // Create a backend, or report that it is not compiled in.
-    std::unique_ptr<Backend> make_backend(BackendType type, const Grid &grid,
-                                          [[maybe_unused]] const BackendOptions &options)
-    {
-        switch (type) {
-            case BackendType::Serial:
-                return std::make_unique<backends::SerialBackend>(grid);
-            case BackendType::OpenMP:
-#if FDTD_WITH_OPENMP
-                return std::make_unique<backends::OmpBackend>(grid, options.omp);
-#else
-                break;
-#endif
-            case BackendType::Cuda:
-                break;
-        }
-        std::ostringstream message;
-        message << "make_backend: the ";
-        message << backend_name(type);
-        message << " backend is not compiled into this build";
-        throw std::runtime_error(message.str());
     }
 }

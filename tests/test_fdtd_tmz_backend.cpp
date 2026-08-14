@@ -23,8 +23,9 @@
 #include <catch2/matchers/catch_matchers_floating_point.hpp>
 
 // Project headers under test.
-#include "fdtd/TMz/backends/fdtd_tmz_backend.h"
+#include "fdtd/TMz/fdtd_tmz_backend.h"
 #include "fdtd/TMz/fdtd_tmz_grid.h"
+#include "fdtd/TMz/fdtd_tmz_simulation.h"
 
 // Standard library for algorithms, sizes and errors.
 #include <algorithm>
@@ -44,15 +45,14 @@ using fdtd::TMz::Component;
 using fdtd::TMz::Fields;
 using fdtd::TMz::Grid;
 using fdtd::TMz::Material;
-using fdtd::TMz::backends::PointInjection;
-using fdtd::TMz::backends::PointProbe;
+using fdtd::TMz::PointInjection;
+using fdtd::TMz::PointProbe;
 
 // Create a serial backend in vacuum at a Courant number, with a unit Ez impulse at (ci, cj).
 static auto make_impulse(const Grid &grid, double courant, std::size_t ci, std::size_t cj,
                          Boundary boundary)
 {
-    auto backend =
-        fdtd::TMz::backends::make_backend(fdtd::TMz::backends::BackendType::Serial, grid);
+    auto backend = fdtd::TMz::make_backend(fdtd::TMz::BackendType::Serial, grid);
     backend->upload(Coeffs(Material(grid), fdtd::TMz::courant_dt(grid, courant)));
     backend->set_boundary(boundary);
     Fields fields(grid);
@@ -62,7 +62,7 @@ static auto make_impulse(const Grid &grid, double courant, std::size_t ci, std::
 }
 
 // Download a backend's fields.
-static Fields download(const fdtd::TMz::backends::Backend &backend)
+static Fields download(const fdtd::TMz::Backend &backend)
 {
     Fields fields(backend.grid());
     backend.download(fields);
@@ -72,38 +72,36 @@ static Fields download(const fdtd::TMz::backends::Backend &backend)
 // Verify that serial is always available and comes first.
 TEST_CASE("Registry lists the serial backend first", "[unit][backend]")
 {
-    const auto types = fdtd::TMz::backends::available_backends();
+    const auto types = fdtd::TMz::available_backends();
     REQUIRE_FALSE(types.empty());
-    CHECK(types.front() == fdtd::TMz::backends::BackendType::Serial);
-    CHECK(fdtd::TMz::backends::is_backend_available(fdtd::TMz::backends::BackendType::Serial));
+    CHECK(types.front() == fdtd::TMz::BackendType::Serial);
+    CHECK(fdtd::TMz::is_backend_available(fdtd::TMz::BackendType::Serial));
 }
 
 // Verify that the registry lists OpenMP when it is compiled in, and never CUDA yet.
 TEST_CASE("Registry reports what was compiled in", "[unit][backend]")
 {
-    using fdtd::TMz::backends::BackendType;
+    using fdtd::TMz::BackendType;
     const fdtd::TMz::Grid grid(4, 4);
 
-    CHECK(fdtd::TMz::backends::available_backends().size() == (FDTD_WITH_OPENMP ? 2 : 1));
-    CHECK(fdtd::TMz::backends::is_backend_available(BackendType::OpenMP) == bool(FDTD_WITH_OPENMP));
+    CHECK(fdtd::TMz::available_backends().size() == (FDTD_WITH_OPENMP ? 2 : 1));
+    CHECK(fdtd::TMz::is_backend_available(BackendType::OpenMP) == bool(FDTD_WITH_OPENMP));
     if (!FDTD_WITH_OPENMP) {
-        CHECK_THROWS_AS(fdtd::TMz::backends::make_backend(BackendType::OpenMP, grid),
-                        std::runtime_error);
+        CHECK_THROWS_AS(fdtd::TMz::make_backend(BackendType::OpenMP, grid), std::runtime_error);
     }
-    CHECK_FALSE(fdtd::TMz::backends::is_backend_available(BackendType::Cuda));
-    CHECK_THROWS_AS(fdtd::TMz::backends::make_backend(BackendType::Cuda, grid), std::runtime_error);
+    CHECK_FALSE(fdtd::TMz::is_backend_available(BackendType::Cuda));
+    CHECK_THROWS_AS(fdtd::TMz::make_backend(BackendType::Cuda, grid), std::runtime_error);
 }
 
 // Verify that the serial backend ignores the settings of the OpenMP backend, even invalid ones.
 TEST_CASE("Serial backend ignores the OpenMP options", "[unit][backend][serial]")
 {
     const Grid grid(9, 7);
-    fdtd::TMz::backends::BackendOptions options;
-    options.omp.tile_x = 0;
-    options.omp.threads = 3;
+    fdtd::TMz::Simulation::Options options;
+    options.omp_tile_x = 0;
+    options.omp_threads = 3;
     auto plain = make_impulse(grid, 0.9, 4, 3, Boundary::Pmc);
-    auto backend =
-        fdtd::TMz::backends::make_backend(fdtd::TMz::backends::BackendType::Serial, grid, options);
+    auto backend = fdtd::TMz::make_backend(fdtd::TMz::BackendType::Serial, grid, options);
     backend->upload(Coeffs(Material(grid), fdtd::TMz::courant_dt(grid, 0.9)));
     backend->set_boundary(Boundary::Pmc);
     backend->upload(download(*plain));
@@ -121,21 +119,20 @@ TEST_CASE("Serial backend ignores the OpenMP options", "[unit][backend][serial]"
 // Verify the backend names.
 TEST_CASE("Backend types have lowercase names", "[unit][backend]")
 {
-    using fdtd::TMz::backends::BackendType;
-    CHECK(fdtd::TMz::backends::backend_name(BackendType::Serial) == "serial");
-    CHECK(fdtd::TMz::backends::backend_name(BackendType::OpenMP) == "openmp");
-    CHECK(fdtd::TMz::backends::backend_name(BackendType::Cuda) == "cuda");
+    using fdtd::TMz::BackendType;
+    CHECK(fdtd::TMz::backend_name(BackendType::Serial) == "serial");
+    CHECK(fdtd::TMz::backend_name(BackendType::OpenMP) == "openmp");
+    CHECK(fdtd::TMz::backend_name(BackendType::Cuda) == "cuda");
 }
 
 // Verify that the serial backend round-trips fields, the split parts of Ez included.
 TEST_CASE("Serial backend round-trips fields", "[unit][backend][serial]")
 {
     const fdtd::TMz::Grid grid(7, 5);
-    auto backend =
-        fdtd::TMz::backends::make_backend(fdtd::TMz::backends::BackendType::Serial, grid);
+    auto backend = fdtd::TMz::make_backend(fdtd::TMz::BackendType::Serial, grid);
     REQUIRE(backend);
     CHECK(backend->name() == "serial");
-    CHECK(backend->type() == fdtd::TMz::backends::BackendType::Serial);
+    CHECK(backend->type() == fdtd::TMz::BackendType::Serial);
     CHECK(backend->grid().nx() == 7);
 
     fdtd::TMz::Fields input(grid);
@@ -158,8 +155,7 @@ TEST_CASE("Serial backend round-trips fields", "[unit][backend][serial]")
 // Verify that fields on another grid are rejected.
 TEST_CASE("Serial backend rejects fields on another grid", "[unit][backend][serial]")
 {
-    auto backend = fdtd::TMz::backends::make_backend(fdtd::TMz::backends::BackendType::Serial,
-                                                     fdtd::TMz::Grid(7, 5));
+    auto backend = fdtd::TMz::make_backend(fdtd::TMz::BackendType::Serial, fdtd::TMz::Grid(7, 5));
     fdtd::TMz::Fields other(fdtd::TMz::Grid(5, 7));
     CHECK_THROWS_AS(backend->upload(other), std::invalid_argument);
     CHECK_THROWS_AS(backend->download(other), std::invalid_argument);
@@ -169,8 +165,7 @@ TEST_CASE("Serial backend rejects fields on another grid", "[unit][backend][seri
 TEST_CASE("Serial backend takes coefficients and a boundary", "[unit][backend][serial]")
 {
     const Grid grid(7, 5);
-    auto backend =
-        fdtd::TMz::backends::make_backend(fdtd::TMz::backends::BackendType::Serial, grid);
+    auto backend = fdtd::TMz::make_backend(fdtd::TMz::BackendType::Serial, grid);
 
     CHECK(backend->boundary() == Boundary::Pec);
     CHECK_THROWS_AS(backend->step(1), std::logic_error);
@@ -387,8 +382,7 @@ TEST_CASE("Serial backend splits Ez in the PML only under Boundary::Pml",
     Material material(grid);
     material.set_pml(pml, 3, 1e-6);
     const Boundary boundary = GENERATE(Boundary::Pml, Boundary::Pec);
-    auto backend =
-        fdtd::TMz::backends::make_backend(fdtd::TMz::backends::BackendType::Serial, grid);
+    auto backend = fdtd::TMz::make_backend(fdtd::TMz::BackendType::Serial, grid);
     backend->upload(Coeffs(material, fdtd::TMz::courant_dt(grid, 0.9)));
     backend->set_boundary(boundary);
     Fields fields(grid);

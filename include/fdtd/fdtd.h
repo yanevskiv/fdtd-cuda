@@ -20,7 +20,7 @@
 #ifndef FDTD_H
 #define FDTD_H
 
-#include "fdtd/TMz/fdtd_tmz_omp_options.h"
+#include "fdtd/TMz/fdtd_tmz_simulation.h"
 #include "fdtd/TMz/fdtd_tmz_waveform.h"
 #include "fdtd/fdtd_constants.h"
 #include "fdtd/fdtd_float.h"

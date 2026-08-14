@@ -25,7 +25,6 @@ add_executable(fdtd_tests
     test_fdtd_tmz_fields.cpp
     test_fdtd_tmz_grid.cpp
     test_fdtd_tmz_material.cpp
-    test_fdtd_tmz_omp_options.cpp
     test_fdtd_tmz_output.cpp
     test_fdtd_tmz_simulation.cpp
     test_fdtd_tmz_waveform.cpp
