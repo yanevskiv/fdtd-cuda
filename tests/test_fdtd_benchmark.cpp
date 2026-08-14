@@ -285,7 +285,7 @@ TEST_CASE("Benchmark runs each OpenMP variant", "[unit][benchmark][openmp]")
     REQUIRE(samples.size() == 4);
     CHECK(samples[0].backend == BackendType::Serial);
     CHECK(samples[0].variant == "default");
-    CHECK(samples[1].variant == "rows");
+    CHECK(samples[1].variant == "rows+simd");
     CHECK(samples[2].variant == "tiles:16x8+simd");
     CHECK(samples[3].variant == "tasks:8x8+simd");
     for (const BenchmarkSample &sample : samples) {

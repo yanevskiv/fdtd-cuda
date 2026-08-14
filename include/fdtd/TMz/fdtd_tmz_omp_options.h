@@ -69,8 +69,9 @@ namespace fdtd
             /** Tile height in cells for Tiles and Tasks, positive. */
             std::size_t tile_y = 32;
 
-            /** Whether the inner loops carry `omp simd`. */
-            bool simd = false;
+            /** Whether the inner loops carry `omp simd`; on by default, the fastest on the M5
+             * sweep. */
+            bool simd = true;
 
             /** Where the parallel regions open; Tasks takes Run only. */
             OmpRegion region = OmpRegion::Run;

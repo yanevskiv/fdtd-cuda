@@ -92,27 +92,43 @@ def setup(ax, xlabel, ylabel, title):
 
 
 def plot_by_size(args, data, values):
-    """Plot throughput against grid size, with one curve per backend and thread count."""
+    """Plot throughput against grid size, with one curve per backend, variant and threads.
+
+    With more than one variant of a backend, only its largest thread count is drawn, so the
+    figure stays readable.
+    """
     fig, ax = plt.subplots(figsize=(8, 5))
 
     i = 0
     for backend in np.unique(data["backend"]):
         selected = data["backend"] == backend
+        variants = np.unique(data["variant"][selected])
         threads = np.unique(data["threads"][selected])
+        if len(variants) > 1:
+            threads = threads[-1:]
 
-        for p in threads:
-            mask = selected & (data["threads"] == p)
-            x, y = statistics(data[mask], values[mask], "nx")
+        for variant in variants:
+            for p in threads:
+                mask = selected & (data["variant"] == variant) & (data["threads"] == p)
+                if not np.any(mask):
+                    continue
 
-            label = backend if len(threads) == 1 else f"{backend}, p={p}"
-            ax.plot(
-                x,
-                y,
-                marker=MARKERS[i % len(MARKERS)],
-                linewidth=1.8,
-                label=label,
-            )
-            i += 1
+                x, y = statistics(data[mask], values[mask], "nx")
+
+                label = backend
+                if len(variants) > 1:
+                    label += f" {variant}"
+                if len(np.unique(data["threads"][selected])) > 1:
+                    label += f", p={p}"
+
+                ax.plot(
+                    x,
+                    y,
+                    marker=MARKERS[i % len(MARKERS)],
+                    linewidth=1.8,
+                    label=label,
+                )
+                i += 1
 
     sizes = np.unique(data["nx"])
     ax.set_xscale("log")
@@ -127,8 +143,17 @@ def plot_by_size(args, data, values):
 
 
 def plot_by_threads(args, data, values, ylabel, title, filename, ideal):
-    """Plot an OpenMP quantity against threads, with one curve per grid size."""
+    """Plot an OpenMP quantity against threads, with one curve per variant and grid size.
+
+    With more than one variant, only the largest grid is drawn, so the figure stays readable.
+    """
     selected = (data["backend"] == "openmp") & ~np.isnan(values)
+    variants = np.unique(data["variant"][selected])
+    if len(variants) > 1:
+        largest = np.max(data["nx"][selected])
+        selected = selected & (data["nx"] == largest)
+        title += f", nx={largest}"
+
     omp = data[selected]
     omp_values = values[selected]
 
@@ -136,17 +161,21 @@ def plot_by_threads(args, data, values, ylabel, title, filename, ideal):
 
     fig, ax = plt.subplots(figsize=(8, 5))
 
-    for i, nx in enumerate(np.unique(omp["nx"])):
-        mask = omp["nx"] == nx
-        x, y = statistics(omp[mask], omp_values[mask], "threads")
+    i = 0
+    for variant in variants:
+        for nx in np.unique(omp["nx"][omp["variant"] == variant]):
+            mask = (omp["variant"] == variant) & (omp["nx"] == nx)
+            x, y = statistics(omp[mask], omp_values[mask], "threads")
 
-        ax.plot(
-            x,
-            y,
-            marker=MARKERS[i % len(MARKERS)],
-            linewidth=1.8,
-            label=f"nx={nx}",
-        )
+            label = f"nx={nx}" if len(variants) == 1 else variant
+            ax.plot(
+                x,
+                y,
+                marker=MARKERS[i % len(MARKERS)],
+                linewidth=1.8,
+                label=label,
+            )
+            i += 1
 
     if ideal == "linear":
         ax.plot(threads, threads, "k--", linewidth=1.3, label="ideal")
@@ -158,6 +187,55 @@ def plot_by_threads(args, data, values, ylabel, title, filename, ideal):
     ax.legend()
 
     save(fig, args, filename)
+
+
+def weak_efficiency(data):
+    """Return the weak scaling efficiency of every sample of a weak run.
+
+    The efficiency is the median time on one thread of the same variant over the sample's time,
+    since every thread count carries the same cells per thread; it is NaN without a one-thread
+    sample.
+    """
+    efficiency = np.full(len(data), np.nan)
+
+    for variant in np.unique(data["variant"]):
+        one = data[(data["variant"] == variant) & (data["threads"] == 1)]
+        same = data["variant"] == variant
+        if len(one) > 0:
+            efficiency[same] = np.median(one["seconds"]) / data["seconds"][same]
+
+    return efficiency
+
+
+def plot_weak(args, data, values):
+    """Plot the weak scaling efficiency against threads, with one curve per variant."""
+    fig, ax = plt.subplots(figsize=(8, 5))
+
+    for i, variant in enumerate(np.unique(data["variant"])):
+        mask = (data["variant"] == variant) & ~np.isnan(values)
+        x, y = statistics(data[mask], values[mask], "threads")
+
+        ax.plot(
+            x,
+            y,
+            marker=MARKERS[i % len(MARKERS)],
+            linewidth=1.8,
+            label=variant,
+        )
+
+    ax.axhline(1, color="k", linestyle="--", linewidth=1.3, label="ideal")
+
+    threads = np.unique(data["threads"])
+    ax.set_xticks(threads)
+    setup(
+        ax,
+        "Number of threads",
+        "Efficiency E(p)",
+        f"Weak scaling efficiency, {data['nx'][0]} x {data['nx'][0]} cells per thread",
+    )
+    ax.legend()
+
+    save(fig, args, "weak_efficiency")
 
 
 def remove(args, name):
@@ -188,6 +266,13 @@ def main():
     throughput, speedup, efficiency = calculate(data)
 
     plot_by_size(args, data, throughput)
+
+    weak = os.path.join(args.dir, f"benchmark_weak_{run}.csv")
+    if os.path.exists(weak):
+        weak_data = load(weak)
+        plot_weak(args, weak_data, weak_efficiency(weak_data))
+    else:
+        remove(args, "weak_efficiency")
 
     if np.all(np.isnan(speedup)):
         remove(args, "speedup")

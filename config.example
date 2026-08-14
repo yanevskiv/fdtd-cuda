@@ -16,7 +16,15 @@ BENCH_REPEAT=10
 BENCH_BACKENDS="all"
 
 # Thread counts, ignored by serial
-BENCH_THREADS="1"
+BENCH_THREADS="1 2 4"
+
+# OpenMP variants, SCHEDULE[:WxH][+simd][+phase] with rows, collapse2, tiles or tasks, or default;
+# ignored by serial
+BENCH_VARIANTS="default"
+
+# Weak scaling: per thread count p, OpenMP on nx = BENCH_WEAK_NX and ny = p * BENCH_WEAK_NX, into
+# benchmark_weak_<timestamp>.csv; empty for none
+BENCH_WEAK_NX=""
 
 # Grid sizes, nx = ny
 BENCH_SIZES="128 256 512 1024 2048"

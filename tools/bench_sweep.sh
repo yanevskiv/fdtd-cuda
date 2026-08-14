@@ -65,7 +65,7 @@ shift $((OPTIND - 1))
 
 # shellcheck source=../config.example
 . "$CONFIG" || config_error "can't load '$NAME' file"
-for name in BENCH_STEPS BENCH_REPEAT BENCH_BACKENDS BENCH_THREADS BENCH_SIZES; do
+for name in BENCH_STEPS BENCH_REPEAT BENCH_BACKENDS BENCH_THREADS BENCH_VARIANTS BENCH_SIZES; do
     [ -n "${!name:-}" ] || config_error "'$NAME' file doesn't set $name"
 done
 
@@ -78,6 +78,11 @@ THREADS=()
 for threads in $BENCH_THREADS; do
     THREADS+=(--threads "$threads")
 done
+VARIANTS=()
+for variant in $BENCH_VARIANTS; do
+    VARIANTS+=(--variant "$variant")
+done
+WEAK_NX="${BENCH_WEAK_NX:-}"
 
 [ "${OUT#/}" != "$OUT" ] || OUT="$PWD/$OUT"
 
@@ -85,6 +90,7 @@ done
 STAMP="$(date +%s%3N)"
 DIR="$OUT/$STAMP"
 CSV="$DIR/benchmark_$STAMP.csv"
+WEAK="$DIR/benchmark_weak_$STAMP.csv"
 LOG="$DIR/benchmark_$STAMP.log"
 if [ -e "$DIR" ]; then
     echo "bench_sweep.sh: $DIR already exists" >&2
@@ -94,14 +100,26 @@ mkdir -p "$DIR" || exit 1
 : > "$LOG"
 
 log "==> config $CONFIG: steps=$BENCH_STEPS repeat=$BENCH_REPEAT backends=($BENCH_BACKENDS)\
- threads=($BENCH_THREADS) sizes=($BENCH_SIZES)"
+ threads=($BENCH_THREADS) variants=($BENCH_VARIANTS) sizes=($BENCH_SIZES) weak_nx=($WEAK_NX)"
 
 # The machine description and the CSV header come first, then one block of rows per size.
 "$HERE/sysinfo.sh" "$(dirname "$PROG")" > "$CSV"
 "$PROG" --header-only >> "$CSV" || exit 1
 for size in $BENCH_SIZES; do
     log "==> nx=ny=$size steps=$BENCH_STEPS repeat=$BENCH_REPEAT"
-    "$PROG" --nx "$size" --steps "$BENCH_STEPS" --repeat "$BENCH_REPEAT" \
-        "${BACKENDS[@]}" "${THREADS[@]}" --no-header 2>&1 >> "$CSV" | tee -a "$LOG" >&2 || exit 1
+    "$PROG" --nx "$size" --steps "$BENCH_STEPS" --repeat "$BENCH_REPEAT" "${BACKENDS[@]}" \
+        "${THREADS[@]}" "${VARIANTS[@]}" --no-header 2>&1 >> "$CSV" | tee -a "$LOG" >&2 || exit 1
 done
 log "==> wrote $CSV"
+
+# Weak scaling keeps the cells per thread fixed: p threads get p rows of nx by nx blocks.
+[ -n "$WEAK_NX" ] || exit 0
+"$HERE/sysinfo.sh" "$(dirname "$PROG")" > "$WEAK"
+"$PROG" --header-only >> "$WEAK" || exit 1
+for threads in $BENCH_THREADS; do
+    log "==> weak nx=$WEAK_NX ny=$((WEAK_NX * threads)) threads=$threads"
+    "$PROG" --nx "$WEAK_NX" --ny "$((WEAK_NX * threads))" --steps "$BENCH_STEPS" \
+        --repeat "$BENCH_REPEAT" --backend openmp --threads "$threads" "${VARIANTS[@]}" \
+        --no-header 2>&1 >> "$WEAK" | tee -a "$LOG" >&2 || exit 1
+done
+log "==> wrote $WEAK"

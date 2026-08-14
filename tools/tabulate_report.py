@@ -31,6 +31,7 @@ FIGURES = [
     ("throughput", "Throughput versus grid size"),
     ("speedup", "Speedup versus number of threads"),
     ("efficiency", "Efficiency versus number of threads"),
+    ("weak_efficiency", "Weak scaling efficiency versus number of threads"),
 ]
 
 MEMCHECK = [
@@ -180,7 +181,7 @@ def figure_list(report, stamp):
         if os.path.exists(os.path.join(report, image)):
             lines.append(f"![{caption}]({image}){{width=90%}}")
 
-    if len(lines) < len(FIGURES):
+    if not os.path.exists(os.path.join(report, f"images/speedup_{stamp}.png")):
         lines.append("Speedup and efficiency need OpenMP and serial samples of the same size.")
 
     return "\n\n".join(lines)
@@ -293,12 +294,18 @@ def benchmark_section(bench, report, stamp):
         return "No benchmark run."
 
     data = bench["samples"]
+
+    weak = "No weak scaling run."
+    if bench["weak"] is not None:
+        weak = results_table(bench["weak"])
+
     return fill(
         "benchmark_section.md",
         stamp=bench["stamp"],
         samples=len(data),
         configurations=len(np.unique(data[CONFIG])),
         results=results_table(data),
+        weak=weak,
         figures=figure_list(report, stamp),
     )
 
@@ -345,7 +352,13 @@ def main():
     if args.benchmark:
         stamp = os.path.basename(os.path.normpath(args.benchmark))
         path = os.path.join(args.benchmark, f"benchmark_{stamp}.csv")
-        bench = {"stamp": stamp, "info": load_info(path), "samples": load_samples(path)}
+        weak = os.path.join(args.benchmark, f"benchmark_weak_{stamp}.csv")
+        bench = {
+            "stamp": stamp,
+            "info": load_info(path),
+            "samples": load_samples(path),
+            "weak": load_samples(weak) if os.path.exists(weak) else None,
+        }
         runs.append(("Benchmark", bench))
 
     if args.profile:

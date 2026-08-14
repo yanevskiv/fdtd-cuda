@@ -33,7 +33,7 @@ using fdtd::TMz::OmpOptions;
 using fdtd::TMz::OmpRegion;
 using fdtd::TMz::OmpSchedule;
 
-// Verify the defaults: rows, the OpenMP thread count, 128 by 32 tiles, no SIMD, one region.
+// Verify the defaults: rows, the OpenMP thread count, 128 by 32 tiles, SIMD, one region.
 TEST_CASE("OpenMP options defaults", "[unit][omp_options]")
 {
     const OmpOptions opts;
@@ -42,7 +42,7 @@ TEST_CASE("OpenMP options defaults", "[unit][omp_options]")
     CHECK(opts.threads == 0);
     CHECK(opts.tile_x == 128);
     CHECK(opts.tile_y == 32);
-    CHECK_FALSE(opts.simd);
+    CHECK(opts.simd);
     CHECK(opts.region == OmpRegion::Run);
 }
 
@@ -63,7 +63,7 @@ TEST_CASE("OpenMP variant names round-trip", "[unit][omp_options]")
 {
     const OmpOptions rows = fdtd::TMz::parse_omp_variant("default");
     CHECK(rows.schedule == OmpSchedule::Rows);
-    CHECK(fdtd::TMz::omp_variant_name(rows) == "rows");
+    CHECK(fdtd::TMz::omp_variant_name(rows) == "rows+simd");
 
     const OmpOptions tiles = fdtd::TMz::parse_omp_variant("tiles:64x16+phase+simd");
     CHECK(tiles.schedule == OmpSchedule::Tiles);
