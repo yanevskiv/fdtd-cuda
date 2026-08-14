@@ -18,14 +18,14 @@
  */
 
 // Struct and kernel declarations.
-#include "fdtd/TMz/backends/fdtd_tmz_block.h"
+#include "fdtd/TMz/backends/cpu/fdtd_tmz_backend_cpu_block.h"
 
 // Standard library for bounds and sizes.
 #include <algorithm>
 #include <cstddef>
 
-// Namespace for the 2D TMz module.
-namespace fdtd::TMz
+// Namespace for what the 2D TMz CPU backends share.
+namespace fdtd::TMz::backends::cpu
 {
     // Helpers private to this file.
     namespace

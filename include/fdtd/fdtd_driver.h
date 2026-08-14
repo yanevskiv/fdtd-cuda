@@ -20,7 +20,7 @@
 #ifndef FDTD_DRIVER_H
 #define FDTD_DRIVER_H
 
-#include "fdtd/TMz/fdtd_tmz_backend.h"
+#include "fdtd/TMz/backends/fdtd_tmz_backend.h"
 #include "fdtd/TMz/fdtd_tmz_boundary.h"
 
 #include <cstddef>
@@ -100,7 +100,7 @@ namespace fdtd
         double pml_reflection = 1e-6;
 
         /** Backend to run on. */
-        TMz::BackendType backend = TMz::BackendType::Serial;
+        TMz::backends::BackendType backend = TMz::backends::BackendType::Serial;
 
         /** Thread count of the OpenMP backend, 0 for the OpenMP default. */
         std::size_t threads = 0;

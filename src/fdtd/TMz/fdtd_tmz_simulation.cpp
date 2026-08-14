@@ -74,7 +74,7 @@ namespace fdtd::TMz
         , m_dt(options_dt(m_grid, options))
         , m_material(m_grid)
         , m_fields(m_grid)
-        , m_backend(make_backend(options.backend, m_grid, {.omp = options.omp}))
+        , m_backend(backends::make_backend(options.backend, m_grid, {.omp = options.omp}))
     {
         apply_pml(m_material, m_options);
         m_backend->upload(Coeffs(m_material, m_dt));
@@ -127,7 +127,7 @@ namespace fdtd::TMz
     }
 
     // Return the backend.
-    const Backend &Simulation::backend() const noexcept
+    const backends::Backend &Simulation::backend() const noexcept
     {
         return *m_backend;
     }
@@ -265,15 +265,15 @@ namespace fdtd::TMz
         if (nsteps == 0) {
             return;
         }
-        std::vector<PointInjection> points;
+        std::vector<backends::PointInjection> points;
         std::vector<std::size_t> slots;
         slots.reserve(m_sources.size());
         for (const Source &source : m_sources) {
-            const auto it =
-                std::find_if(points.begin(), points.end(), [&source](const PointInjection &point) {
-                    return point.component == source.point.component &&
-                           point.index == source.point.index;
-                });
+            const auto it = std::find_if(points.begin(), points.end(),
+                                         [&source](const backends::PointInjection &point) {
+                                             return point.component == source.point.component &&
+                                                    point.index == source.point.index;
+                                         });
             slots.push_back(static_cast<std::size_t>(it - points.begin()));
             if (it == points.end()) {
                 points.push_back(source.point);

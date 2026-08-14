@@ -20,7 +20,7 @@
 #ifndef FDTD_BENCHMARK_H
 #define FDTD_BENCHMARK_H
 
-#include "fdtd/TMz/fdtd_tmz_backend.h"
+#include "fdtd/TMz/backends/fdtd_tmz_backend.h"
 #include "fdtd/TMz/fdtd_tmz_boundary.h"
 
 #include <cstddef>
@@ -53,7 +53,7 @@ namespace fdtd
         double warmup = 0.1;
 
         /** Backends to measure in order; none means every compiled backend. */
-        std::vector<TMz::BackendType> backends;
+        std::vector<TMz::backends::BackendType> backends;
 
         /** OpenMP variant names (see TMz::parse_omp_variant) to measure; none means "default". */
         std::vector<std::string> variants;
@@ -84,7 +84,7 @@ namespace fdtd
     struct BenchmarkSample
     {
         /** Backend the run was on. */
-        TMz::BackendType backend;
+        TMz::backends::BackendType backend;
 
         /** Canonical OpenMP variant name, or "default" for the other backends. */
         std::string variant;

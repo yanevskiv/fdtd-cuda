@@ -33,8 +33,8 @@
 
 using fdtd::DriverOptions;
 using fdtd::parse_driver_options;
-using fdtd::TMz::BackendType;
 using fdtd::TMz::Boundary;
+using fdtd::TMz::backends::BackendType;
 
 namespace
 {
@@ -215,7 +215,7 @@ TEST_CASE("Driver smoke run with the PML", "[unit][driver]")
 // Verify that an OpenMP run logs its variant and writes the same probe as a serial run.
 TEST_CASE("Driver smoke run on OpenMP", "[unit][driver][openmp]")
 {
-    if (!fdtd::TMz::is_backend_available(BackendType::OpenMP)) {
+    if (!fdtd::TMz::backends::is_backend_available(BackendType::OpenMP)) {
         SKIP("the OpenMP backend is not compiled in");
     }
     const auto dir = std::filesystem::temp_directory_path() / "fdtd_test_driver_openmp";

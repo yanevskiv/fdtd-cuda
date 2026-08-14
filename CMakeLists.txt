@@ -26,8 +26,6 @@ option(FDTD_EXACT "Build the library without contracted multiply-adds, for bit-f
 
 # The library.
 add_library(fdtd
-    src/fdtd/TMz/fdtd_tmz_waveform.cpp
-    src/fdtd/TMz/fdtd_tmz_backend.cpp
     src/fdtd/TMz/fdtd_tmz_coeffs.cpp
     src/fdtd/TMz/fdtd_tmz_fields.cpp
     src/fdtd/TMz/fdtd_tmz_grid.cpp
@@ -35,11 +33,13 @@ add_library(fdtd
     src/fdtd/TMz/fdtd_tmz_omp_options.cpp
     src/fdtd/TMz/fdtd_tmz_output.cpp
     src/fdtd/TMz/fdtd_tmz_simulation.cpp
-    src/fdtd/TMz/backends/fdtd_tmz_backend_cpu.cpp
-    src/fdtd/TMz/backends/fdtd_tmz_block.cpp
-    src/fdtd/TMz/backends/fdtd_tmz_partition.cpp
-    src/fdtd/TMz/backends/fdtd_tmz_stepper.cpp
-    src/fdtd/TMz/backends/fdtd_tmz_backend_serial.cpp)
+    src/fdtd/TMz/fdtd_tmz_waveform.cpp
+    src/fdtd/TMz/backends/fdtd_tmz_backend.cpp
+    src/fdtd/TMz/backends/fdtd_tmz_backend_serial.cpp
+    src/fdtd/TMz/backends/cpu/fdtd_tmz_backend_cpu_base.cpp
+    src/fdtd/TMz/backends/cpu/fdtd_tmz_backend_cpu_block.cpp
+    src/fdtd/TMz/backends/cpu/fdtd_tmz_backend_cpu_partition.cpp
+    src/fdtd/TMz/backends/cpu/fdtd_tmz_backend_cpu_stepper.cpp)
 add_library(fdtd::fdtd ALIAS fdtd)
 target_compile_features(fdtd PUBLIC cxx_std_20)
 target_include_directories(fdtd PUBLIC
@@ -52,7 +52,7 @@ target_compile_definitions(fdtd PUBLIC
     FDTD_EXACT=$<BOOL:${FDTD_EXACT}>)
 target_link_libraries(fdtd PRIVATE $<BUILD_INTERFACE:fdtd_warnings>)
 if(FDTD_WITH_OPENMP)
-    target_sources(fdtd PRIVATE src/fdtd/TMz/backends/fdtd_tmz_backend_openmp.cpp)
+    target_sources(fdtd PRIVATE src/fdtd/TMz/backends/fdtd_tmz_backend_omp.cpp)
     target_link_libraries(fdtd PRIVATE OpenMP::OpenMP_CXX)
 endif()
 
@@ -154,7 +154,9 @@ endif()
 
 # Installation and package export.
 install(DIRECTORY include/ DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}
-    PATTERN backends EXCLUDE
+    PATTERN cpu EXCLUDE
+    PATTERN fdtd_tmz_backend_omp.h EXCLUDE
+    PATTERN fdtd_tmz_backend_serial.h EXCLUDE
     PATTERN fdtd_args.h EXCLUDE
     PATTERN fdtd_benchmark.h EXCLUDE
     PATTERN fdtd_driver.h EXCLUDE)

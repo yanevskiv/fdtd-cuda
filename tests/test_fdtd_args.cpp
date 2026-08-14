@@ -27,8 +27,8 @@
 
 using fdtd::Argument;
 using fdtd::split_arguments;
-using fdtd::TMz::BackendType;
 using fdtd::TMz::Boundary;
+using fdtd::TMz::backends::BackendType;
 
 namespace
 {

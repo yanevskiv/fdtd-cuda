@@ -22,7 +22,7 @@
 #include <catch2/generators/catch_generators.hpp>
 
 // Project headers under test.
-#include "fdtd/TMz/backends/fdtd_tmz_partition.h"
+#include "fdtd/TMz/backends/cpu/fdtd_tmz_backend_cpu_partition.h"
 #include "fdtd/TMz/fdtd_tmz_grid.h"
 
 // Standard library for sizes, buffers and errors.
@@ -31,9 +31,9 @@
 #include <vector>
 
 // Shorthand for the types under test.
-using fdtd::TMz::Block;
 using fdtd::TMz::Grid;
-using fdtd::TMz::Partition;
+using fdtd::TMz::backends::cpu::Block;
+using fdtd::TMz::backends::cpu::Partition;
 
 // Helpers private to this file.
 namespace

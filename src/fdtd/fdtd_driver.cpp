@@ -260,8 +260,8 @@ namespace fdtd
         log << " s, ";
         log << options.steps;
         log << " steps on ";
-        log << TMz::backend_name(options.backend);
-        if (options.backend == TMz::BackendType::OpenMP) {
+        log << TMz::backends::backend_name(options.backend);
+        if (options.backend == TMz::backends::BackendType::OpenMP) {
             log << " (";
             log << TMz::omp_variant_name(simOptions.omp);
             if (options.threads > 0) {

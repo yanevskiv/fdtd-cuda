@@ -59,9 +59,9 @@ static void fill_distinct(Fields &fields)
 static void run(Fields &fields, const Coeffs &coeffs, Boundary boundary, int nsteps)
 {
     for (int n = 0; n < nsteps; ++n) {
-        fdtd::TMz::serial_update_h(fields, coeffs);
-        fdtd::TMz::serial_update_e(fields, coeffs, 0);
-        fdtd::TMz::serial_update_boundary(fields, coeffs, boundary);
+        fdtd::TMz::backends::serial_update_h(fields, coeffs);
+        fdtd::TMz::backends::serial_update_e(fields, coeffs, 0);
+        fdtd::TMz::backends::serial_update_boundary(fields, coeffs, boundary);
     }
 }
 
@@ -75,7 +75,7 @@ TEST_CASE("Serial update of an Ez impulse", "[unit][serial_update]")
     const std::size_t c = grid.index(3, 3);
     fields.ez()[c] = 1;
 
-    fdtd::TMz::serial_update_h(fields, coeffs);
+    fdtd::TMz::backends::serial_update_h(fields, coeffs);
     const double h = double(coeffs.coeff_hy_2()[c]) / double(grid.dx());
     CHECK_THAT(double(fields.hy()[grid.index(2, 3)]), WithinRel(h, TOL));
     CHECK_THAT(double(fields.hy()[grid.index(3, 3)]), WithinRel(-h, TOL));
@@ -84,7 +84,7 @@ TEST_CASE("Serial update of an Ez impulse", "[unit][serial_update]")
     CHECK(fields.hx()[grid.index(2, 3)] == FloatType(0));
     CHECK(fields.hy()[grid.index(3, 2)] == FloatType(0));
 
-    fdtd::TMz::serial_update_e(fields, coeffs, 0);
+    fdtd::TMz::backends::serial_update_e(fields, coeffs, 0);
     CHECK_THAT(double(fields.ez()[c]), WithinRel(0.5, TOL));
     CHECK_THAT(double(fields.ez()[grid.index(2, 3)]), WithinRel(0.125, TOL));
     CHECK_THAT(double(fields.ez()[grid.index(4, 3)]), WithinRel(0.125, TOL));
@@ -102,8 +102,9 @@ TEST_CASE("Serial update reads the coefficients by field", "[unit][serial_update
     const std::vector<FloatType> ezY(grid.size(), FloatType(8));
     const std::vector<FloatType> hx(grid.size(), FloatType(0.25));
     const std::vector<FloatType> hy(grid.size(), FloatType(0.125));
-    const fdtd::TMz::CoeffsView coeffs(ezX.data(), zero.data(), ezY.data(), zero.data(), hx.data(),
-                                       zero.data(), hy.data(), zero.data());
+    const fdtd::TMz::backends::cpu::CoeffsView coeffs(ezX.data(), zero.data(), ezY.data(),
+                                                      zero.data(), hx.data(), zero.data(),
+                                                      hy.data(), zero.data());
     Fields fields(grid);
     for (std::size_t k = 0; k < grid.size(); ++k) {
         fields.ez()[k] = 1;
@@ -111,8 +112,8 @@ TEST_CASE("Serial update reads the coefficients by field", "[unit][serial_update
         fields.hy()[k] = 1;
     }
 
-    fdtd::TMz::serial_update_h(fields, coeffs);
-    fdtd::TMz::serial_update_e(fields, coeffs, 0);
+    fdtd::TMz::backends::serial_update_h(fields, coeffs);
+    fdtd::TMz::backends::serial_update_e(fields, coeffs, 0);
 
     CHECK(fields.hx()[grid.index(1, 1)] == FloatType(0.25));
     CHECK(fields.hy()[grid.index(1, 1)] == FloatType(0.125));
@@ -135,8 +136,8 @@ TEST_CASE("Serial update leaves the edges alone", "[unit][serial_update]")
     const std::size_t lastRow = grid.ny() - 1;
     const std::size_t lastCol = grid.nx() - 1;
 
-    fdtd::TMz::serial_update_h(fields, coeffs);
-    fdtd::TMz::serial_update_e(fields, coeffs, 0);
+    fdtd::TMz::backends::serial_update_h(fields, coeffs);
+    fdtd::TMz::backends::serial_update_e(fields, coeffs, 0);
 
     for (std::size_t i = 0; i < grid.nx(); ++i) {
         CHECK(fields.hx()[grid.index(i, lastRow)] == FloatType(0));
@@ -159,8 +160,8 @@ TEST_CASE("Serial update on degenerate grids", "[unit][serial_update]")
         Fields fields(grid);
         fields.ez()[0] = 1;
 
-        fdtd::TMz::serial_update_h(fields, coeffs);
-        fdtd::TMz::serial_update_e(fields, coeffs, 0);
+        fdtd::TMz::backends::serial_update_h(fields, coeffs);
+        fdtd::TMz::backends::serial_update_e(fields, coeffs, 0);
 
         CHECK(fields.ez()[0] == FloatType(1));
     }
@@ -174,7 +175,7 @@ TEST_CASE("PEC boundary zeroes the edge Ez", "[unit][boundary]")
     Fields fields(grid);
     fill_distinct(fields);
 
-    fdtd::TMz::serial_update_boundary(fields, coeffs, Boundary::Pec);
+    fdtd::TMz::backends::serial_update_boundary(fields, coeffs, Boundary::Pec);
 
     for (std::size_t j = 0; j < grid.ny(); ++j) {
         for (std::size_t i = 0; i < grid.nx(); ++i) {
@@ -211,7 +212,7 @@ TEST_CASE("PMC boundary reads H outside as zero", "[unit][boundary]")
     const double top = ce1 * ez(1, 2) + ce2 * ((hy(1, 2) - hy(0, 2)) / dx - (0 - hx(1, 1)) / dy);
     const double centre = ez(1, 1);
 
-    fdtd::TMz::serial_update_boundary(fields, coeffs, Boundary::Pmc);
+    fdtd::TMz::backends::serial_update_boundary(fields, coeffs, Boundary::Pmc);
 
     CHECK_THAT(ez(0, 0), WithinRel(corner, TOL));
     CHECK_THAT(ez(2, 1), WithinRel(right, TOL));
@@ -253,8 +254,8 @@ TEST_CASE("Boundary on degenerate grids", "[unit][boundary]")
         Fields fields(grid);
         fill_distinct(fields);
 
-        fdtd::TMz::serial_update_boundary(fields, coeffs, Boundary::Pmc);
-        fdtd::TMz::serial_update_boundary(fields, coeffs, Boundary::Pec);
+        fdtd::TMz::backends::serial_update_boundary(fields, coeffs, Boundary::Pmc);
+        fdtd::TMz::backends::serial_update_boundary(fields, coeffs, Boundary::Pec);
 
         for (const FloatType v : fields.ez()) {
             CHECK(v == FloatType(0));
@@ -276,9 +277,9 @@ TEST_CASE("Split update matches the plain update without loss", "[unit][serial_u
         split.ezx()[k] = split.ez()[k];
     }
 
-    fdtd::TMz::serial_update_e(plain, coeffs, 0);
-    fdtd::TMz::serial_update_e(split, coeffs, pml);
-    fdtd::TMz::serial_update_pml(split, coeffs, pml);
+    fdtd::TMz::backends::serial_update_e(plain, coeffs, 0);
+    fdtd::TMz::backends::serial_update_e(split, coeffs, pml);
+    fdtd::TMz::backends::serial_update_pml(split, coeffs, pml);
 
     double scale = 0;
     for (std::size_t k = 0; k < grid.size(); ++k) {
@@ -314,7 +315,7 @@ TEST_CASE("Split update damps each part along its direction", "[unit][serial_upd
         fields.ezy()[k] = 1;
     }
 
-    fdtd::TMz::serial_update_pml(fields, coeffs, 4);
+    fdtd::TMz::backends::serial_update_pml(fields, coeffs, 4);
 
     const Fields &f = fields;
     for (const std::size_t i : {std::size_t(1), std::size_t(18)}) {
@@ -342,7 +343,7 @@ TEST_CASE("PEC boundary zeroes the edge split fields", "[unit][boundary][pml]")
         fields.ezy()[k] = 2;
     }
 
-    fdtd::TMz::serial_update_boundary(fields, coeffs, Boundary::Pml);
+    fdtd::TMz::backends::serial_update_boundary(fields, coeffs, Boundary::Pml);
 
     CHECK(fields.ezx()[grid.index(0, 2)] == FloatType(0));
     CHECK(fields.ezy()[grid.index(5, 4)] == FloatType(0));

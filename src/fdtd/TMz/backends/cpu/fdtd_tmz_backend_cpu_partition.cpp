@@ -18,15 +18,15 @@
  */
 
 // Class declaration.
-#include "fdtd/TMz/backends/fdtd_tmz_partition.h"
+#include "fdtd/TMz/backends/cpu/fdtd_tmz_backend_cpu_partition.h"
 
 // Standard library for searches, sizes and errors.
 #include <algorithm>
 #include <cstddef>
 #include <stdexcept>
 
-// Namespace for the 2D TMz module.
-namespace fdtd::TMz
+// Namespace for what the 2D TMz CPU backends share.
+namespace fdtd::TMz::backends::cpu
 {
     // Start with no parts.
     Partition::Partition(const Grid &grid)

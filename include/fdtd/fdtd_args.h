@@ -20,7 +20,7 @@
 #ifndef FDTD_ARGS_H
 #define FDTD_ARGS_H
 
-#include "fdtd/TMz/fdtd_tmz_backend.h"
+#include "fdtd/TMz/backends/fdtd_tmz_backend.h"
 #include "fdtd/TMz/fdtd_tmz_boundary.h"
 
 #include <cstddef>
@@ -111,7 +111,7 @@ namespace fdtd
      * @return The backend type.
      * @throws std::invalid_argument On another name.
      */
-    TMz::BackendType parse_backend_arg(std::string_view name, std::string_view text);
+    TMz::backends::BackendType parse_backend_arg(std::string_view name, std::string_view text);
 }
 
 #endif

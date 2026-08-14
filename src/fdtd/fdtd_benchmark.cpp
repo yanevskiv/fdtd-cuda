@@ -50,7 +50,8 @@ namespace fdtd
         constexpr std::string_view PRECISION = FDTD_DOUBLE ? "double" : "float";
 
         // Add a backend to the list unless it is there already.
-        void add_backend(std::vector<TMz::BackendType> &backends, TMz::BackendType type)
+        void add_backend(std::vector<TMz::backends::BackendType> &backends,
+                         TMz::backends::BackendType type)
         {
             if (std::find(backends.begin(), backends.end(), type) == backends.end()) {
                 backends.push_back(type);
@@ -72,7 +73,7 @@ namespace fdtd
                 options.warmup = parse_nonnegative_arg(name, value);
             } else if (name == "--backend") {
                 if (value == "all") {
-                    for (const auto type : TMz::available_backends()) {
+                    for (const auto type : TMz::backends::available_backends()) {
                         add_backend(options.backends, type);
                     }
                 } else {
@@ -101,7 +102,8 @@ namespace fdtd
         }
 
         // Check the settings the parser leaves to the library.
-        void check(const BenchmarkOptions &options, std::span<const TMz::BackendType> backends,
+        void check(const BenchmarkOptions &options,
+                   std::span<const TMz::backends::BackendType> backends,
                    std::span<const std::string> variants)
         {
             if (options.steps == 0) {
@@ -111,10 +113,10 @@ namespace fdtd
                 throw std::invalid_argument("run_benchmark: repeat must be positive");
             }
             for (const auto type : backends) {
-                if (!TMz::is_backend_available(type)) {
+                if (!TMz::backends::is_backend_available(type)) {
                     std::ostringstream message;
                     message << "run_benchmark: backend not compiled in: ";
-                    message << TMz::backend_name(type);
+                    message << TMz::backends::backend_name(type);
                     throw std::invalid_argument(message.str());
                 }
             }
@@ -132,7 +134,7 @@ namespace fdtd
 
         // Build the workload, time its run, and sum Ez once the fields are back.
         BenchmarkSample measure(const BenchmarkOptions &options, std::size_t ny,
-                                TMz::BackendType backend, const std::string &variant,
+                                TMz::backends::BackendType backend, const std::string &variant,
                                 std::size_t threads, std::size_t repeat)
         {
             TMz::Simulation::Options simOptions;
@@ -156,7 +158,7 @@ namespace fdtd
             const double seconds = std::chrono::duration<double>(stop - start).count();
             return {
                 .backend = backend,
-                .variant = backend == TMz::BackendType::OpenMP
+                .variant = backend == TMz::backends::BackendType::OpenMP
                                ? TMz::omp_variant_name(simOptions.omp)
                                : std::string("default"),
                 .threads = threads,
@@ -176,8 +178,9 @@ namespace fdtd
         }
 
         // Run the workload untimed until the warm-up time has passed.
-        void warm_up(const BenchmarkOptions &options, std::size_t ny, TMz::BackendType backend,
-                     const std::string &variant, std::size_t threads)
+        void warm_up(const BenchmarkOptions &options, std::size_t ny,
+                     TMz::backends::BackendType backend, const std::string &variant,
+                     std::size_t threads)
         {
             if (!(options.warmup > 0)) {
                 return;
@@ -209,7 +212,7 @@ namespace fdtd
             const double cells = static_cast<double>(first.nx) * static_cast<double>(first.ny) *
                                  static_cast<double>(first.nsteps);
             std::ostringstream line;
-            line << TMz::backend_name(first.backend);
+            line << TMz::backends::backend_name(first.backend);
             line << ' ';
             line << first.variant;
             line << ", threads ";
@@ -308,7 +311,7 @@ namespace fdtd
     std::string format_benchmark_row(const BenchmarkSample &sample)
     {
         std::ostringstream row;
-        row << TMz::backend_name(sample.backend);
+        row << TMz::backends::backend_name(sample.backend);
         row << ',';
         row << sample.variant;
         row << ',';
@@ -338,8 +341,8 @@ namespace fdtd
     std::vector<BenchmarkSample> run_benchmark(const BenchmarkOptions &options, std::ostream &out,
                                                std::ostream &log)
     {
-        const std::vector<TMz::BackendType> backends =
-            options.backends.empty() ? TMz::available_backends() : options.backends;
+        const std::vector<TMz::backends::BackendType> backends =
+            options.backends.empty() ? TMz::backends::available_backends() : options.backends;
         const std::vector<std::string> variants =
             options.variants.empty() ? std::vector<std::string>{"default"} : options.variants;
         const std::vector<std::size_t> threadCounts =
@@ -373,9 +376,9 @@ namespace fdtd
         }
         for (const auto backend : backends) {
             const std::vector<std::size_t> &counts =
-                backend == TMz::BackendType::Serial ? serialThreads : threadCounts;
+                backend == TMz::backends::BackendType::Serial ? serialThreads : threadCounts;
             const std::vector<std::string> &names =
-                backend == TMz::BackendType::Serial ? serialVariants : variants;
+                backend == TMz::backends::BackendType::Serial ? serialVariants : variants;
             for (const std::string &variant : names) {
                 for (const std::size_t threads : counts) {
                     warm_up(options, ny, backend, variant, threads);

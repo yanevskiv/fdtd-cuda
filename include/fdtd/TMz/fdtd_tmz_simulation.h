@@ -20,7 +20,7 @@
 #ifndef FDTD_TMZ_SIMULATION_H
 #define FDTD_TMZ_SIMULATION_H
 
-#include "fdtd/TMz/fdtd_tmz_backend.h"
+#include "fdtd/TMz/backends/fdtd_tmz_backend.h"
 #include "fdtd/TMz/fdtd_tmz_boundary.h"
 #include "fdtd/TMz/fdtd_tmz_component.h"
 #include "fdtd/TMz/fdtd_tmz_fields.h"
@@ -87,7 +87,7 @@ namespace fdtd
                 double pml_reflection = 1e-6;
 
                 /** Backend to run on. */
-                BackendType backend = BackendType::Serial;
+                backends::BackendType backend = backends::BackendType::Serial;
 
                 /** Settings of the OpenMP backend, ignored by the others. */
                 OmpOptions omp;
@@ -170,7 +170,7 @@ namespace fdtd
              *
              * @return The backend.
              */
-            const Backend &backend() const noexcept;
+            const backends::Backend &backend() const noexcept;
 
             /**
              * Add a soft point source: the waveform is added to one cell every step.
@@ -307,7 +307,7 @@ namespace fdtd
             struct Source
             {
                 /** Component and cell. */
-                PointInjection point;
+                backends::PointInjection point;
 
                 /** Value at a time in seconds. */
                 Waveform waveform;
@@ -329,7 +329,7 @@ namespace fdtd
             Fields m_fields;
 
             /** Backend that owns the working fields and steps them. */
-            std::unique_ptr<Backend> m_backend;
+            std::unique_ptr<backends::Backend> m_backend;
 
             /** Time steps run so far. */
             std::size_t m_step_count = 0;
@@ -338,7 +338,7 @@ namespace fdtd
             std::vector<Source> m_sources;
 
             /** Probe cells, in the order added. */
-            std::vector<PointProbe> m_probes;
+            std::vector<backends::PointProbe> m_probes;
 
             /** Steps of the snapshots still to take, in increasing order. */
             std::vector<std::size_t> m_snapshot_steps;

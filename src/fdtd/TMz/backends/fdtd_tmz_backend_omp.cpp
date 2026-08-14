@@ -18,10 +18,10 @@
  */
 
 // Class declaration.
-#include "fdtd/TMz/backends/fdtd_tmz_backend_openmp.h"
+#include "fdtd/TMz/backends/fdtd_tmz_backend_omp.h"
 
 // The stepper the threads share.
-#include "fdtd/TMz/backends/fdtd_tmz_stepper.h"
+#include "fdtd/TMz/backends/cpu/fdtd_tmz_backend_cpu_stepper.h"
 
 // OpenMP runtime for the default thread count.
 #include <omp.h>
@@ -34,8 +34,8 @@
 #include <string_view>
 #include <vector>
 
-// Namespace for the 2D TMz module.
-namespace fdtd::TMz
+// Namespace for the 2D TMz backends.
+namespace fdtd::TMz::backends
 {
     // Helpers private to this file.
     namespace
@@ -47,33 +47,35 @@ namespace fdtd::TMz
         const OmpOptions &checked(const OmpOptions &options)
         {
             if (options.tile_x == 0 || options.tile_y == 0) {
-                throw std::invalid_argument("OpenMPBackend: tile sides must be positive");
+                throw std::invalid_argument("OmpBackend: tile sides must be positive");
             }
             if (options.schedule == OmpSchedule::Tasks && options.region == OmpRegion::Phase) {
-                throw std::invalid_argument("OpenMPBackend: Tasks run in one region per run");
+                throw std::invalid_argument("OmpBackend: Tasks run in one region per run");
             }
             return options;
         }
 
         // Cut the grid into the parts of the schedule: rows, one range per thread, or tiles.
-        Partition partition_for(const Grid &grid, const OmpOptions &options, std::size_t threads)
+        cpu::Partition partition_for(const Grid &grid, const OmpOptions &options,
+                                     std::size_t threads)
         {
             switch (options.schedule) {
                 case OmpSchedule::Rows:
-                    return Partition::tiles(grid, grid.nx(), 1);
+                    return cpu::Partition::tiles(grid, grid.nx(), 1);
                 case OmpSchedule::Collapse2:
-                    return Partition::ranges(grid, threads);
+                    return cpu::Partition::ranges(grid, threads);
                 case OmpSchedule::Tiles:
                 case OmpSchedule::Tasks:
                     break;
             }
-            return Partition::tiles(grid, options.tile_x, options.tile_y);
+            return cpu::Partition::tiles(grid, options.tile_x, options.tile_y);
         }
 
         // Run every step as a static omp for over the parts per phase, in one region or one per
         // phase.
         template <bool Simd, OmpRegion Region>
-        void run_loops(const Stepper &stepper, std::size_t parts, std::size_t nsteps, int threads)
+        void run_loops(const cpu::Stepper &stepper, std::size_t parts, std::size_t nsteps,
+                       int threads)
         {
             if constexpr (Region == OmpRegion::Run) {
 #pragma omp parallel num_threads(threads)
@@ -103,8 +105,8 @@ namespace fdtd::TMz
 
         // Pick the region instance of the loops.
         template <bool Simd>
-        void run_loops(const Stepper &stepper, std::size_t parts, std::size_t nsteps, int threads,
-                       OmpRegion region)
+        void run_loops(const cpu::Stepper &stepper, std::size_t parts, std::size_t nsteps,
+                       int threads, OmpRegion region)
         {
             if (region == OmpRegion::Run) {
                 run_loops<Simd, OmpRegion::Run>(stepper, parts, nsteps, threads);
@@ -115,8 +117,8 @@ namespace fdtd::TMz
 
         // Make one task per tile per phase, each waiting for the phases of the tiles it reads.
         template <bool Simd>
-        void run_tasks(const Stepper &stepper, const Partition &partition, std::size_t nsteps,
-                       int threads)
+        void run_tasks(const cpu::Stepper &stepper, const cpu::Partition &partition,
+                       std::size_t nsteps, int threads)
         {
             const std::size_t parts = partition.size();
             const std::size_t columns = partition.tiles_x();
@@ -149,8 +151,8 @@ namespace fdtd::TMz
     }
 
     // Check the options, fix the thread count and cut the grid for the schedule.
-    OpenMPBackend::OpenMPBackend(const Grid &grid, const OmpOptions &options)
-        : CpuBackend(grid)
+    OmpBackend::OmpBackend(const Grid &grid, const OmpOptions &options)
+        : cpu::CpuBase(grid)
         , m_options(checked(options))
         , m_threads(options.threads > 0 ? options.threads
                                         : static_cast<std::size_t>(omp_get_max_threads()))
@@ -160,37 +162,37 @@ namespace fdtd::TMz
     }
 
     // Return the backend name.
-    std::string_view OpenMPBackend::name() const noexcept
+    std::string_view OmpBackend::name() const noexcept
     {
         return backend_name(BackendType::OpenMP);
     }
 
     // Return the backend type.
-    BackendType OpenMPBackend::type() const noexcept
+    BackendType OmpBackend::type() const noexcept
     {
         return BackendType::OpenMP;
     }
 
     // Return the options.
-    const OmpOptions &OpenMPBackend::options() const noexcept
+    const OmpOptions &OmpBackend::options() const noexcept
     {
         return m_options;
     }
 
     // Return the thread count.
-    std::size_t OpenMPBackend::threads() const noexcept
+    std::size_t OmpBackend::threads() const noexcept
     {
         return m_threads;
     }
 
     // Build the stepper and hand its parts to the threads as loops or tasks, with or without SIMD.
-    void OpenMPBackend::advance(std::size_t nsteps, std::span<const PointInjection> points,
-                                std::span<const FloatType> values)
+    void OmpBackend::advance(std::size_t nsteps, std::span<const PointInjection> points,
+                             std::span<const FloatType> values)
     {
         require_coeffs();
         FloatType *records = add_records(nsteps);
-        const Stepper stepper(fields(), coeffs(), active_pml(), boundary(), m_partition, points,
-                              values, probes(), records);
+        const cpu::Stepper stepper(fields(), coeffs(), active_pml(), boundary(), m_partition,
+                                   points, values, probes(), records);
         const int threads = static_cast<int>(m_threads);
         const std::size_t parts = m_partition.size();
         const bool tasks = m_options.schedule == OmpSchedule::Tasks;

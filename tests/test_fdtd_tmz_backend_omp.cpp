@@ -22,7 +22,7 @@
 #include <catch2/generators/catch_generators.hpp>
 
 // Project headers under test.
-#include "fdtd/TMz/fdtd_tmz_backend.h"
+#include "fdtd/TMz/backends/fdtd_tmz_backend.h"
 #include "fdtd/TMz/fdtd_tmz_omp_options.h"
 #include "fdtd/TMz/fdtd_tmz_simulation.h"
 #include "fdtd/TMz/fdtd_tmz_waveform.h"
@@ -39,13 +39,13 @@
 
 // Shorthand for the types under test.
 using fdtd::FloatType;
-using fdtd::TMz::BackendType;
 using fdtd::TMz::Boundary;
 using fdtd::TMz::Component;
 using fdtd::TMz::OmpOptions;
 using fdtd::TMz::OmpRegion;
 using fdtd::TMz::OmpSchedule;
 using fdtd::TMz::Simulation;
+using fdtd::TMz::backends::BackendType;
 
 // Helpers private to this file.
 namespace
@@ -174,7 +174,7 @@ namespace
     // Skip the test when the OpenMP backend is not compiled in.
     void require_openmp()
     {
-        if (!fdtd::TMz::is_backend_available(BackendType::OpenMP)) {
+        if (!fdtd::TMz::backends::is_backend_available(BackendType::OpenMP)) {
             SKIP("the OpenMP backend is not compiled in");
         }
     }
@@ -274,21 +274,21 @@ TEST_CASE("OpenMP backend checks its options", "[unit][backend][openmp]")
 {
     require_openmp();
     const fdtd::TMz::Grid grid(16, 16);
-    fdtd::TMz::BackendOptions options;
-    const auto backend = fdtd::TMz::make_backend(BackendType::OpenMP, grid, options);
+    fdtd::TMz::backends::BackendOptions options;
+    const auto backend = fdtd::TMz::backends::make_backend(BackendType::OpenMP, grid, options);
     CHECK(backend->name() == "openmp");
     CHECK(backend->type() == BackendType::OpenMP);
 
     options.omp.tile_x = 0;
-    CHECK_THROWS_AS(fdtd::TMz::make_backend(BackendType::OpenMP, grid, options),
+    CHECK_THROWS_AS(fdtd::TMz::backends::make_backend(BackendType::OpenMP, grid, options),
                     std::invalid_argument);
     options.omp.tile_x = 8;
     options.omp.tile_y = 0;
-    CHECK_THROWS_AS(fdtd::TMz::make_backend(BackendType::OpenMP, grid, options),
+    CHECK_THROWS_AS(fdtd::TMz::backends::make_backend(BackendType::OpenMP, grid, options),
                     std::invalid_argument);
     options.omp.tile_y = 8;
     options.omp.schedule = OmpSchedule::Tasks;
     options.omp.region = OmpRegion::Phase;
-    CHECK_THROWS_AS(fdtd::TMz::make_backend(BackendType::OpenMP, grid, options),
+    CHECK_THROWS_AS(fdtd::TMz::backends::make_backend(BackendType::OpenMP, grid, options),
                     std::invalid_argument);
 }

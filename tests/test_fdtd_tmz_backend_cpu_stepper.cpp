@@ -22,8 +22,8 @@
 #include <catch2/generators/catch_generators.hpp>
 
 // Project headers under test.
-#include "fdtd/TMz/backends/fdtd_tmz_partition.h"
-#include "fdtd/TMz/backends/fdtd_tmz_stepper.h"
+#include "fdtd/TMz/backends/cpu/fdtd_tmz_backend_cpu_partition.h"
+#include "fdtd/TMz/backends/cpu/fdtd_tmz_backend_cpu_stepper.h"
 #include "fdtd/TMz/fdtd_tmz_grid.h"
 #include "fdtd/TMz/fdtd_tmz_material.h"
 
@@ -40,10 +40,10 @@ using fdtd::TMz::Component;
 using fdtd::TMz::Fields;
 using fdtd::TMz::Grid;
 using fdtd::TMz::Material;
-using fdtd::TMz::Partition;
-using fdtd::TMz::PointInjection;
-using fdtd::TMz::PointProbe;
-using fdtd::TMz::Stepper;
+using fdtd::TMz::backends::PointInjection;
+using fdtd::TMz::backends::PointProbe;
+using fdtd::TMz::backends::cpu::Partition;
+using fdtd::TMz::backends::cpu::Stepper;
 
 // Helpers private to this file.
 namespace

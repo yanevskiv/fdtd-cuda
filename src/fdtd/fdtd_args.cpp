@@ -165,11 +165,12 @@ namespace fdtd
     }
 
     // Match the name of every backend type.
-    TMz::BackendType parse_backend_arg(std::string_view name, std::string_view text)
+    TMz::backends::BackendType parse_backend_arg(std::string_view name, std::string_view text)
     {
         for (const auto type :
-             {TMz::BackendType::Serial, TMz::BackendType::OpenMP, TMz::BackendType::Cuda}) {
-            if (text == TMz::backend_name(type)) {
+             {TMz::backends::BackendType::Serial, TMz::backends::BackendType::OpenMP,
+              TMz::backends::BackendType::Cuda}) {
+            if (text == TMz::backends::backend_name(type)) {
                 return type;
             }
         }

@@ -22,7 +22,7 @@
 #include <catch2/generators/catch_generators.hpp>
 
 // Project headers under test.
-#include "fdtd/TMz/backends/fdtd_tmz_block.h"
+#include "fdtd/TMz/backends/cpu/fdtd_tmz_backend_cpu_block.h"
 #include "fdtd/TMz/fdtd_tmz_grid.h"
 #include "fdtd/TMz/fdtd_tmz_material.h"
 
@@ -33,12 +33,12 @@
 
 // Shorthand for the types under test.
 using fdtd::FloatType;
-using fdtd::TMz::Block;
 using fdtd::TMz::Boundary;
 using fdtd::TMz::Coeffs;
 using fdtd::TMz::Fields;
 using fdtd::TMz::Grid;
 using fdtd::TMz::Material;
+using fdtd::TMz::backends::cpu::Block;
 
 // Helpers private to this file.
 namespace
@@ -90,10 +90,11 @@ namespace
     {
         for (int n = 0; n < nsteps; ++n) {
             for (const Block &block : blocks) {
-                fdtd::TMz::update_h_block<Simd>(fields, coeffs, block);
+                fdtd::TMz::backends::cpu::update_h_block<Simd>(fields, coeffs, block);
             }
             for (const Block &block : blocks) {
-                fdtd::TMz::update_e_block<Simd>(fields, coeffs, block, pml, boundary);
+                fdtd::TMz::backends::cpu::update_e_block<Simd>(fields, coeffs, block, pml,
+                                                               boundary);
             }
         }
     }
@@ -103,19 +104,20 @@ namespace
 TEST_CASE("Blocks intersect", "[unit][block]")
 {
     const Grid grid(7, 5);
-    const Block whole = fdtd::TMz::whole_block(grid);
+    const Block whole = fdtd::TMz::backends::cpu::whole_block(grid);
     CHECK(whole.i0 == 0);
     CHECK(whole.i1 == 7);
     CHECK(whole.j0 == 0);
     CHECK(whole.j1 == 5);
     CHECK_FALSE(whole.empty());
 
-    const Block part = fdtd::TMz::intersect(whole, {.i0 = 5, .i1 = 9, .j0 = 1, .j1 = 3});
+    const Block part =
+        fdtd::TMz::backends::cpu::intersect(whole, {.i0 = 5, .i1 = 9, .j0 = 1, .j1 = 3});
     CHECK(part.i0 == 5);
     CHECK(part.i1 == 7);
     CHECK(part.j0 == 1);
     CHECK(part.j1 == 3);
-    CHECK(fdtd::TMz::intersect(whole, {.i0 = 7, .i1 = 9, .j0 = 0, .j1 = 5}).empty());
+    CHECK(fdtd::TMz::backends::cpu::intersect(whole, {.i0 = 7, .i1 = 9, .j0 = 0, .j1 = 5}).empty());
     CHECK(Block{.i0 = 2, .i1 = 2, .j0 = 0, .j1 = 1}.empty());
 }
 
@@ -123,12 +125,12 @@ TEST_CASE("Blocks intersect", "[unit][block]")
 TEST_CASE("Interior block leaves out the edge and the PML", "[unit][block]")
 {
     const Grid grid(12, 9);
-    const Block plain = fdtd::TMz::interior_block(grid, 0);
+    const Block plain = fdtd::TMz::backends::cpu::interior_block(grid, 0);
     CHECK(plain.i0 == 1);
     CHECK(plain.i1 == 11);
     CHECK(plain.j0 == 1);
     CHECK(plain.j1 == 8);
-    const Block pml = fdtd::TMz::interior_block(grid, 3);
+    const Block pml = fdtd::TMz::backends::cpu::interior_block(grid, 3);
     CHECK(pml.i0 == 3);
     CHECK(pml.i1 == 9);
     CHECK(pml.j0 == 3);
@@ -153,7 +155,7 @@ TEST_CASE("Block updates match the whole-grid update", "[unit][block]")
     Fields simd(grid);
     fill_distinct(simd);
 
-    run<false>(whole, coeffs, {fdtd::TMz::whole_block(grid)}, pml, boundary, 4);
+    run<false>(whole, coeffs, {fdtd::TMz::backends::cpu::whole_block(grid)}, pml, boundary, 4);
     run<false>(blocked, coeffs, cut(grid, w, h), pml, boundary, 4);
     run<true>(simd, coeffs, cut(grid, w, h), pml, boundary, 4);
 
@@ -169,8 +171,8 @@ TEST_CASE("Edge update stays inside its block", "[unit][block][boundary]")
     Fields fields(grid);
     std::fill(fields.ez().begin(), fields.ez().end(), FloatType(1));
 
-    fdtd::TMz::update_boundary_block(fields, coeffs, {.i0 = 0, .i1 = 3, .j0 = 0, .j1 = 2},
-                                     Boundary::Pec);
+    fdtd::TMz::backends::cpu::update_boundary_block(
+        fields, coeffs, {.i0 = 0, .i1 = 3, .j0 = 0, .j1 = 2}, Boundary::Pec);
 
     for (std::size_t j = 0; j < grid.ny(); ++j) {
         for (std::size_t i = 0; i < grid.nx(); ++i) {
@@ -192,7 +194,7 @@ TEST_CASE("Block updates on degenerate grids", "[unit][block]")
     Fields blocked(grid);
     fill_distinct(blocked);
 
-    run<false>(whole, coeffs, {fdtd::TMz::whole_block(grid)}, 0, Boundary::Pmc, 3);
+    run<false>(whole, coeffs, {fdtd::TMz::backends::cpu::whole_block(grid)}, 0, Boundary::Pmc, 3);
     run<false>(blocked, coeffs, cut(grid, 1, 1), 0, Boundary::Pmc, 3);
 
     CHECK(same(whole, blocked));

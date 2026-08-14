@@ -16,16 +16,16 @@ add_executable(fdtd_tests
     test_fdtd_constants.cpp
     test_fdtd_driver.cpp
     test_fdtd_tmz_backend.cpp
-    test_fdtd_tmz_backend_openmp.cpp
+    test_fdtd_tmz_backend_cpu_block.cpp
+    test_fdtd_tmz_backend_cpu_partition.cpp
+    test_fdtd_tmz_backend_cpu_stepper.cpp
+    test_fdtd_tmz_backend_omp.cpp
     test_fdtd_tmz_backend_serial.cpp
-    test_fdtd_tmz_block.cpp
     test_fdtd_tmz_coeffs.cpp
     test_fdtd_tmz_fields.cpp
     test_fdtd_tmz_grid.cpp
     test_fdtd_tmz_material.cpp
     test_fdtd_tmz_omp_options.cpp
-    test_fdtd_tmz_partition.cpp
-    test_fdtd_tmz_stepper.cpp
     test_fdtd_tmz_output.cpp
     test_fdtd_tmz_simulation.cpp
     test_fdtd_tmz_waveform.cpp

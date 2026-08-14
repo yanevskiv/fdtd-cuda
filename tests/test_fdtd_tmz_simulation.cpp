@@ -34,13 +34,13 @@
 // Shorthand for the types under test.
 using Catch::Matchers::WithinRel;
 using fdtd::FloatType;
-using fdtd::TMz::BackendType;
 using fdtd::TMz::Boundary;
 using fdtd::TMz::Component;
 using fdtd::TMz::courant_dt;
 using fdtd::TMz::Grid;
 using fdtd::TMz::Material;
 using fdtd::TMz::Simulation;
+using fdtd::TMz::backends::BackendType;
 
 // A waveform that returns the time it is sampled at.
 static FloatType ramp(FloatType t)

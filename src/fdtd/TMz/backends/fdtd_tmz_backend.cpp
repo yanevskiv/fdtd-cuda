@@ -18,12 +18,12 @@
  */
 
 // Interface declaration.
-#include "fdtd/TMz/fdtd_tmz_backend.h"
+#include "fdtd/TMz/backends/fdtd_tmz_backend.h"
 
 // Backend implementations.
 #include "fdtd/TMz/backends/fdtd_tmz_backend_serial.h"
 #if FDTD_WITH_OPENMP
-#include "fdtd/TMz/backends/fdtd_tmz_backend_openmp.h"
+#include "fdtd/TMz/backends/fdtd_tmz_backend_omp.h"
 #endif
 
 // Standard library for algorithms, limits, errors and string building.
@@ -34,8 +34,8 @@
 #include <string>
 #include <utility>
 
-// Namespace for the 2D TMz module.
-namespace fdtd::TMz
+// Namespace for the 2D TMz backends.
+namespace fdtd::TMz::backends
 {
     // Check that a flat index names a cell inside the grid, not padding.
     static bool inside(const Grid &grid, std::size_t index)
@@ -135,10 +135,10 @@ namespace fdtd::TMz
     {
         switch (type) {
             case BackendType::Serial:
-                return std::make_unique<SerialBackend>(grid);
+                return std::make_unique<backends::SerialBackend>(grid);
             case BackendType::OpenMP:
 #if FDTD_WITH_OPENMP
-                return std::make_unique<OpenMPBackend>(grid, options.omp);
+                return std::make_unique<backends::OmpBackend>(grid, options.omp);
 #else
                 break;
 #endif
