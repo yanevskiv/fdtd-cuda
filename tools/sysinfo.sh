@@ -107,15 +107,16 @@ get_governor() {
 
 # Print the name, memory and driver of the first GPU
 get_gpu() {
-    local line="" name="" memory="" driver=""
-    line="$(first_line nvidia-smi --query-gpu=name,memory.total,driver_version \
+    local line="" name="" memory="" driver="" capability=""
+    line="$(first_line nvidia-smi --query-gpu=name,memory.total,driver_version,compute_cap \
         --format=csv,noheader)"
     if [ -n "$line" ]; then
-        IFS=',' read -r name memory driver <<< "$line"
+        IFS=',' read -r name memory driver capability <<< "$line"
     fi
     emit gpu_name "${name# }"
     emit gpu_memory "${memory# }"
     emit gpu_driver "${driver# }"
+    emit gpu_compute_capability "${capability# }"
 }
 
 # Print the C++ compiler of the build and the nvcc version
@@ -142,6 +143,16 @@ get_cmake() {
     flags="${flags# }"
     emit build_type "$type"
     emit cxx_flags "${CACHE:+${flags:-none}}"
+    flags=""
+    if [ "$(cache_value FDTD_WITH_CUDA)" = ON ]; then
+        flags="$(cache_value CMAKE_CUDA_FLAGS)"
+        if [ -n "$type" ]; then
+            flags="$flags $(cache_value "CMAKE_CUDA_FLAGS_${type^^}")"
+        fi
+        flags="${flags# }"
+    fi
+    emit cuda_architectures "$(cache_value CMAKE_CUDA_ARCHITECTURES)"
+    emit cuda_flags "${CACHE:+${flags:-none}}"
     emit fdtd_double "$(cache_value FDTD_DOUBLE)"
     emit fdtd_with_openmp "$(cache_value FDTD_WITH_OPENMP)"
     emit fdtd_with_cuda "$(cache_value FDTD_WITH_CUDA)"

@@ -24,9 +24,11 @@ CONFIG="$(dirname "$HERE")/config"
 NAME="../config"
 PROG=""
 OUT="results/profiles"
-TOOLS="perf-stat perf-record callgrind cachegrind memcheck"
+TOOLS="perf-stat perf-record callgrind cachegrind memcheck nsys ncu"
 PERF_EVENTS="task-clock,cycles:u,instructions:u,branches:u,branch-misses:u"
 PERF_EVENTS="$PERF_EVENTS,cache-references:u,cache-misses:u"
+NCU_SKIP=20
+NCU_COUNT=10
 
 # Print usage instructions
 usage() {
@@ -81,6 +83,21 @@ valgrind_refusal() {
     command -v valgrind >/dev/null || echo "valgrind is missing"
 }
 
+# Print why a GPU tool cannot profile this run, or nothing when it can
+gpu_refusal() {
+    command -v "$1" >/dev/null || { echo "$1 is missing"; return; }
+    [ "$PROFILE_BACKEND" = cuda ] || echo "$1 needs PROFILE_BACKEND=cuda"
+}
+
+# Print why ncu cannot read the GPU counters, or nothing when it can
+ncu_refusal() {
+    local params=/proc/driver/nvidia/params reason
+    reason="$(gpu_refusal ncu)"
+    [ -z "$reason" ] || { echo "$reason"; return; }
+    [ "$(id -u)" -ne 0 ] && [ -r "$params" ] && grep -q '^RmProfilingAdminOnly: 1' "$params" \
+        && echo "ncu refused (RmProfilingAdminOnly=1, counters for admins only)"
+}
+
 # Count hardware events over the whole run with perf stat
 run_perf_stat() {
     run perf stat -x, -o "$DIR/profile_perf-stat_$STAMP.csv" -e "$PERF_EVENTS" \
@@ -120,6 +137,25 @@ run_cachegrind() {
 run_memcheck() {
     run valgrind --tool=memcheck --leak-check=full \
         --log-file="$DIR/profile_memcheck_$STAMP.txt" -- "$PROG" "${VALGRIND_ARGS[@]}"
+}
+
+# Trace the CUDA calls and kernels with nsys, and save its kernel and API summaries as CSV
+run_nsys() {
+    local base="$DIR/profile_nsys_$STAMP"
+    run nsys profile --trace=cuda --sample=none --cpuctxsw=none --force-overwrite=true \
+        -o "$base" "$PROG" "${PERF_ARGS[@]}"
+    run nsys stats --report cuda_gpu_kern_sum --report cuda_api_sum --format csv \
+        --output "$base" "$base.nsys-rep"
+    mv "${base}_cuda_gpu_kern_sum.csv" "$base.csv" || exit 1
+    mv "${base}_cuda_api_sum.csv" "$DIR/profile_nsys-api_$STAMP.csv" || exit 1
+}
+
+# Measure the speed of light of a few kernels with ncu, and save its details as CSV
+run_ncu() {
+    local base="$DIR/profile_ncu_$STAMP"
+    run ncu --section SpeedOfLight --launch-skip "$NCU_SKIP" --launch-count "$NCU_COUNT" \
+        --export "$base" --force-overwrite "$PROG" "${PERF_ARGS[@]}"
+    ncu --import "$base.ncu-rep" --csv --page details > "$base.csv" 2>> "$LOG" || exit 1
 }
 
 while getopts "p:c:o:h" opt; do
@@ -175,6 +211,8 @@ describe profile_perf_size "$PROFILE_PERF_SIZE"
 describe profile_perf_steps "$PROFILE_PERF_STEPS"
 describe profile_valgrind_size "$PROFILE_VALGRIND_SIZE"
 describe profile_valgrind_steps "$PROFILE_VALGRIND_STEPS"
+describe profile_ncu_skip "$NCU_SKIP"
+describe profile_ncu_count "$NCU_COUNT"
 
 log "==> config $CONFIG: tools=($PROFILE_TOOLS) backend=$PROFILE_BACKEND\
  threads=$PROFILE_THREADS perf=${PROFILE_PERF_SIZE}^2x$PROFILE_PERF_STEPS\
@@ -182,9 +220,13 @@ log "==> config $CONFIG: tools=($PROFILE_TOOLS) backend=$PROFILE_BACKEND\
 
 PERF="$(perf_refusal)"
 VALGRIND="$(valgrind_refusal)"
+NSYS="$(gpu_refusal nsys)"
+NCU="$(ncu_refusal)"
 for tool in $PROFILE_TOOLS; do
     case "$tool" in
         perf-*) reason="$PERF" ;;
+        nsys) reason="$NSYS" ;;
+        ncu) reason="$NCU" ;;
         *) reason="$VALGRIND" ;;
     esac
     if [ -n "$reason" ]; then

@@ -18,6 +18,7 @@
 # along with fdtd-cuda; if not, see <https://www.gnu.org/licenses/>.
 
 import os
+import csv
 import argparse
 import string
 import datetime
@@ -29,6 +30,7 @@ CONFIG = ["backend", "variant", "precision", "threads", "nx", "ny", "nsteps"]
 
 FIGURES = [
     ("throughput", "Throughput versus grid size"),
+    ("speedup_size", "Speedup over serial versus grid size"),
     ("speedup", "Speedup versus number of threads"),
     ("efficiency", "Efficiency versus number of threads"),
     ("weak_efficiency", "Weak scaling efficiency versus number of threads"),
@@ -46,6 +48,20 @@ MEMCHECK = [
 ]
 
 TOP = 10
+
+NCU_METRICS = [
+    "Duration",
+    "Memory Throughput",
+    "DRAM Throughput",
+    "Compute (SM) Throughput",
+]
+
+MICROSECONDS = {
+    "nsecond": 1e-3,
+    "usecond": 1.0,
+    "msecond": 1e3,
+    "second": 1e6,
+}
 
 
 def load_info(path):
@@ -106,6 +122,12 @@ def function(name):
     if len(name) > 60:
         name = name[:57] + "..."
     return f"`{name}`"
+
+
+def kernel(name):
+    """Return a CUDA kernel's name without its namespaces and parameters, as code."""
+    name = name.split("(")[0]
+    return f"`{name.split('::')[-1]}`"
 
 
 def sources_table(runs):
@@ -278,6 +300,63 @@ def memcheck(path):
     return "```\n" + "\n".join(lines) + "\n```"
 
 
+def nsys(path):
+    """Return the GPU kernels of an nsys kernel summary, by total time, as a table."""
+    rows = []
+
+    with open(path, encoding="utf-8") as f:
+        for line in csv.DictReader(f):
+            rows.append([
+                kernel(line["Name"]),
+                line["Instances"],
+                f"{float(line['Total Time (ns)']) / 1e6:.3f}",
+                f"{float(line['Avg (ns)']) / 1e3:.2f}",
+                f"{float(line['Time (%)']):.1f}%",
+            ])
+
+    return table(["Kernel", "Launches", "Total (ms)", "Mean (us)", "Share"], "lrrrr", rows)
+
+
+def ncu(path):
+    """Return the speed-of-light metrics of an ncu details CSV, averaged per kernel, as a table.
+
+    The duration is in microseconds and the throughputs in percent of the peak.
+    """
+    sums = {}
+    launches = {}
+
+    with open(path, encoding="utf-8") as f:
+        lines = [line for line in f if not line.startswith("==")]
+
+    for line in csv.DictReader(lines):
+        metric = line["Metric Name"]
+        if metric not in NCU_METRICS:
+            continue
+
+        name = kernel(line["Kernel Name"])
+        value = float(line["Metric Value"].replace(",", ""))
+        if metric == "Duration":
+            value *= MICROSECONDS[line["Metric Unit"]]
+
+        sums.setdefault(name, {})
+        sums[name][metric] = sums[name].get(metric, 0.0) + value
+        launches.setdefault(name, set()).add(line["ID"])
+
+    rows = []
+    for name in sums:
+        count = len(launches[name])
+        row = [name, count]
+        for metric in NCU_METRICS:
+            row.append(f"{sums[name].get(metric, float('nan')) / count:.1f}")
+        rows.append(row)
+
+    return table(
+        ["Kernel", "Launches", "Duration (us)", "Memory (%)", "DRAM (%)", "SM (%)"],
+        "lrrrrr",
+        rows,
+    )
+
+
 def tool(profile, name, suffix, summarize):
     """Return the summary of a tool's output file in a profile run, or why there is none."""
     path = os.path.join(profile["dir"], f"profile_{name}_{profile['stamp']}.{suffix}")
@@ -330,6 +409,10 @@ def profile_section(profile):
         callgrind=tool(profile, "callgrind", "out", callgrind),
         cachegrind=tool(profile, "cachegrind", "out", cachegrind),
         memcheck=tool(profile, "memcheck", "txt", memcheck),
+        nsys=tool(profile, "nsys", "csv", nsys),
+        ncu=tool(profile, "ncu", "csv", ncu),
+        ncu_skip=info.get("profile_ncu_skip", "unknown"),
+        ncu_count=info.get("profile_ncu_count", "unknown"),
     )
 
 

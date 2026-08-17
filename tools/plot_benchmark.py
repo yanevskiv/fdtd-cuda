@@ -24,8 +24,11 @@ import matplotlib
 
 matplotlib.use("Agg")
 import matplotlib.pyplot as plt
+import matplotlib.ticker as ticker
 
 MARKERS = ["o", "s", "^", "D", "v", "P", "X", "*"]
+
+LEGEND_INSIDE = 8
 
 
 def load(path):
@@ -46,15 +49,15 @@ def load(path):
 def calculate(data):
     """Return the throughput, speedup and efficiency of every sample.
 
-    The speedup is over the serial median of the same grid size, and only OpenMP samples have
-    one; the others are NaN.
+    The speedup is over the serial median of the same grid size, and only OpenMP and CUDA
+    samples have one; the others are NaN. The efficiency is the speedup over the threads.
     """
     throughput = data["nx"] * data["ny"] * data["nsteps"] / data["seconds"] / 1e6
     speedup = np.full(len(data), np.nan)
 
     for nx in np.unique(data["nx"]):
         serial = data[(data["backend"] == "serial") & (data["nx"] == nx)]
-        parallel = (data["backend"] == "openmp") & (data["nx"] == nx)
+        parallel = (data["backend"] != "serial") & (data["nx"] == nx)
         if len(serial) > 0:
             speedup[parallel] = np.median(serial["seconds"]) / data["seconds"][parallel]
 
@@ -89,6 +92,23 @@ def setup(ax, xlabel, ylabel, title):
     ax.set_ylabel(ylabel)
     ax.set_title(title)
     ax.grid(axis="y", alpha=0.3)
+
+
+def log_y(ax):
+    """Make the y axis logarithmic, labelled in plain numbers at 1, 2 and 5 per decade."""
+    ax.set_yscale("log")
+    ax.yaxis.set_major_locator(ticker.LogLocator(subs=(1.0, 2.0, 5.0)))
+    ax.yaxis.set_major_formatter(ticker.ScalarFormatter())
+    ax.yaxis.set_minor_formatter(ticker.NullFormatter())
+
+
+def legend(ax):
+    """Draw the legend inside the axes, or beside them when it holds many curves."""
+    count = len(ax.get_legend_handles_labels()[1])
+    if count > LEGEND_INSIDE:
+        ax.legend(fontsize="small", loc="upper left", bbox_to_anchor=(1.02, 1))
+    else:
+        ax.legend()
 
 
 def plot_by_size(args, data, values):
@@ -135,11 +155,62 @@ def plot_by_size(args, data, values):
     ax.set_xticks(sizes)
     ax.set_xticklabels([str(size) for size in sizes])
     ax.minorticks_off()
+    if np.any(data["backend"] == "cuda"):
+        log_y(ax)
 
     setup(ax, "Grid size nx = ny", "Throughput (Mcells/s)", "Throughput versus grid size")
-    ax.legend()
+    legend(ax)
 
     save(fig, args, "throughput")
+
+
+def plot_speedup_by_size(args, data, values):
+    """Plot the speedup over serial against grid size, one curve per backend and variant.
+
+    Each OpenMP variant is drawn at its largest thread count. The y axis is logarithmic when a
+    GPU is in the run, whose speedup is orders of magnitude above the CPU's.
+    """
+    fig, ax = plt.subplots(figsize=(8, 5))
+
+    i = 0
+    for backend in np.unique(data["backend"]):
+        if backend == "serial":
+            continue
+
+        selected = (data["backend"] == backend) & ~np.isnan(values)
+        for variant in np.unique(data["variant"][selected]):
+            mask = selected & (data["variant"] == variant)
+            p = np.max(data["threads"][mask])
+            mask = mask & (data["threads"] == p)
+
+            x, y = statistics(data[mask], values[mask], "nx")
+
+            label = f"{backend} {variant}"
+            if backend == "openmp":
+                label += f", p={p}"
+
+            ax.plot(
+                x,
+                y,
+                marker=MARKERS[i % len(MARKERS)],
+                linewidth=1.8,
+                label=label,
+            )
+            i += 1
+
+    sizes = np.unique(data["nx"])
+    ax.set_xscale("log")
+    ax.set_xticks(sizes)
+    ax.set_xticklabels([str(size) for size in sizes])
+    ax.minorticks_off()
+    if np.any(data["backend"] == "cuda"):
+        log_y(ax)
+    ax.axhline(1, color="k", linestyle="--", linewidth=1.3, label="serial")
+
+    setup(ax, "Grid size nx = ny", "Speedup S", "Speedup over serial versus grid size")
+    legend(ax)
+
+    save(fig, args, "speedup_size")
 
 
 def plot_by_threads(args, data, values, ylabel, title, filename, ideal):
@@ -275,9 +346,18 @@ def main():
         remove(args, "weak_efficiency")
 
     if np.all(np.isnan(speedup)):
+        remove(args, "speedup_size")
         remove(args, "speedup")
         remove(args, "efficiency")
-        print("==> No OpenMP samples with a serial run of the same size: no speedup plots")
+        print("==> No samples with a serial run of the same size: no speedup plots")
+        return
+
+    plot_speedup_by_size(args, data, speedup)
+
+    if np.all(np.isnan(speedup[data["backend"] == "openmp"])):
+        remove(args, "speedup")
+        remove(args, "efficiency")
+        print("==> No OpenMP samples with a serial run of the same size: no thread plots")
         return
 
     plot_by_threads(

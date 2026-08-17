@@ -15,11 +15,12 @@ BENCH_REPEAT=10
 # Backends: serial, openmp, cuda, or all for every compiled one
 BENCH_BACKENDS="all"
 
-# Thread counts, ignored by serial
+# Thread counts, for OpenMP only
 BENCH_THREADS="1 2 4"
 
-# OpenMP variants, SCHEDULE[:WxH][+simd][+phase] with rows, collapse2, tiles or tasks, or default;
-# ignored by serial
+# Variants, OpenMP and CUDA names mixed: OpenMP SCHEDULE[:WxH][+simd][+phase] with rows,
+# collapse2, tiles or tasks; CUDA KERNEL[:BXxBY] with fused or split; or default. Each backend
+# runs the names it reads, or default when it reads none; serial runs default only
 BENCH_VARIANTS="default"
 
 # Weak scaling: per thread count p, OpenMP on nx = BENCH_WEAK_NX and ny = p * BENCH_WEAK_NX, into
@@ -31,14 +32,15 @@ BENCH_SIZES="128 256 512 1024 2048"
 
 # --- Profile run ---
 
-# Tools, any of: perf-stat perf-record callgrind cachegrind memcheck
+# Tools, any of: perf-stat perf-record callgrind cachegrind memcheck nsys ncu; nsys and ncu
+# need PROFILE_BACKEND="cuda"
 PROFILE_TOOLS="perf-stat perf-record callgrind cachegrind memcheck"
 
 # Backend and thread count profiled
 PROFILE_BACKEND="serial"
 PROFILE_THREADS=1
 
-# Grid size, nx = ny, and time steps under perf
+# Grid size, nx = ny, and time steps under perf, nsys and ncu
 PROFILE_PERF_SIZE=1024
 PROFILE_PERF_STEPS=200
 

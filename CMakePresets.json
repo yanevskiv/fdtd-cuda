@@ -88,9 +88,12 @@
         },
         {
             "name": "profile",
-            "displayName": "Profile (the bench preset with symbols and frame pointers)",
+            "displayName": "Profile (the bench preset with symbols, frame pointers and CUDA line info)",
             "inherits": ["bench"],
-            "cacheVariables": { "CMAKE_CXX_FLAGS": "-g -fno-omit-frame-pointer" }
+            "cacheVariables": {
+                "CMAKE_CXX_FLAGS": "-g -fno-omit-frame-pointer",
+                "CMAKE_CUDA_FLAGS": "-lineinfo"
+            }
         }
     ],
     "buildPresets": [
