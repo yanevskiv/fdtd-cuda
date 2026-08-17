@@ -60,6 +60,7 @@ if(FDTD_WITH_OPENMP)
 endif()
 if(FDTD_WITH_CUDA)
     target_sources(fdtd PRIVATE
+        src/fdtd/TMz/backends/fdtd_tmz_backend_cuda.cu
         src/fdtd/TMz/backends/gpu/fdtd_tmz_backend_gpu_buffer.cu
         src/fdtd/TMz/backends/gpu/fdtd_tmz_backend_gpu_device.cu
         src/fdtd/TMz/backends/gpu/fdtd_tmz_backend_gpu_stream.cu)

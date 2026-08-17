@@ -63,6 +63,13 @@ namespace fdtd
             Phase
         };
 
+        /** How the CUDA backend lays the update of a step out in kernels. */
+        enum class CudaKernel {
+            /** One E kernel for every cell, each thread taking its cell's edge, PML or interior
+             * branch. The default. */
+            Fused
+        };
+
         /**
          * A 2D TMz simulation: grid, material, fields and the backend that steps them.
          *
@@ -131,6 +138,16 @@ namespace fdtd
                 /** Where the OpenMP backend opens its parallel regions; Tasks takes Run only. */
                 OmpRegion omp_region = OmpRegion::Run;
 
+                /** How the CUDA backend lays a step out in kernels. */
+                CudaKernel cuda_kernel = CudaKernel::Fused;
+
+                /** Threads along x of a CUDA thread block, positive. */
+                std::size_t cuda_block_x = 32;
+
+                /** Threads along y of a CUDA thread block, positive, with cuda_block_x *
+                 * cuda_block_y within the device's threads per block. */
+                std::size_t cuda_block_y = 8;
+
                 /** Whether an explicit dt above the Courant limit is rejected. */
                 bool check_stability = true;
             };
@@ -154,7 +171,9 @@ namespace fdtd
              *         a negative or non-finite dt, or, with check_stability, an explicit
              *         dt above the Courant limit, or, with an active PML, PML settings that
              *         Material::set_pml() rejects, or backend settings the backend rejects.
-             * @throws std::runtime_error When the backend is not compiled in.
+             * @throws std::runtime_error When the backend is not compiled in, or is CUDA and no
+             *         device is present.
+             * @throws CudaError When a CUDA call of the backend fails.
              */
             Simulation(std::size_t nx, std::size_t ny, const Options &options);
 
@@ -392,7 +411,8 @@ namespace fdtd
          * @param type Backend type.
          * @param grid Grid the backend works on.
          * @return The new backend.
-         * @throws std::runtime_error When the backend is not compiled in.
+         * @throws std::runtime_error When the backend is not compiled in, or is CUDA and no
+         *         device is present.
          */
         std::unique_ptr<Backend> make_backend(BackendType type, const Grid &grid);
 
@@ -401,9 +421,10 @@ namespace fdtd
          *
          * @param type Backend type.
          * @param grid Grid the backend works on.
-         * @param options Settings; a backend reads only its own, as the omp_ fields.
+         * @param options Settings; a backend reads only its own, as the omp_ or cuda_ fields.
          * @return The new backend.
-         * @throws std::runtime_error When the backend is not compiled in.
+         * @throws std::runtime_error When the backend is not compiled in, or is CUDA and no
+         *         device is present.
          * @throws std::invalid_argument When the backend's settings are invalid.
          */
         std::unique_ptr<Backend> make_backend(BackendType type, const Grid &grid,

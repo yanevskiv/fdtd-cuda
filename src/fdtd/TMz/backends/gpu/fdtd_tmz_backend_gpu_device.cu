@@ -20,6 +20,9 @@
 // Function declarations.
 #include "fdtd/TMz/backends/gpu/fdtd_tmz_backend_gpu_device.h"
 
+// The check that turns a failed call into a CudaError.
+#include "fdtd/TMz/backends/gpu/fdtd_tmz_backend_gpu_check.cuh"
+
 // CUDA runtime.
 #include <cuda_runtime.h>
 
@@ -38,5 +41,16 @@ namespace fdtd::TMz::backends::gpu
             return 0;
         }
         return static_cast<std::size_t>(count);
+    }
+
+    // Ask the current device for its limit.
+    std::size_t max_threads_per_block()
+    {
+        int device = 0;
+        check(cudaGetDevice(&device), "cudaGetDevice");
+        int threads = 0;
+        check(cudaDeviceGetAttribute(&threads, cudaDevAttrMaxThreadsPerBlock, device),
+              "cudaDeviceGetAttribute");
+        return static_cast<std::size_t>(threads);
     }
 }

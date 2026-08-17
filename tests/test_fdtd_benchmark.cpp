@@ -24,6 +24,7 @@
 #include "fdtd/fdtd_benchmark.h"
 #include "fdtd/fdtd_float.h"
 
+#include <cstddef>
 #include <filesystem>
 #include <fstream>
 #include <sstream>
@@ -247,10 +248,14 @@ TEST_CASE("Benchmark warm-up does not leak into samples", "[unit][benchmark]")
 {
     auto options = small();
     std::string csv;
-    const double cold = run(options, csv).front().checksum;
+    const auto cold = run(options, csv);
     options.warmup = 0.01;
-    for (const BenchmarkSample &sample : run(options, csv)) {
-        CHECK(sample.checksum == cold);
+    const auto warm = run(options, csv);
+    REQUIRE(warm.size() == cold.size());
+    for (std::size_t k = 0; k < warm.size(); ++k) {
+        INFO("backend " << fdtd::TMz::backend_name(warm[k].backend));
+        CHECK(warm[k].backend == cold[k].backend);
+        CHECK(warm[k].checksum == cold[k].checksum);
     }
 }
 
@@ -267,6 +272,26 @@ TEST_CASE("Benchmark resolves ny and serial threads", "[unit][benchmark]")
     REQUIRE(samples.size() == 1);
     CHECK(samples[0].ny == 48);
     CHECK(samples[0].threads == 1);
+}
+
+// Verify that CUDA runs once as default with one thread, whatever the OpenMP settings.
+TEST_CASE("Benchmark runs CUDA once", "[unit][benchmark][cuda]")
+{
+    if (!fdtd::TMz::is_backend_available(BackendType::Cuda)) {
+        SKIP("the CUDA backend is not compiled in, or no device is present");
+    }
+    auto options = small();
+    options.repeat = 1;
+    options.backends = {BackendType::Cuda};
+    options.threads = {2, 4};
+    options.variants = {"rows", "tiles+simd"};
+    std::string csv;
+    const auto samples = run(options, csv);
+    REQUIRE(samples.size() == 1);
+    CHECK(samples[0].backend == BackendType::Cuda);
+    CHECK(samples[0].variant == "default");
+    CHECK(samples[0].threads == 1);
+    CHECK(samples[0].checksum != 0);
 }
 
 // Verify one row set per OpenMP variant under its canonical name, serial once as default.

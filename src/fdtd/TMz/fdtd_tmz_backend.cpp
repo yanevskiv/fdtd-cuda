@@ -20,6 +20,11 @@
 // Interface declaration.
 #include "fdtd/TMz/fdtd_tmz_backend.h"
 
+// The CUDA device count, for the registry.
+#if FDTD_WITH_CUDA
+#include "fdtd/TMz/backends/gpu/fdtd_tmz_backend_gpu_device.h"
+#endif
+
 // Standard library for algorithms, limits, errors and pairs.
 #include <algorithm>
 #include <limits>
@@ -98,13 +103,18 @@ namespace fdtd::TMz
         return "unknown";
     }
 
-    // List the backends compiled into this build.
+    // List the backends compiled into this build, CUDA only when a device is present.
     std::vector<BackendType> available_backends()
     {
         std::vector<BackendType> types{BackendType::Serial};
         if (FDTD_WITH_OPENMP) {
             types.push_back(BackendType::OpenMP);
         }
+#if FDTD_WITH_CUDA
+        if (backends::gpu::device_count() > 0) {
+            types.push_back(BackendType::Cuda);
+        }
+#endif
         return types;
     }
 

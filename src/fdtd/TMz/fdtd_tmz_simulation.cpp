@@ -29,6 +29,9 @@
 #if FDTD_WITH_OPENMP
 #include "fdtd/TMz/backends/fdtd_tmz_backend_omp.h"
 #endif
+#if FDTD_WITH_CUDA
+#include "fdtd/TMz/backends/fdtd_tmz_backend_cuda.h"
+#endif
 
 // Standard library for algorithms, math, errors, string building and moves.
 #include <algorithm>
@@ -347,7 +350,11 @@ namespace fdtd::TMz
                 break;
 #endif
             case BackendType::Cuda:
+#if FDTD_WITH_CUDA
+                return std::make_unique<backends::CudaBackend>(grid, options);
+#else
                 break;
+#endif
         }
         std::ostringstream message;
         message << "make_backend: the ";

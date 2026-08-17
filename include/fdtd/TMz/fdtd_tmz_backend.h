@@ -254,14 +254,14 @@ namespace fdtd
         std::string_view backend_name(BackendType type) noexcept;
 
         /**
-         * Backends compiled into this build, serial first.
+         * Backends compiled into this build, serial first; CUDA only when a device is present.
          *
          * @return The available types.
          */
         std::vector<BackendType> available_backends();
 
         /**
-         * Whether a backend is compiled into this build.
+         * Whether a backend is compiled into this build and, for CUDA, a device is present.
          *
          * @param type Backend type.
          * @return True when make_backend() can create it.

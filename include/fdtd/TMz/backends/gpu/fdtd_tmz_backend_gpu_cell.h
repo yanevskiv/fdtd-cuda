@@ -21,6 +21,7 @@
 #define FDTD_TMZ_BACKEND_GPU_CELL_H
 
 #include "fdtd/TMz/fdtd_tmz_boundary.h"
+#include "fdtd/TMz/fdtd_tmz_component.h"
 #include "fdtd/fdtd_float.h"
 
 #ifdef __CUDACC__
@@ -116,6 +117,41 @@ namespace fdtd
                     /** Hy curl factors. */
                     const FloatType *coeff_hy_2;
                 };
+
+                /** A cell of one component that a source adds to or a probe reads, on the device.
+                 */
+                struct DevicePoint
+                {
+                    /** Component the cell belongs to. */
+                    Component component;
+
+                    /** Index of the cell, j * pitch + i with the device pitch. */
+                    int cell;
+
+                    /** Column of the point in a step's row of source values or probe records. */
+                    int column;
+                };
+
+                /**
+                 * Array of a component.
+                 *
+                 * @param fields Fields and grid.
+                 * @param component Ez, Hx or Hy.
+                 * @return The array.
+                 */
+                FDTD_HOST_DEVICE inline FloatType *field_of(const DeviceFields &fields,
+                                                            Component component) noexcept
+                {
+                    switch (component) {
+                        case Component::Hx:
+                            return fields.hx;
+                        case Component::Hy:
+                            return fields.hy;
+                        case Component::Ez:
+                            break;
+                    }
+                    return fields.ez;
+                }
 
                 /**
                  * Whether a cell lies on the edge of the grid.

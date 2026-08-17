@@ -42,6 +42,14 @@ namespace fdtd
                  * @return The device count.
                  */
                 std::size_t device_count() noexcept;
+
+                /**
+                 * Most threads a block may hold on the current device.
+                 *
+                 * @return The limit, 1024 on every device since compute capability 2.0.
+                 * @throws CudaError When the query fails.
+                 */
+                std::size_t max_threads_per_block();
             }
         }
     }

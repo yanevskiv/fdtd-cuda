@@ -20,6 +20,7 @@ add_executable(fdtd_tests
     test_fdtd_tmz_backend_cpu_block.cpp
     test_fdtd_tmz_backend_cpu_partition.cpp
     test_fdtd_tmz_backend_cpu_stepper.cpp
+    test_fdtd_tmz_backend_cuda.cpp
     test_fdtd_tmz_backend_gpu_cell.cpp
     test_fdtd_tmz_backend_omp.cpp
     test_fdtd_tmz_backend_serial.cpp
@@ -41,8 +42,12 @@ endif()
 target_link_libraries(fdtd_tests PRIVATE fdtd::fdtd fdtd_args fdtd_benchmark fdtd_driver fdtd_warnings Catch2::Catch2WithMain)
 # The bound of the backend comparisons, in machine epsilons per step.
 set(FDTD_TEST_TOLERANCE 4 CACHE STRING "Bound of the backend comparisons in machine epsilons per step")
+# CUDA's bound is wider: nvcc fuses multiply-adds that the host rounds twice.
+set(FDTD_TEST_CUDA_TOLERANCE 8 CACHE STRING
+    "Bound of the CUDA comparisons with serial in machine epsilons per step")
 target_compile_definitions(fdtd_tests PRIVATE
     FDTD_TEST_TOLERANCE=${FDTD_TEST_TOLERANCE}
+    FDTD_TEST_CUDA_TOLERANCE=${FDTD_TEST_CUDA_TOLERANCE}
     FDTD_TEST_PROJECT_VERSION="${PROJECT_VERSION}"
     FDTD_TEST_PROJECT_VERSION_MAJOR=${PROJECT_VERSION_MAJOR}
     FDTD_TEST_PROJECT_VERSION_MINOR=${PROJECT_VERSION_MINOR}
@@ -70,3 +75,29 @@ add_test(NAME "benchmark program smoke"
 set_tests_properties("benchmark program smoke" PROPERTIES
     LABELS "bench-smoke"
     PASS_REGULAR_EXPRESSION "${bench_header}\nserial,default,[a-z]+,1,64,64,10,")
+
+# The CUDA tests under compute-sanitizer's four tools, run by hand. Failed API calls are left to
+# the tests, which make one on purpose and see every other as a CudaError.
+if(FDTD_WITH_CUDA)
+    find_program(FDTD_COMPUTE_SANITIZER compute-sanitizer HINTS ${CUDAToolkit_BIN_DIR})
+    if(FDTD_COMPUTE_SANITIZER)
+        set(sanitize_steps)
+        foreach(tool memcheck initcheck synccheck racecheck)
+            set(tool_options --tool ${tool} --error-exitcode 1 --report-api-errors no)
+            if(tool STREQUAL "memcheck")
+                list(APPEND tool_options --leak-check full)
+            endif()
+            list(APPEND sanitize_steps
+                COMMAND ${CMAKE_COMMAND} -E echo "==> compute-sanitizer --tool ${tool}"
+                COMMAND ${FDTD_COMPUTE_SANITIZER} ${tool_options} $<TARGET_FILE:fdtd_tests> [cuda])
+        endforeach()
+    else()
+        set(sanitize_steps
+            COMMAND ${CMAKE_COMMAND} -E echo "cuda-sanitize: compute-sanitizer is missing"
+            COMMAND ${CMAKE_COMMAND} -E false)
+    endif()
+    add_custom_target(cuda-sanitize ${sanitize_steps}
+        DEPENDS fdtd_tests
+        USES_TERMINAL
+        VERBATIM)
+endif()

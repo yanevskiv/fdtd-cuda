@@ -78,19 +78,23 @@ TEST_CASE("Registry lists the serial backend first", "[unit][backend]")
     CHECK(fdtd::TMz::is_backend_available(fdtd::TMz::BackendType::Serial));
 }
 
-// Verify that the registry lists OpenMP when it is compiled in, and never CUDA yet.
+// Verify that the registry lists OpenMP when compiled in, and CUDA only when compiled in.
 TEST_CASE("Registry reports what was compiled in", "[unit][backend]")
 {
     using fdtd::TMz::BackendType;
     const fdtd::TMz::Grid grid(4, 4);
 
-    CHECK(fdtd::TMz::available_backends().size() == (FDTD_WITH_OPENMP ? 2 : 1));
+    const bool cuda = fdtd::TMz::is_backend_available(BackendType::Cuda);
+    CHECK(fdtd::TMz::available_backends().size() ==
+          1 + (FDTD_WITH_OPENMP ? 1U : 0U) + (cuda ? 1U : 0U));
     CHECK(fdtd::TMz::is_backend_available(BackendType::OpenMP) == bool(FDTD_WITH_OPENMP));
     if (!FDTD_WITH_OPENMP) {
         CHECK_THROWS_AS(fdtd::TMz::make_backend(BackendType::OpenMP, grid), std::runtime_error);
     }
-    CHECK_FALSE(fdtd::TMz::is_backend_available(BackendType::Cuda));
-    CHECK_THROWS_AS(fdtd::TMz::make_backend(BackendType::Cuda, grid), std::runtime_error);
+    if (!FDTD_WITH_CUDA) {
+        CHECK_FALSE(cuda);
+        CHECK_THROWS_AS(fdtd::TMz::make_backend(BackendType::Cuda, grid), std::runtime_error);
+    }
 }
 
 // Verify that the serial backend ignores the settings of the OpenMP backend, even invalid ones.

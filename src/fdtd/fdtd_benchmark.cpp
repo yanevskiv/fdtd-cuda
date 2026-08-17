@@ -273,8 +273,8 @@ namespace fdtd
         usage << "                        (default: all)\n";
         usage << "  --variant V           OpenMP variant, SCHEDULE[:WxH][+simd][+phase] with\n";
         usage << "                        rows, collapse2, tiles or tasks, or default;\n";
-        usage << "                        repeatable, ignored by serial (default: default)\n";
-        usage << "  --threads N           Thread count, ignored by serial; repeatable\n";
+        usage << "                        repeatable, for OpenMP only (default: default)\n";
+        usage << "  --threads N           Thread count, for OpenMP only; repeatable\n";
         usage << "                        (default: 1)\n";
         usage << "  --boundary B          Outer boundary, pec, pmc or pml (default: pml)\n";
         usage << "  --output FILE         Write the CSV to FILE (default: standard output)\n";
@@ -336,8 +336,8 @@ namespace fdtd
             options.variants.empty() ? std::vector<std::string>{"default"} : options.variants;
         const std::vector<std::size_t> threadCounts =
             options.threads.empty() ? std::vector<std::size_t>{1} : options.threads;
-        const std::vector<std::size_t> serialThreads{1};
-        const std::vector<std::string> serialVariants{"default"};
+        const std::vector<std::size_t> oneThread{1};
+        const std::vector<std::string> defaultOnly{"default"};
         const std::size_t ny = options.ny > 0 ? options.ny : options.nx;
         if (!options.header_only) {
             check(options, backends, variants);
@@ -364,10 +364,9 @@ namespace fdtd
             return samples;
         }
         for (const auto backend : backends) {
-            const std::vector<std::size_t> &counts =
-                backend == TMz::BackendType::Serial ? serialThreads : threadCounts;
-            const std::vector<std::string> &names =
-                backend == TMz::BackendType::Serial ? serialVariants : variants;
+            const bool openmp = backend == TMz::BackendType::OpenMP;
+            const std::vector<std::size_t> &counts = openmp ? threadCounts : oneThread;
+            const std::vector<std::string> &names = openmp ? variants : defaultOnly;
             for (const std::string &variant : names) {
                 for (const std::size_t threads : counts) {
                     warm_up(options, ny, backend, variant, threads);

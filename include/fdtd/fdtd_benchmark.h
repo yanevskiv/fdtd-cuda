@@ -58,7 +58,7 @@ namespace fdtd
         /** OpenMP variant names (see parse_omp_variant_arg) to measure; none means "default". */
         std::vector<std::string> variants;
 
-        /** Thread counts to measure, ignored by serial; none means 1. */
+        /** Thread counts to measure, read by OpenMP only; none means 1. */
         std::vector<std::size_t> threads;
 
         /** Outer boundary condition; the PML takes the default settings of Simulation. */
@@ -89,7 +89,7 @@ namespace fdtd
         /** Canonical OpenMP variant name, or "default" for the other backends. */
         std::string variant;
 
-        /** Threads the run used, 1 for serial. */
+        /** Threads the run used, 1 for serial and CUDA. */
         std::size_t threads;
 
         /** Cells along x. */
@@ -153,9 +153,9 @@ namespace fdtd
      *
      * The workload is a grid of vacuum at Courant number 0.99 with a Gaussian Ez source
      * 12 steps wide at the centre. A configuration is a backend, a variant and a thread
-     * count; serial runs once per size, as "default" with one thread. Each one is warmed up with
-     * untimed runs, then measured repeat times; every sample builds a new Simulation and times only
-     * Simulation::run. A summary line per configuration goes to the log.
+     * count; serial and CUDA run once per size, as "default" with one thread. Each one is warmed up
+     * with untimed runs, then measured repeat times; every sample builds a new Simulation and times
+     * only Simulation::run. A summary line per configuration goes to the log.
      *
      * @param options Settings of the run.
      * @param out Stream for the CSV when no output file is set.
