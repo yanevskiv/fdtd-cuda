@@ -20,6 +20,7 @@ add_executable(fdtd_tests
     test_fdtd_tmz_backend_cpu_block.cpp
     test_fdtd_tmz_backend_cpu_partition.cpp
     test_fdtd_tmz_backend_cpu_stepper.cpp
+    test_fdtd_tmz_backend_gpu_cell.cpp
     test_fdtd_tmz_backend_omp.cpp
     test_fdtd_tmz_backend_serial.cpp
     test_fdtd_tmz_coeffs.cpp
