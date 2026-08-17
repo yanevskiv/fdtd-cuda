@@ -23,6 +23,7 @@
 #include "fdtd/TMz/fdtd_tmz_simulation.h"
 #include "fdtd/TMz/fdtd_tmz_waveform.h"
 #include "fdtd/fdtd_constants.h"
+#include "fdtd/fdtd_cuda_error.h"
 #include "fdtd/fdtd_float.h"
 #include "fdtd/fdtd_version.h"
 

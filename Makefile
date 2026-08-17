@@ -5,7 +5,7 @@ BENCH_DIR ?= $(lastword $(sort $(wildcard build/results/benchmarks/*)))
 PROFILE_DIR ?= $(lastword $(sort $(wildcard build/results/profiles/*)))
 REPORT_DIR ?= build/reports/$(shell date +%s%3N)
 
-SOURCES = $(shell git ls-files --cached --others --exclude-standard 'include/*.h' 'src/*.h' 'src/*.cpp' 'src/*.cu' 'src/*.cuh' \
+SOURCES = $(shell git ls-files --cached --others --exclude-standard 'include/*.h' 'include/*.cuh' 'src/*.h' 'src/*.cpp' 'src/*.cu' 'src/*.cuh' \
 	'tests/*.cpp' 'tests/*.h' 'samples/*.cpp')
 
 .PHONY: all configure build test install workflow bench profile report

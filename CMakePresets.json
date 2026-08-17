@@ -58,6 +58,16 @@
             }
         },
         {
+            "name": "cuda",
+            "displayName": "CUDA required (gcc, Debug), warnings as errors",
+            "inherits": ["base", "gcc"],
+            "cacheVariables": {
+                "CMAKE_BUILD_TYPE": "Debug",
+                "FDTD_WITH_CUDA": "ON",
+                "FDTD_WERROR": "ON"
+            }
+        },
+        {
             "name": "exact",
             "displayName": "Exact (gcc, Release, no contracted multiply-adds)",
             "inherits": ["base", "gcc"],
@@ -89,6 +99,7 @@
         { "name": "clang-debug", "configurePreset": "clang-debug" },
         { "name": "clang-release", "configurePreset": "clang-release" },
         { "name": "ci-cpu", "configurePreset": "ci-cpu" },
+        { "name": "cuda", "configurePreset": "cuda" },
         { "name": "exact", "configurePreset": "exact" },
         { "name": "bench", "configurePreset": "bench" },
         { "name": "profile", "configurePreset": "profile" }
@@ -105,6 +116,7 @@
         { "name": "clang-debug", "inherits": "base", "configurePreset": "clang-debug" },
         { "name": "clang-release", "inherits": "base", "configurePreset": "clang-release" },
         { "name": "ci-cpu", "inherits": "base", "configurePreset": "ci-cpu" },
+        { "name": "cuda", "inherits": "base", "configurePreset": "cuda" },
         { "name": "exact", "inherits": "base", "configurePreset": "exact" }
     ],
     "workflowPresets": [

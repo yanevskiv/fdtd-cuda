@@ -16,6 +16,9 @@ include(FdtdBackends)
 set(CMAKE_CXX_STANDARD 20)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_CXX_EXTENSIONS OFF)
+set(CMAKE_CUDA_STANDARD 20)
+set(CMAKE_CUDA_STANDARD_REQUIRED ON)
+set(CMAKE_CUDA_EXTENSIONS OFF)
 set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
 
 option(FDTD_DOUBLE "Use double instead of float for fdtd::FloatType" OFF)
@@ -26,6 +29,7 @@ option(FDTD_EXACT "Build the library without contracted multiply-adds, for bit-f
 
 # The library.
 add_library(fdtd
+    src/fdtd/fdtd_cuda_error.cpp
     src/fdtd/TMz/fdtd_tmz_backend.cpp
     src/fdtd/TMz/fdtd_tmz_coeffs.cpp
     src/fdtd/TMz/fdtd_tmz_fields.cpp
@@ -54,10 +58,16 @@ if(FDTD_WITH_OPENMP)
     target_sources(fdtd PRIVATE src/fdtd/TMz/backends/fdtd_tmz_backend_omp.cpp)
     target_link_libraries(fdtd PRIVATE OpenMP::OpenMP_CXX)
 endif()
+if(FDTD_WITH_CUDA)
+    target_sources(fdtd PRIVATE src/fdtd/TMz/backends/gpu/fdtd_tmz_backend_gpu_device.cu)
+    target_link_libraries(fdtd PRIVATE CUDA::cudart)
+endif()
 
 # The exact build: no multiply-add is contracted, so rounding follows the source.
 if(FDTD_EXACT)
-    target_compile_options(fdtd PRIVATE $<$<COMPILE_LANG_AND_ID:CXX,GNU,Clang>:-ffp-contract=off>)
+    target_compile_options(fdtd PRIVATE
+        $<$<COMPILE_LANG_AND_ID:CXX,GNU,Clang>:-ffp-contract=off>
+        $<$<COMPILE_LANGUAGE:CUDA>:--fmad=false>)
 endif()
 
 # Argument parsing shared by the programs.

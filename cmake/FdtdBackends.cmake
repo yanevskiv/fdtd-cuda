@@ -17,3 +17,13 @@ option(FDTD_WITH_CUDA "Build the CUDA backend" ${fdtd_cuda_found})
 if(FDTD_WITH_CUDA AND NOT fdtd_cuda_found)
     message(FATAL_ERROR "FDTD_WITH_CUDA is ON but no CUDA compiler was found")
 endif()
+
+# The CUDA language for the backend's .cu files, built for the GPU of this machine unless the
+# architectures are given.
+if(FDTD_WITH_CUDA)
+    if(NOT DEFINED CMAKE_CUDA_ARCHITECTURES)
+        set(CMAKE_CUDA_ARCHITECTURES native CACHE STRING "CUDA architectures to build for")
+    endif()
+    enable_language(CUDA)
+    find_package(CUDAToolkit REQUIRED)
+endif()
