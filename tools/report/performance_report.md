@@ -9,7 +9,7 @@ colorlinks: true
 header-includes:
   - \usepackage{float}
   - \floatplacement{figure}{H}
-  - \AtBeginEnvironment{longtable}{\small}
+  - \AtBeginEnvironment{longtable}{\small\setlength{\tabcolsep}{4pt}}
 ---
 
 # Sources
@@ -21,7 +21,7 @@ $sources
 
 # Machine
 
-The description each run recorded of the machine and the build it ran.
+The description each run recorded of the machine and the build it ran, the values all runs share first.
 
 $machine
 

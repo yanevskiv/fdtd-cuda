@@ -142,18 +142,33 @@ def sources_table(runs):
 
 
 def machine_table(runs):
-    """Return the machine description of each run as a table, a column per run."""
+    """
+    Return the machine description of the runs as tables.
+
+    Returns the keys every run gives the same value in one table, a value each, then the keys
+    the runs differ in, a column per run, so long values such as the CPU model fit the page.
+    """
     keys = []
     for _, run in runs:
         for key in run["info"]:
             if key not in keys and not key.startswith(("profile_", "skipped_")):
                 keys.append(key)
 
-    rows = []
+    shared = []
+    differ = []
     for key in keys:
-        rows.append([f"`{key}`"] + [run["info"].get(key, "") for _, run in runs])
+        values = [run["info"].get(key, "") for _, run in runs]
+        if len(set(values)) == 1:
+            shared.append([f"`{key}`", values[0]])
+        else:
+            differ.append([f"`{key}`"] + values)
 
-    return table(["Key"] + [label for label, _ in runs], "l" * (len(runs) + 1), rows)
+    text = table(["Key", "Value"], "ll", shared)
+    if differ:
+        text += "\n\nThe keys the runs differ in:\n\n"
+        text += table(["Key"] + [label for label, _ in runs], "l" * (len(runs) + 1), differ)
+
+    return text
 
 
 def results_table(data):
