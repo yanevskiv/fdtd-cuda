@@ -59,7 +59,10 @@ if(FDTD_WITH_OPENMP)
     target_link_libraries(fdtd PRIVATE OpenMP::OpenMP_CXX)
 endif()
 if(FDTD_WITH_CUDA)
-    target_sources(fdtd PRIVATE src/fdtd/TMz/backends/gpu/fdtd_tmz_backend_gpu_device.cu)
+    target_sources(fdtd PRIVATE
+        src/fdtd/TMz/backends/gpu/fdtd_tmz_backend_gpu_buffer.cu
+        src/fdtd/TMz/backends/gpu/fdtd_tmz_backend_gpu_device.cu
+        src/fdtd/TMz/backends/gpu/fdtd_tmz_backend_gpu_stream.cu)
     target_link_libraries(fdtd PRIVATE CUDA::cudart)
 endif()
 
