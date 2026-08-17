@@ -142,6 +142,65 @@ namespace fdtd
      * @return The name, as `tasks:128x32+simd`.
      */
     std::string omp_variant_name(const TMz::Simulation::Options &options);
+
+    /**
+     * Parse a CUDA variant name, `<kernel>[:<BX>x<BY>]`, into cuda_ fields.
+     *
+     * The kernel is `fused` or `split`; `:BXxBY` sets the thread block, the default one when it
+     * is left out. `default` names the default settings. Whether the device takes the block is
+     * left to the backend.
+     *
+     * @param name Option name for the error message.
+     * @param text Variant name, as `split:16x16`.
+     * @param options Options whose cuda_ fields are set; unchanged on an error.
+     * @throws std::invalid_argument When the name is malformed.
+     */
+    void parse_cuda_variant_arg(std::string_view name, std::string_view text,
+                                TMz::Simulation::Options &options);
+
+    /**
+     * Canonical CUDA variant name of simulation options, which parse_cuda_variant_arg() reads
+     * back.
+     *
+     * The block is always written.
+     *
+     * @param options Options to name.
+     * @return The name, as `fused:32x8`.
+     */
+    std::string cuda_variant_name(const TMz::Simulation::Options &options);
+
+    /**
+     * Whether a backend reads a variant name.
+     *
+     * Every backend reads `default`, the only name serial reads; OpenMP reads the names of
+     * parse_omp_variant_arg() and CUDA those of parse_cuda_variant_arg().
+     *
+     * @param backend Backend type.
+     * @param text Variant name.
+     * @return True when parse_variant_arg() takes the name for the backend.
+     */
+    bool backend_reads_variant(TMz::BackendType backend, std::string_view text);
+
+    /**
+     * Parse a variant name for a backend into its fields.
+     *
+     * @param name Option name for the error message.
+     * @param backend Backend whose grammar reads the name.
+     * @param text Variant name.
+     * @param options Options whose fields of the backend are set; unchanged on an error.
+     * @throws std::invalid_argument When the backend does not read the name.
+     */
+    void parse_variant_arg(std::string_view name, TMz::BackendType backend, std::string_view text,
+                           TMz::Simulation::Options &options);
+
+    /**
+     * Canonical variant name of simulation options for a backend.
+     *
+     * @param backend Backend type.
+     * @param options Options to name.
+     * @return "default" for serial, omp_variant_name() for OpenMP, cuda_variant_name() for CUDA.
+     */
+    std::string variant_name(TMz::BackendType backend, const TMz::Simulation::Options &options);
 }
 
 #endif

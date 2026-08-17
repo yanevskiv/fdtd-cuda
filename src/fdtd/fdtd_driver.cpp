@@ -23,7 +23,7 @@
 // Shared argument parsing.
 #include "fdtd/fdtd_args.h"
 
-// The simulation, its output files, the OpenMP variants and the source waveform.
+// The simulation, its output files, the backend variants and the source waveform.
 #include "fdtd/TMz/fdtd_tmz_output.h"
 #include "fdtd/TMz/fdtd_tmz_simulation.h"
 #include "fdtd/TMz/fdtd_tmz_waveform.h"
@@ -120,8 +120,6 @@ namespace fdtd
             } else if (name == "--threads") {
                 options.threads = parse_size_arg(name, value);
             } else if (name == "--variant") {
-                TMz::Simulation::Options check;
-                parse_omp_variant_arg(name, value, check);
                 options.variant = std::string(value);
             } else if (name == "--output") {
                 if (value.empty()) {
@@ -175,6 +173,8 @@ namespace fdtd
                 apply(options, arg.name, arg.value);
             }
         }
+        TMz::Simulation::Options check;
+        parse_variant_arg("--variant", options.backend, options.variant, check);
         return options;
     }
 
@@ -208,8 +208,10 @@ namespace fdtd
         usage << "                        (0, 1) (default: 1e-6)\n";
         usage << "  --backend B           Backend, serial, openmp or cuda (default: serial)\n";
         usage << "  --threads N           OpenMP threads, 0 for the OpenMP default (default: 0)\n";
-        usage << "  --variant V           OpenMP variant, SCHEDULE[:WxH][+simd][+phase] with\n";
-        usage << "                        rows, collapse2, tiles or tasks (default: default)\n";
+        usage << "  --variant V           Variant of the backend: for OpenMP\n";
+        usage << "                        SCHEDULE[:WxH][+simd][+phase], SCHEDULE rows,\n";
+        usage << "                        collapse2, tiles or tasks; for CUDA KERNEL[:BXxBY],\n";
+        usage << "                        KERNEL fused or split (default: default)\n";
         usage << "  --output DIR          Directory for the files (default: out)\n";
         usage << "  -h, --help            Show this message and exit\n";
         usage << "  -v, --version         Show the version and exit\n";
@@ -233,7 +235,7 @@ namespace fdtd
         simOptions.pml_order = options.pml_order;
         simOptions.pml_reflection = options.pml_reflection;
         simOptions.backend = options.backend;
-        parse_omp_variant_arg("--variant", options.variant, simOptions);
+        parse_variant_arg("--variant", options.backend, options.variant, simOptions);
         simOptions.omp_threads = options.threads;
         const std::size_t ny = options.ny > 0 ? options.ny : options.nx;
         TMz::Simulation sim(options.nx, ny, simOptions);
@@ -261,10 +263,10 @@ namespace fdtd
         log << options.steps;
         log << " steps on ";
         log << TMz::backend_name(options.backend);
-        if (options.backend == TMz::BackendType::OpenMP) {
+        if (options.backend != TMz::BackendType::Serial) {
             log << " (";
-            log << omp_variant_name(simOptions);
-            if (options.threads > 0) {
+            log << variant_name(options.backend, simOptions);
+            if (options.backend == TMz::BackendType::OpenMP && options.threads > 0) {
                 log << ", ";
                 log << options.threads;
                 log << " threads";

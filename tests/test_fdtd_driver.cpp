@@ -23,6 +23,7 @@
 #include "fdtd/TMz/fdtd_tmz_simulation.h"
 #include "fdtd/fdtd_driver.h"
 
+#include <cstddef>
 #include <filesystem>
 #include <fstream>
 #include <sstream>
@@ -125,6 +126,15 @@ TEST_CASE("Driver parses the OpenMP options", "[unit][driver]")
     CHECK(options.variant == "tiles:16x8+simd");
 }
 
+// Verify a CUDA variant, given before or after the backend.
+TEST_CASE("Driver parses a CUDA variant", "[unit][driver]")
+{
+    CHECK(parse({"--backend", "cuda", "--variant", "split:16x16"}).variant == "split:16x16");
+    const auto options = parse({"--variant=fused", "--backend=cuda"});
+    CHECK(options.backend == BackendType::Cuda);
+    CHECK(options.variant == "fused");
+}
+
 // Verify that bad arguments throw.
 TEST_CASE("Driver rejects bad arguments", "[unit][driver]")
 {
@@ -145,6 +155,9 @@ TEST_CASE("Driver rejects bad arguments", "[unit][driver]")
     CHECK_THROWS_AS(parse({"--threads", "two"}), std::invalid_argument);
     CHECK_THROWS_AS(parse({"--variant", "fast"}), std::invalid_argument);
     CHECK_THROWS_AS(parse({"--variant", "rows:4x4"}), std::invalid_argument);
+    CHECK_THROWS_AS(parse({"--variant", "rows"}), std::invalid_argument);
+    CHECK_THROWS_AS(parse({"--variant", "fused", "--backend", "openmp"}), std::invalid_argument);
+    CHECK_THROWS_AS(parse({"--backend", "cuda", "--variant", "tiles"}), std::invalid_argument);
     CHECK_THROWS_AS(parse({"--output="}), std::invalid_argument);
     CHECK_THROWS_AS(parse({"--frobnicate", "1"}), std::invalid_argument);
     CHECK_THROWS_AS(parse({"stray"}), std::invalid_argument);
@@ -237,6 +250,40 @@ TEST_CASE("Driver smoke run on OpenMP", "[unit][driver][openmp]")
     a << serial.rdbuf();
     b << openmp.rdbuf();
     CHECK(a.str() == b.str());
+    std::filesystem::remove_all(dir);
+}
+
+// Verify that a CUDA run logs its variant and writes a probe trace as long as serial's.
+TEST_CASE("Driver smoke run on CUDA", "[unit][driver][cuda]")
+{
+    if (!fdtd::TMz::is_backend_available(BackendType::Cuda)) {
+        SKIP("the CUDA backend is not compiled in, or no device is present");
+    }
+    const auto dir = std::filesystem::temp_directory_path() / "fdtd_test_driver_cuda";
+    std::filesystem::remove_all(dir);
+    auto options = parse({"--nx", "32", "--steps", "20", "--probe", "20,16"});
+    options.output = dir / "serial";
+    std::ostringstream log;
+    fdtd::run_driver(options, log);
+    options = parse({"--nx", "32", "--steps", "20", "--probe", "20,16", "--backend", "cuda",
+                     "--variant", "split:16x16"});
+    options.output = dir / "cuda";
+    fdtd::run_driver(options, log);
+
+    CHECK(log.str().find("on cuda (split:16x16)") != std::string::npos);
+    std::ifstream serial(dir / "serial" / "probe_0.csv");
+    std::ifstream cuda(dir / "cuda" / "probe_0.csv");
+    std::string line;
+    std::size_t serialLines = 0;
+    while (std::getline(serial, line)) {
+        ++serialLines;
+    }
+    std::size_t cudaLines = 0;
+    while (std::getline(cuda, line)) {
+        ++cudaLines;
+    }
+    CHECK(serialLines > 20);
+    CHECK(cudaLines == serialLines);
     std::filesystem::remove_all(dir);
 }
 

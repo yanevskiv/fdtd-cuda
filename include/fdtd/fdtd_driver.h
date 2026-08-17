@@ -105,7 +105,7 @@ namespace fdtd
         /** Thread count of the OpenMP backend, 0 for the OpenMP default. */
         std::size_t threads = 0;
 
-        /** OpenMP variant name, as parse_omp_variant_arg reads it. */
+        /** Variant name of the backend, as parse_variant_arg reads it. */
         std::string variant = "default";
 
         /** Directory the files are written to. */
@@ -121,11 +121,13 @@ namespace fdtd
     /**
      * Parse the command-line arguments, without the program name.
      *
-     * Each option takes its value as the next argument or after '='.
+     * Each option takes its value as the next argument or after '='. The variant is checked
+     * against the backend once every option is read, so the two may come in either order.
      *
      * @param args Arguments in order.
      * @return The settings.
-     * @throws std::invalid_argument On an unknown option, a missing value or a bad value.
+     * @throws std::invalid_argument On an unknown option, a missing value, a bad value, or a
+     *         variant the backend does not read.
      */
     DriverOptions parse_driver_options(std::span<const std::string_view> args);
 

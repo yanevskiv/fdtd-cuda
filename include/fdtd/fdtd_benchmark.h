@@ -55,7 +55,8 @@ namespace fdtd
         /** Backends to measure in order; none means every compiled backend. */
         std::vector<TMz::BackendType> backends;
 
-        /** OpenMP variant names (see parse_omp_variant_arg) to measure; none means "default". */
+        /** Variant names (see parse_variant_arg) to measure, OpenMP and CUDA ones mixed; none means
+         * "default". */
         std::vector<std::string> variants;
 
         /** Thread counts to measure, read by OpenMP only; none means 1. */
@@ -86,7 +87,7 @@ namespace fdtd
         /** Backend the run was on. */
         TMz::BackendType backend;
 
-        /** Canonical OpenMP variant name, or "default" for the other backends. */
+        /** Canonical variant name in the backend's grammar, "default" for serial. */
         std::string variant;
 
         /** Threads the run used, 1 for serial and CUDA. */
@@ -153,16 +154,18 @@ namespace fdtd
      *
      * The workload is a grid of vacuum at Courant number 0.99 with a Gaussian Ez source
      * 12 steps wide at the centre. A configuration is a backend, a variant and a thread
-     * count; serial and CUDA run once per size, as "default" with one thread. Each one is warmed up
-     * with untimed runs, then measured repeat times; every sample builds a new Simulation and times
-     * only Simulation::run. A summary line per configuration goes to the log.
+     * count. A backend runs the variants it reads, or "default" when it reads none; serial reads
+     * "default" only. Serial and CUDA run with one thread, OpenMP with each thread count. Each
+     * configuration is warmed up with untimed runs, then measured repeat times; every sample
+     * builds a new Simulation and times only Simulation::run. A summary line per configuration
+     * goes to the log.
      *
      * @param options Settings of the run.
      * @param out Stream for the CSV when no output file is set.
      * @param log Stream for the summary lines.
      * @return The samples in the order written.
      * @throws std::invalid_argument On zero steps or repeats, a backend that is not
-     *         compiled in, a malformed variant, or settings the simulation rejects.
+     *         compiled in, a variant no backend reads, or settings the simulation rejects.
      * @throws std::runtime_error When the output file cannot be written.
      */
     std::vector<BenchmarkSample> run_benchmark(const BenchmarkOptions &options, std::ostream &out,

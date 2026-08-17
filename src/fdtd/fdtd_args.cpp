@@ -20,7 +20,7 @@
 // Function declarations.
 #include "fdtd/fdtd_args.h"
 
-// Standard library for parsing, math, string building and errors.
+// Standard library for parsing, math, string building, errors and pairs.
 #include <algorithm>
 #include <charconv>
 #include <cmath>
@@ -29,6 +29,7 @@
 #include <stdexcept>
 #include <string>
 #include <system_error>
+#include <utility>
 
 // Namespace for the fdtd library.
 namespace fdtd
@@ -76,18 +77,53 @@ namespace fdtd
             return "tasks";
         }
 
-        // Read a positive decimal tile side, the whole field.
-        std::size_t parse_tile_side(std::string_view name, std::string_view text,
-                                    std::string_view side)
+        // Name a CUDA kernel layout.
+        std::string_view kernel_name(TMz::CudaKernel kernel) noexcept
+        {
+            switch (kernel) {
+                case TMz::CudaKernel::Fused:
+                    return "fused";
+                case TMz::CudaKernel::Split:
+                    break;
+            }
+            return "split";
+        }
+
+        // Read a positive decimal side, the whole field, of a tile or a block.
+        std::size_t parse_side(std::string_view name, std::string_view text, std::string_view side,
+                               std::string_view what)
         {
             std::size_t value = 0;
             const auto [end, error] =
                 std::from_chars(side.data(), side.data() + side.size(), value);
             if (side.empty() || error != std::errc() || end != side.data() + side.size() ||
                 value == 0) {
-                malformed_variant(name, text, "tile sides must be positive integers");
+                std::ostringstream reason;
+                reason << what;
+                reason << " sides must be positive integers";
+                malformed_variant(name, text, reason.str());
             }
             return value;
+        }
+
+        // Read the two sides of a tile or a block written as WxH.
+        std::pair<std::size_t, std::size_t> parse_sides(std::string_view name,
+                                                        std::string_view text,
+                                                        std::string_view size,
+                                                        std::string_view what)
+        {
+            const std::size_t cross = size.find('x');
+            if (cross == std::string_view::npos) {
+                std::ostringstream reason;
+                reason << "expected a ";
+                reason << what;
+                reason << " size as WxH";
+                malformed_variant(name, text, reason.str());
+            }
+            return {
+                parse_side(name, text, size.substr(0, cross), what),
+                parse_side(name, text, size.substr(cross + 1), what),
+            };
         }
     }
 
@@ -276,13 +312,9 @@ namespace fdtd
                 parsed.omp_schedule != TMz::OmpSchedule::Tasks) {
                 malformed_variant(name, text, "a tile size is for tiles and tasks only");
             }
-            const std::string_view size = head.substr(colon + 1);
-            const std::size_t cross = size.find('x');
-            if (cross == std::string_view::npos) {
-                malformed_variant(name, text, "expected a tile size as WxH");
-            }
-            parsed.omp_tile_x = parse_tile_side(name, text, size.substr(0, cross));
-            parsed.omp_tile_y = parse_tile_side(name, text, size.substr(cross + 1));
+            const auto [x, y] = parse_sides(name, text, head.substr(colon + 1), "tile");
+            parsed.omp_tile_x = x;
+            parsed.omp_tile_y = y;
         }
         options = parsed;
     }
@@ -306,5 +338,92 @@ namespace fdtd
             name << "+phase";
         }
         return name.str();
+    }
+
+    // Read the kernel, then the block when there is one.
+    void parse_cuda_variant_arg(std::string_view name, std::string_view text,
+                                TMz::Simulation::Options &options)
+    {
+        const TMz::Simulation::Options defaults;
+        TMz::Simulation::Options parsed = options;
+        parsed.cuda_kernel = defaults.cuda_kernel;
+        parsed.cuda_block_x = defaults.cuda_block_x;
+        parsed.cuda_block_y = defaults.cuda_block_y;
+        if (text == "default") {
+            options = parsed;
+            return;
+        }
+        const std::size_t colon = text.find(':');
+        const std::string_view kernel = text.substr(0, colon);
+        if (kernel == "fused") {
+            parsed.cuda_kernel = TMz::CudaKernel::Fused;
+        } else if (kernel == "split") {
+            parsed.cuda_kernel = TMz::CudaKernel::Split;
+        } else {
+            malformed_variant(name, text, "expected fused or split");
+        }
+        if (colon != std::string_view::npos) {
+            const auto [x, y] = parse_sides(name, text, text.substr(colon + 1), "block");
+            parsed.cuda_block_x = x;
+            parsed.cuda_block_y = y;
+        }
+        options = parsed;
+    }
+
+    // Write the kernel and the block.
+    std::string cuda_variant_name(const TMz::Simulation::Options &options)
+    {
+        std::ostringstream name;
+        name << kernel_name(options.cuda_kernel);
+        name << ':';
+        name << options.cuda_block_x;
+        name << 'x';
+        name << options.cuda_block_y;
+        return name.str();
+    }
+
+    // Try the backend's grammar on the name.
+    bool backend_reads_variant(TMz::BackendType backend, std::string_view text)
+    {
+        TMz::Simulation::Options scratch;
+        try {
+            parse_variant_arg("variant", backend, text, scratch);
+        } catch (const std::invalid_argument &) {
+            return false;
+        }
+        return true;
+    }
+
+    // Hand the name to the backend's grammar; serial reads default only.
+    void parse_variant_arg(std::string_view name, TMz::BackendType backend, std::string_view text,
+                           TMz::Simulation::Options &options)
+    {
+        switch (backend) {
+            case TMz::BackendType::Serial:
+                if (text != "default") {
+                    malformed_variant(name, text, "the serial backend has no variants");
+                }
+                return;
+            case TMz::BackendType::OpenMP:
+                parse_omp_variant_arg(name, text, options);
+                return;
+            case TMz::BackendType::Cuda:
+                break;
+        }
+        parse_cuda_variant_arg(name, text, options);
+    }
+
+    // Name the variant in the backend's grammar.
+    std::string variant_name(TMz::BackendType backend, const TMz::Simulation::Options &options)
+    {
+        switch (backend) {
+            case TMz::BackendType::Serial:
+                return "default";
+            case TMz::BackendType::OpenMP:
+                return omp_variant_name(options);
+            case TMz::BackendType::Cuda:
+                break;
+        }
+        return cuda_variant_name(options);
     }
 }

@@ -30,6 +30,7 @@ using fdtd::Argument;
 using fdtd::split_arguments;
 using fdtd::TMz::BackendType;
 using fdtd::TMz::Boundary;
+using fdtd::TMz::CudaKernel;
 using fdtd::TMz::OmpRegion;
 using fdtd::TMz::OmpSchedule;
 using fdtd::TMz::Simulation;
@@ -41,6 +42,14 @@ namespace
     {
         Simulation::Options options;
         fdtd::parse_omp_variant_arg("--variant", text, options);
+        return options;
+    }
+
+    // Parse a CUDA variant name into default options.
+    Simulation::Options cuda_variant(std::string_view text)
+    {
+        Simulation::Options options;
+        fdtd::parse_cuda_variant_arg("--variant", text, options);
         return options;
     }
 
@@ -177,4 +186,79 @@ TEST_CASE("OpenMP variant names reject malformed text", "[unit][args]")
                         std::invalid_argument);
         CHECK(options.omp_schedule == OmpSchedule::Tasks);
     }
+}
+
+// Verify that CUDA names read into options and canonical names, block included, read back.
+TEST_CASE("CUDA variant names round-trip", "[unit][args]")
+{
+    const Simulation::Options fused = cuda_variant("default");
+    CHECK(fused.cuda_kernel == CudaKernel::Fused);
+    CHECK(fused.cuda_block_x == 32);
+    CHECK(fused.cuda_block_y == 8);
+    CHECK(fdtd::cuda_variant_name(fused) == "fused:32x8");
+
+    const Simulation::Options split = cuda_variant("split:16x4");
+    CHECK(split.cuda_kernel == CudaKernel::Split);
+    CHECK(split.cuda_block_x == 16);
+    CHECK(split.cuda_block_y == 4);
+    CHECK(fdtd::cuda_variant_name(split) == "split:16x4");
+
+    CHECK(fdtd::cuda_variant_name(cuda_variant("split")) == "split:32x8");
+    for (const std::string name : {"fused:32x8", "fused:1x1", "split:128x1", "split:7x5"}) {
+        CAPTURE(name);
+        CHECK(fdtd::cuda_variant_name(cuda_variant(name)) == name);
+    }
+}
+
+// Verify that a CUDA variant sets the cuda_ fields only, and that malformed names throw.
+TEST_CASE("CUDA variant names reject malformed text", "[unit][args]")
+{
+    Simulation::Options options;
+    options.omp_schedule = OmpSchedule::Tasks;
+    options.cuda_block_x = 7;
+    fdtd::parse_cuda_variant_arg("--variant", "split", options);
+    CHECK(options.omp_schedule == OmpSchedule::Tasks);
+    CHECK(options.cuda_block_x == 32);
+
+    for (const char *name :
+         {"", "Fused", "fast", "rows", "fused:", "fused:32", "fused:0x8", "fused:32x0",
+          "fused:32x8x2", "fused:ax8", "fused+simd", "split:", "default:32x8"}) {
+        CAPTURE(name);
+        Simulation::Options unchanged;
+        unchanged.cuda_kernel = CudaKernel::Split;
+        CHECK_THROWS_AS(fdtd::parse_cuda_variant_arg("--variant", name, unchanged),
+                        std::invalid_argument);
+        CHECK(unchanged.cuda_kernel == CudaKernel::Split);
+    }
+}
+
+// Verify which backend reads which name, and the name each writes back.
+TEST_CASE("Variant names belong to their backend", "[unit][args]")
+{
+    for (const BackendType backend :
+         {BackendType::Serial, BackendType::OpenMP, BackendType::Cuda}) {
+        CHECK(fdtd::backend_reads_variant(backend, "default"));
+        CHECK_FALSE(fdtd::backend_reads_variant(backend, "fast"));
+    }
+    CHECK(fdtd::backend_reads_variant(BackendType::OpenMP, "tiles:8x8+simd"));
+    CHECK_FALSE(fdtd::backend_reads_variant(BackendType::Cuda, "tiles:8x8+simd"));
+    CHECK_FALSE(fdtd::backend_reads_variant(BackendType::Serial, "rows"));
+    CHECK(fdtd::backend_reads_variant(BackendType::Cuda, "split:16x16"));
+    CHECK_FALSE(fdtd::backend_reads_variant(BackendType::OpenMP, "split:16x16"));
+    CHECK_FALSE(fdtd::backend_reads_variant(BackendType::Serial, "fused"));
+
+    Simulation::Options options;
+    fdtd::parse_variant_arg("--variant", BackendType::Cuda, "split:8x4", options);
+    CHECK(options.cuda_kernel == CudaKernel::Split);
+    fdtd::parse_variant_arg("--variant", BackendType::OpenMP, "collapse2", options);
+    CHECK(options.omp_schedule == OmpSchedule::Collapse2);
+    CHECK(options.cuda_kernel == CudaKernel::Split);
+    CHECK_THROWS_AS(fdtd::parse_variant_arg("--variant", BackendType::Serial, "rows", options),
+                    std::invalid_argument);
+    CHECK_THROWS_AS(fdtd::parse_variant_arg("--variant", BackendType::OpenMP, "fused", options),
+                    std::invalid_argument);
+
+    CHECK(fdtd::variant_name(BackendType::Serial, options) == "default");
+    CHECK(fdtd::variant_name(BackendType::OpenMP, options) == "collapse2");
+    CHECK(fdtd::variant_name(BackendType::Cuda, options) == "split:8x4");
 }

@@ -274,8 +274,8 @@ TEST_CASE("Benchmark resolves ny and serial threads", "[unit][benchmark]")
     CHECK(samples[0].threads == 1);
 }
 
-// Verify that CUDA runs once as default with one thread, whatever the OpenMP settings.
-TEST_CASE("Benchmark runs CUDA once", "[unit][benchmark][cuda]")
+// Verify that CUDA runs its own variants with one thread, and the default when given none.
+TEST_CASE("Benchmark runs each CUDA variant", "[unit][benchmark][cuda]")
 {
     if (!fdtd::TMz::is_backend_available(BackendType::Cuda)) {
         SKIP("the CUDA backend is not compiled in, or no device is present");
@@ -286,12 +286,46 @@ TEST_CASE("Benchmark runs CUDA once", "[unit][benchmark][cuda]")
     options.threads = {2, 4};
     options.variants = {"rows", "tiles+simd"};
     std::string csv;
-    const auto samples = run(options, csv);
+    auto samples = run(options, csv);
     REQUIRE(samples.size() == 1);
     CHECK(samples[0].backend == BackendType::Cuda);
-    CHECK(samples[0].variant == "default");
+    CHECK(samples[0].variant == "fused:32x8");
     CHECK(samples[0].threads == 1);
     CHECK(samples[0].checksum != 0);
+
+    options.variants = {"rows", "split:16x16", "fused:7x5"};
+    samples = run(options, csv);
+    REQUIRE(samples.size() == 2);
+    CHECK(samples[0].variant == "split:16x16");
+    CHECK(samples[1].variant == "fused:7x5");
+    CHECK(samples[0].threads == 1);
+}
+
+// Verify that a mixed list gives each backend its own names, serial the default.
+TEST_CASE("Benchmark splits a mixed variant list by backend", "[unit][benchmark]")
+{
+    auto options = small();
+    options.repeat = 1;
+    options.variants = {"collapse2+simd", "split", "rows"};
+    std::string csv;
+    const auto samples = run(options, csv);
+    std::vector<std::string> openmp;
+    std::vector<std::string> cuda;
+    for (const BenchmarkSample &sample : samples) {
+        if (sample.backend == BackendType::Serial) {
+            CHECK(sample.variant == "default");
+        } else if (sample.backend == BackendType::OpenMP) {
+            openmp.push_back(sample.variant);
+        } else {
+            cuda.push_back(sample.variant);
+        }
+    }
+    if (fdtd::TMz::is_backend_available(BackendType::OpenMP)) {
+        CHECK(openmp == std::vector<std::string>{"collapse2+simd", "rows"});
+    }
+    if (fdtd::TMz::is_backend_available(BackendType::Cuda)) {
+        CHECK(cuda == std::vector<std::string>{"split:32x8"});
+    }
 }
 
 // Verify one row set per OpenMP variant under its canonical name, serial once as default.
