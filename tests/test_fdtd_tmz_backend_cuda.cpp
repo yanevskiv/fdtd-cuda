@@ -64,7 +64,7 @@ namespace
     constexpr double TOLERANCE = FDTD_TEST_CUDA_TOLERANCE;
 
     // Kernel layouts built so far.
-    constexpr CudaKernel KERNELS[] = {CudaKernel::Fused};
+    constexpr CudaKernel KERNELS[] = {CudaKernel::Fused, CudaKernel::Split};
 
     // Result of a run: the fields and every probe's record.
     struct Run

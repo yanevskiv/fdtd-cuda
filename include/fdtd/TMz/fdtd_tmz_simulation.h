@@ -67,7 +67,11 @@ namespace fdtd
         enum class CudaKernel {
             /** One E kernel for every cell, each thread taking its cell's edge, PML or interior
              * branch. The default. */
-            Fused
+            Fused,
+
+            /** Three E kernels with no branch on the cell: the interior, the PML slabs and the
+             * edge. */
+            Split
         };
 
         /**

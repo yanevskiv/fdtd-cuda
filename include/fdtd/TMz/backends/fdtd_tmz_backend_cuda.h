@@ -52,8 +52,8 @@ namespace fdtd
              * Rows on the device are padded to 128 bytes; the host grid keeps its pitch, and
              * the copies and the cells of sources and probes go from one to the other. A step
              * is H, the Hx and Hy sources, E, the Ez sources and the probes, in that order on
-             * one stream. Each advance ends with a wait for the stream, so the work is done
-             * when step() returns.
+             * one stream. E is one kernel or three, as cuda_kernel says. Each advance ends with
+             * a wait for the stream, so the work is done when step() returns.
              */
             class CudaBackend final : public Backend
             {
@@ -211,6 +211,16 @@ namespace fdtd
                  * @return The view.
                  */
                 gpu::DeviceCoeffs device_coeffs() const noexcept;
+
+                /**
+                 * Queue the E update of the Split layout: the interior, the PML slabs, then the
+                 * edge.
+                 *
+                 * @param fields View of the device fields.
+                 * @param coeffs View of the device coefficients.
+                 */
+                void launch_split_e(const gpu::DeviceFields &fields,
+                                    const gpu::DeviceCoeffs &coeffs);
 
                 /**
                  * Run one step's kernels on the stream.
