@@ -349,12 +349,28 @@ namespace fdtd
         parsed.cuda_kernel = defaults.cuda_kernel;
         parsed.cuda_block_x = defaults.cuda_block_x;
         parsed.cuda_block_y = defaults.cuda_block_y;
+        parsed.cuda_graph = defaults.cuda_graph;
         if (text == "default") {
             options = parsed;
             return;
         }
-        const std::size_t colon = text.find(':');
-        const std::string_view kernel = text.substr(0, colon);
+        const std::string_view head = text.substr(0, text.find('+'));
+        std::string_view suffixes = text.substr(head.size());
+        bool graph = false;
+        while (!suffixes.empty()) {
+            suffixes.remove_prefix(1);
+            const std::string_view suffix = suffixes.substr(0, suffixes.find('+'));
+            suffixes.remove_prefix(suffix.size());
+            if (suffix == "graph" && !graph) {
+                graph = true;
+            } else {
+                malformed_variant(name, text, "expected +graph, once");
+            }
+        }
+        parsed.cuda_graph = graph;
+
+        const std::size_t colon = head.find(':');
+        const std::string_view kernel = head.substr(0, colon);
         if (kernel == "fused") {
             parsed.cuda_kernel = TMz::CudaKernel::Fused;
         } else if (kernel == "split") {
@@ -363,14 +379,14 @@ namespace fdtd
             malformed_variant(name, text, "expected fused or split");
         }
         if (colon != std::string_view::npos) {
-            const auto [x, y] = parse_sides(name, text, text.substr(colon + 1), "block");
+            const auto [x, y] = parse_sides(name, text, head.substr(colon + 1), "block");
             parsed.cuda_block_x = x;
             parsed.cuda_block_y = y;
         }
         options = parsed;
     }
 
-    // Write the kernel and the block.
+    // Write the kernel and the block, then the suffixes.
     std::string cuda_variant_name(const TMz::Simulation::Options &options)
     {
         std::ostringstream name;
@@ -379,6 +395,9 @@ namespace fdtd
         name << options.cuda_block_x;
         name << 'x';
         name << options.cuda_block_y;
+        if (options.cuda_graph) {
+            name << "+graph";
+        }
         return name.str();
     }
 

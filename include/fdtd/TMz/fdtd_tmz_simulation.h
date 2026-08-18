@@ -152,6 +152,10 @@ namespace fdtd
                  * cuda_block_y within the device's threads per block. */
                 std::size_t cuda_block_y = 8;
 
+                /** Whether the CUDA backend replays a graph of 16 captured steps instead of
+                 * launching each kernel of each step. */
+                bool cuda_graph = false;
+
                 /** Whether an explicit dt above the Courant limit is rejected. */
                 bool check_stability = true;
             };

@@ -199,6 +199,44 @@ namespace
         return result;
     }
 
+    // Step a backend through advances of the given lengths, each with sources on Ez, Hx and Hy
+    // and values of its own, and probes set before the first and again before the last.
+    Run run_advances(const Simulation::Options &options, const Grid &grid, Boundary boundary,
+                     std::span<const std::size_t> lengths)
+    {
+        Material material(grid);
+        material.set_pml(5, 3, 1e-6);
+        const Coeffs coeffs(material, fdtd::TMz::courant_dt(grid, 0.9));
+        Fields fields(grid);
+        fill_distinct(fields);
+        const auto backend = fdtd::TMz::make_backend(BackendType::Cuda, grid, options);
+        backend->upload(fields);
+        backend->upload(coeffs);
+        backend->set_boundary(boundary);
+
+        const std::size_t last = grid.index(grid.nx() - 1, grid.ny() - 1);
+        const std::vector<PointProbe> probes{{Component::Ez, last / 2}, {Component::Hy, last}};
+        const std::vector<PointInjection> points{
+            {Component::Hx, last / 3}, {Component::Ez, last / 2}, {Component::Hy, 1}};
+        Run result;
+        backend->set_probes(probes);
+        for (std::size_t a = 0; a < lengths.size(); ++a) {
+            if (a + 1 == lengths.size()) {
+                append(result.probes, backend->fetch_probes());
+                backend->set_probes(std::span(probes).first(1));
+            }
+            std::vector<FloatType> values(lengths[a] * points.size());
+            for (std::size_t k = 0; k < values.size(); ++k) {
+                values[k] = FloatType((k + a) % 7) / FloatType(10);
+            }
+            backend->step(lengths[a], std::span(points), std::span(values));
+        }
+        backend->download(fields);
+        append_fields(result.fields, fields);
+        append(result.probes, backend->fetch_probes());
+        return result;
+    }
+
     // Relative max-norm difference of two arrays, against the max-norm of the first.
     double relative_difference(std::span<const FloatType> ref, std::span<const FloatType> other)
     {
@@ -408,6 +446,27 @@ TEST_CASE("CUDA probes over several advances", "[backend][cuda]")
     CHECK(backend->probe_count() == 1);
     CHECK(backend->probe_steps() == 4);
     CHECK(backend->fetch_probes().size() == 4);
+}
+
+// Verify that replaying captured steps as a graph gives the plain launches' results bit for bit:
+// advances shorter than a graph, as long as one and longer, the sources and probes changing
+// between them so the graph is captured again, and the remainder steps launched plainly.
+TEST_CASE("CUDA graphs match plain launches bit for bit", "[backend][cuda]")
+{
+    require_cuda();
+    const auto boundary = GENERATE(Boundary::Pec, Boundary::Pmc, Boundary::Pml);
+    const Grid grid(45, 37, FloatType(1e-3), FloatType(2e-3));
+    const std::vector<std::size_t> lengths{5, 16, 37, 0, 33};
+    for (const CudaKernel kernel : KERNELS) {
+        INFO("kernel " << static_cast<int>(kernel));
+        auto options = cuda_options(kernel, {32, 8});
+        const Run plain = run_advances(options, grid, boundary, lengths);
+        options.cuda_graph = true;
+        const Run graph = run_advances(options, grid, boundary, lengths);
+        CHECK(graph.fields == plain.fields);
+        CHECK(graph.probes == plain.probes);
+        CHECK(plain.probes.size() == 2 * (5 + 16 + 37) + 33);
+    }
 }
 
 // Verify that the backend has its name and rejects settings it cannot run.

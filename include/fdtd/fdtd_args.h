@@ -144,11 +144,11 @@ namespace fdtd
     std::string omp_variant_name(const TMz::Simulation::Options &options);
 
     /**
-     * Parse a CUDA variant name, `<kernel>[:<BX>x<BY>]`, into cuda_ fields.
+     * Parse a CUDA variant name, `<kernel>[:<BX>x<BY>][+graph]`, into cuda_ fields.
      *
      * The kernel is `fused` or `split`; `:BXxBY` sets the thread block, the default one when it
-     * is left out. `default` names the default settings. Whether the device takes the block is
-     * left to the backend.
+     * is left out; `+graph` replays captured steps as a CUDA graph. `default` names the default
+     * settings. Whether the device takes the block is left to the backend.
      *
      * @param name Option name for the error message.
      * @param text Variant name, as `split:16x16`.
@@ -165,7 +165,7 @@ namespace fdtd
      * The block is always written.
      *
      * @param options Options to name.
-     * @return The name, as `fused:32x8`.
+     * @return The name, as `fused:32x8` or `split:16x16+graph`.
      */
     std::string cuda_variant_name(const TMz::Simulation::Options &options);
 

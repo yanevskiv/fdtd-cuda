@@ -22,6 +22,7 @@
 
 #include "fdtd/TMz/backends/gpu/fdtd_tmz_backend_gpu_buffer.h"
 #include "fdtd/TMz/backends/gpu/fdtd_tmz_backend_gpu_cell.h"
+#include "fdtd/TMz/backends/gpu/fdtd_tmz_backend_gpu_graph.h"
 #include "fdtd/TMz/backends/gpu/fdtd_tmz_backend_gpu_stream.h"
 #include "fdtd/TMz/fdtd_tmz_backend.h"
 #include "fdtd/TMz/fdtd_tmz_boundary.h"
@@ -234,12 +235,53 @@ namespace fdtd
                  *
                  * @param fields View of the device fields.
                  * @param coeffs View of the device coefficients.
-                 * @param n Step of this advance, from zero.
+                 * @param n Step of this advance, from zero; unused when replay is set.
                  * @param magnetic Sources that add to Hx or Hy, first in the device sources.
                  * @param electric Sources that add to Ez, after the magnetic ones.
+                 * @param replay Whether the kernels read the step from the device counter and
+                 *        count it, so a graph can replay them, instead of being given n.
                  */
                 void launch_step(const gpu::DeviceFields &fields, const gpu::DeviceCoeffs &coeffs,
-                                 std::size_t n, std::size_t magnetic, std::size_t electric);
+                                 std::size_t n, std::size_t magnetic, std::size_t electric,
+                                 bool replay);
+
+                /** What a captured graph depends on besides the backend's fixed arrays. */
+                struct GraphKey
+                {
+                    /** Sources that add to Hx or Hy. */
+                    std::size_t magnetic = 0;
+
+                    /** Sources that add to Ez. */
+                    std::size_t electric = 0;
+
+                    /** Probes. */
+                    std::size_t probes = 0;
+
+                    /** Outer boundary condition. */
+                    Boundary boundary = Boundary::Pec;
+
+                    /** PML thickness in force. */
+                    int pml = 0;
+
+                    /** Device sources. */
+                    const void *sources = nullptr;
+
+                    /** Device source values. */
+                    const void *values = nullptr;
+
+                    /** Device probe cells. */
+                    const void *points = nullptr;
+
+                    /** Device probe records. */
+                    const void *records = nullptr;
+
+                    /**
+                     * Compare every member.
+                     *
+                     * @return Whether the keys are equal.
+                     */
+                    bool operator==(const GraphKey &) const = default;
+                };
 
                 /** Settings of the backend. */
                 Simulation::Options m_options;
@@ -292,6 +334,9 @@ namespace fdtd
                 /** Device Hy curl factors. */
                 gpu::DeviceBuffer<FloatType> m_coeff_hy_2;
 
+                /** Step of the advance that a replayed graph is on, counted on the device. */
+                gpu::DeviceBuffer<int> m_device_step;
+
                 /** Whether coefficients were uploaded. */
                 bool m_has_coeffs = false;
 
@@ -318,6 +363,12 @@ namespace fdtd
 
                 /** Probe records of the current advance on the device, step-major. */
                 gpu::DeviceBuffer<FloatType> m_device_records;
+
+                /** Graph of GRAPH_STEPS steps, captured by the first advance that needs it. */
+                gpu::Graph m_graph;
+
+                /** What m_graph was captured with, captured again when this changes. */
+                GraphKey m_graph_key;
             };
         }
     }

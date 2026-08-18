@@ -153,6 +153,23 @@ namespace fdtd
                     return fields.ez;
                 }
 
+                /**
+                 * Read an element that no thread of the running kernel writes, through the
+                 * read-only data cache on the device and as a plain load on the host.
+                 *
+                 * @param array Array to read.
+                 * @param k Index of the element.
+                 * @return The element.
+                 */
+                FDTD_HOST_DEVICE inline FloatType read_only(const FloatType *array, int k) noexcept
+                {
+#ifdef __CUDA_ARCH__
+                    return __ldg(array + k);
+#else
+                    return array[k];
+#endif
+                }
+
                 /** A cell of the grid by column and row. */
                 struct CellIndex
                 {
@@ -307,14 +324,15 @@ namespace fdtd
                     const FloatType *Ez = fields.ez;
                     if (j < fields.ny - 1) {
                         FloatType *Hx = fields.hx;
-                        Hx[k] = coeffs.coeff_hx_1[k] * Hx[k] - coeffs.coeff_hx_2[k] *
-                                                                   fields.inv_dy *
-                                                                   (Ez[k + fields.pitch] - Ez[k]);
+                        Hx[k] = read_only(coeffs.coeff_hx_1, k) * Hx[k] -
+                                read_only(coeffs.coeff_hx_2, k) * fields.inv_dy *
+                                    (read_only(Ez, k + fields.pitch) - read_only(Ez, k));
                     }
                     if (i < fields.nx - 1) {
                         FloatType *Hy = fields.hy;
-                        Hy[k] = coeffs.coeff_hy_1[k] * Hy[k] +
-                                coeffs.coeff_hy_2[k] * fields.inv_dx * (Ez[k + 1] - Ez[k]);
+                        Hy[k] = read_only(coeffs.coeff_hy_1, k) * Hy[k] +
+                                read_only(coeffs.coeff_hy_2, k) * fields.inv_dx *
+                                    (read_only(Ez, k + 1) - read_only(Ez, k));
                     }
                 }
 
@@ -335,9 +353,11 @@ namespace fdtd
                     const FloatType *Hx = fields.hx;
                     const FloatType *Hy = fields.hy;
                     FloatType *Ez = fields.ez;
-                    const FloatType curl = (Hy[k] - Hy[k - 1]) * fields.inv_dx -
-                                           (Hx[k] - Hx[k - fields.pitch]) * fields.inv_dy;
-                    Ez[k] = coeffs.coeff_ez_x1[k] * Ez[k] + coeffs.coeff_ez_x2[k] * curl;
+                    const FloatType curl =
+                        (read_only(Hy, k) - read_only(Hy, k - 1)) * fields.inv_dx -
+                        (read_only(Hx, k) - read_only(Hx, k - fields.pitch)) * fields.inv_dy;
+                    Ez[k] = read_only(coeffs.coeff_ez_x1, k) * Ez[k] +
+                            read_only(coeffs.coeff_ez_x2, k) * curl;
                 }
 
                 /**
@@ -358,10 +378,12 @@ namespace fdtd
                     const FloatType *Hy = fields.hy;
                     FloatType *Ezx = fields.ezx;
                     FloatType *Ezy = fields.ezy;
-                    Ezx[k] = coeffs.coeff_ez_x1[k] * Ezx[k] +
-                             coeffs.coeff_ez_x2[k] * fields.inv_dx * (Hy[k] - Hy[k - 1]);
-                    Ezy[k] = coeffs.coeff_ez_y1[k] * Ezy[k] -
-                             coeffs.coeff_ez_y2[k] * fields.inv_dy * (Hx[k] - Hx[k - fields.pitch]);
+                    Ezx[k] = read_only(coeffs.coeff_ez_x1, k) * Ezx[k] +
+                             read_only(coeffs.coeff_ez_x2, k) * fields.inv_dx *
+                                 (read_only(Hy, k) - read_only(Hy, k - 1));
+                    Ezy[k] = read_only(coeffs.coeff_ez_y1, k) * Ezy[k] -
+                             read_only(coeffs.coeff_ez_y2, k) * fields.inv_dy *
+                                 (read_only(Hx, k) - read_only(Hx, k - fields.pitch));
                     fields.ez[k] = Ezx[k] + Ezy[k];
                 }
 
@@ -392,13 +414,15 @@ namespace fdtd
                     }
                     const FloatType *Hx = fields.hx;
                     const FloatType *Hy = fields.hy;
-                    const FloatType hyRight = i + 1 < fields.nx ? Hy[k] : FloatType(0);
-                    const FloatType hyLeft = i > 0 ? Hy[k - 1] : FloatType(0);
-                    const FloatType hxTop = j + 1 < fields.ny ? Hx[k] : FloatType(0);
-                    const FloatType hxBottom = j > 0 ? Hx[k - fields.pitch] : FloatType(0);
+                    const FloatType hyRight = i + 1 < fields.nx ? read_only(Hy, k) : FloatType(0);
+                    const FloatType hyLeft = i > 0 ? read_only(Hy, k - 1) : FloatType(0);
+                    const FloatType hxTop = j + 1 < fields.ny ? read_only(Hx, k) : FloatType(0);
+                    const FloatType hxBottom =
+                        j > 0 ? read_only(Hx, k - fields.pitch) : FloatType(0);
                     const FloatType curl =
                         (hyRight - hyLeft) * fields.inv_dx - (hxTop - hxBottom) * fields.inv_dy;
-                    Ez[k] = coeffs.coeff_ez_x1[k] * Ez[k] + coeffs.coeff_ez_x2[k] * curl;
+                    Ez[k] = read_only(coeffs.coeff_ez_x1, k) * Ez[k] +
+                            read_only(coeffs.coeff_ez_x2, k) * curl;
                 }
 
                 /**

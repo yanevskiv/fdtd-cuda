@@ -19,8 +19,8 @@ BENCH_BACKENDS="all"
 BENCH_THREADS="1 2 4"
 
 # Variants, OpenMP and CUDA names mixed: OpenMP SCHEDULE[:WxH][+simd][+phase] with rows,
-# collapse2, tiles or tasks; CUDA KERNEL[:BXxBY] with fused or split; or default. Each backend
-# runs the names it reads, or default when it reads none; serial runs default only
+# collapse2, tiles or tasks; CUDA KERNEL[:BXxBY][+graph] with fused or split; or default. Each
+# backend runs the names it reads, or default when it reads none; serial runs default only
 BENCH_VARIANTS="default"
 
 # Weak scaling: per thread count p, OpenMP on nx = BENCH_WEAK_NX and ny = p * BENCH_WEAK_NX, into

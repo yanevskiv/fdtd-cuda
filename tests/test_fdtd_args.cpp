@@ -204,7 +204,12 @@ TEST_CASE("CUDA variant names round-trip", "[unit][args]")
     CHECK(fdtd::cuda_variant_name(split) == "split:16x4");
 
     CHECK(fdtd::cuda_variant_name(cuda_variant("split")) == "split:32x8");
-    for (const std::string name : {"fused:32x8", "fused:1x1", "split:128x1", "split:7x5"}) {
+    CHECK_FALSE(fused.cuda_graph);
+    const Simulation::Options graph = cuda_variant("fused+graph");
+    CHECK(graph.cuda_graph);
+    CHECK(fdtd::cuda_variant_name(graph) == "fused:32x8+graph");
+    for (const std::string name :
+         {"fused:32x8", "fused:1x1", "split:128x1", "split:7x5", "split:16x16+graph"}) {
         CAPTURE(name);
         CHECK(fdtd::cuda_variant_name(cuda_variant(name)) == name);
     }
@@ -216,13 +221,16 @@ TEST_CASE("CUDA variant names reject malformed text", "[unit][args]")
     Simulation::Options options;
     options.omp_schedule = OmpSchedule::Tasks;
     options.cuda_block_x = 7;
+    options.cuda_graph = true;
     fdtd::parse_cuda_variant_arg("--variant", "split", options);
     CHECK(options.omp_schedule == OmpSchedule::Tasks);
     CHECK(options.cuda_block_x == 32);
+    CHECK_FALSE(options.cuda_graph);
 
     for (const char *name :
          {"", "Fused", "fast", "rows", "fused:", "fused:32", "fused:0x8", "fused:32x0",
-          "fused:32x8x2", "fused:ax8", "fused+simd", "split:", "default:32x8"}) {
+          "fused:32x8x2", "fused:ax8", "fused+simd", "split:", "default:32x8", "fused+graph+graph",
+          "fused+", "+graph", "fused+graph:32x8", "default+graph"}) {
         CAPTURE(name);
         Simulation::Options unchanged;
         unchanged.cuda_kernel = CudaKernel::Split;

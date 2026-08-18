@@ -64,6 +64,7 @@ if(FDTD_WITH_CUDA)
         src/fdtd/TMz/backends/fdtd_tmz_backend_cuda.cu
         src/fdtd/TMz/backends/gpu/fdtd_tmz_backend_gpu_buffer.cu
         src/fdtd/TMz/backends/gpu/fdtd_tmz_backend_gpu_device.cu
+        src/fdtd/TMz/backends/gpu/fdtd_tmz_backend_gpu_graph.cu
         src/fdtd/TMz/backends/gpu/fdtd_tmz_backend_gpu_stream.cu)
     target_link_libraries(fdtd PRIVATE CUDA::cudart)
 endif()
