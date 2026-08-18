@@ -486,6 +486,47 @@ TEST_CASE("Simulation takes scheduled snapshots", "[unit][simulation]")
     CHECK(std::equal(last.fields.ez().begin(), last.fields.ez().end(), ref.fields().ez().begin()));
 }
 
+// Verify that a run with a handler hands over the scheduled snapshots of the run in order,
+// keeps none, and leaves the later ones scheduled, with the fields of a run that keeps them.
+TEST_CASE("Simulation hands snapshots to a handler", "[unit][simulation]")
+{
+    Simulation sim(16, 12);
+    Simulation ref(16, 12);
+    for (Simulation *s : {&sim, &ref}) {
+        s->add_source(5, 6, Component::Ez, fdtd::TMz::Gaussian::from_steps(s->dt(), 4));
+        s->add_probe(9, 4, Component::Ez);
+        for (const std::size_t step : std::vector<std::size_t>{5, 6, 12, 19}) {
+            s->add_snapshot(step);
+        }
+    }
+    std::vector<std::size_t> steps;
+    std::vector<std::vector<FloatType>> ez;
+    const auto keep = [&](std::size_t step, const fdtd::TMz::Fields &fields) {
+        steps.push_back(step);
+        ez.emplace_back(fields.ez().begin(), fields.ez().end());
+    };
+    sim.run(12, keep);
+    CHECK(steps == std::vector<std::size_t>{5, 6, 12});
+    CHECK(sim.snapshots().empty());
+    CHECK(sim.step_count() == 12);
+    sim.run(10, keep);
+    CHECK(steps == std::vector<std::size_t>{5, 6, 12, 19});
+
+    ref.run(22);
+    REQUIRE(ref.snapshots().size() == 4);
+    for (std::size_t k = 0; k < 4; ++k) {
+        const auto &kept = ref.snapshots()[k].fields.ez();
+        CHECK(std::equal(kept.begin(), kept.end(), ez[k].begin()));
+    }
+    sim.download();
+    ref.download();
+    CHECK(
+        std::equal(sim.fields().ez().begin(), sim.fields().ez().end(), ref.fields().ez().begin()));
+    const auto probes = sim.probe_data(0);
+    const auto refProbes = ref.probe_data(0);
+    CHECK(std::equal(probes.begin(), probes.end(), refProbes.begin(), refProbes.end()));
+}
+
 // Verify that a snapshot step already passed throws.
 TEST_CASE("Simulation checks snapshot steps", "[unit][simulation]")
 {

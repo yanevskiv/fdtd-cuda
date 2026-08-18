@@ -19,9 +19,9 @@ BENCH_BACKENDS="all"
 BENCH_THREADS="1 2 4"
 
 # Variants, OpenMP and CUDA names mixed: OpenMP SCHEDULE[:WxH][+simd][+phase] with rows,
-# collapse2, tiles or tasks; CUDA KERNEL[:BXxBY][+table][+graph] with fused, split or tiled; or
-# default. Each backend runs the names it reads, or default when it reads none; serial runs
-# default only
+# collapse2, tiles or tasks; CUDA KERNEL[:BXxBY][+table][+graph][+async] with fused, split or
+# tiled; or default. Each backend runs the names it reads, or default when it reads none; serial
+# runs default only
 BENCH_VARIANTS="default"
 
 # Weak scaling: per thread count p, OpenMP on nx = BENCH_WEAK_NX and ny = p * BENCH_WEAK_NX, into
@@ -38,6 +38,9 @@ BENCH_ORDER="interleaved"
 
 # Outer boundary of the workload: pml, the default, or pec or pmc with no PML
 BENCH_BOUNDARY="pml"
+
+# Steps between the snapshots each sample copies to the host, timed with it; 0 for none
+BENCH_SNAPSHOT_EVERY=0
 
 # Label of the run, written into its CSV; the report tells apart by label the runs that share a
 # configuration, such as runs under different OMP_* settings; empty for none

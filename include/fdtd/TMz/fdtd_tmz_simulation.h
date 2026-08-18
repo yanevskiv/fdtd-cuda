@@ -30,6 +30,7 @@
 #include "fdtd/fdtd_float.h"
 
 #include <cstddef>
+#include <functional>
 #include <memory>
 #include <vector>
 
@@ -174,6 +175,10 @@ namespace fdtd
                 /** Whether the CUDA backend replays a graph of 16 captured steps instead of
                  * launching each kernel of each step. */
                 bool cuda_graph = false;
+
+                /** Whether the CUDA backend copies the snapshots of a run out while it goes on
+                 * stepping (see run() with a handler), instead of stopping for each. */
+                bool cuda_async_snapshots = false;
 
                 /** Whether an explicit dt above the Courant limit is rejected. */
                 bool check_stability = true;
@@ -356,6 +361,22 @@ namespace fdtd
              */
             void run(std::size_t nsteps);
 
+            /** Receives a snapshot: the steps run when it was taken, and the fields then, valid
+             * only during the call. */
+            using SnapshotHandler = std::function<void(std::size_t step, const Fields &fields)>;
+
+            /**
+             * Advance the simulation and hand the scheduled snapshots of the run to a handler,
+             * instead of keeping them in snapshots().
+             *
+             * The run is one call to the backend, which may copy a snapshot out while it goes
+             * on stepping, and call the handler while the steps after it run.
+             *
+             * @param nsteps Number of time steps to run.
+             * @param handler Receives each snapshot, in step order.
+             */
+            void run(std::size_t nsteps, const SnapshotHandler &handler);
+
             /**
              * Number of time steps run so far.
              *
@@ -394,6 +415,17 @@ namespace fdtd
              * @param nsteps Number of time steps to run.
              */
             void advance(std::size_t nsteps);
+
+            /**
+             * The distinct source cells, and the summed values of the sources on each, for the
+             * next steps.
+             *
+             * @param nsteps Number of time steps.
+             * @param points Set to the cells.
+             * @param values Set to one value per cell per step, step-major.
+             */
+            void sample_sources(std::size_t nsteps, std::vector<PointInjection> &points,
+                                std::vector<FloatType> &values) const;
 
             /** A point source: the cell it adds to and its waveform. */
             struct Source

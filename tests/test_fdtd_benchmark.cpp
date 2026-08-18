@@ -107,6 +107,7 @@ TEST_CASE("Benchmark defaults", "[unit][benchmark]")
     CHECK(options.repeat == 10);
     CHECK(options.warmup == 0.1);
     CHECK(options.order == fdtd::BenchmarkOrder::Grouped);
+    CHECK(options.snapshot_every == 0);
     CHECK(options.backends.empty());
     CHECK(options.variants.empty());
     CHECK(options.threads.empty());
@@ -131,6 +132,8 @@ TEST_CASE("Benchmark parses every option", "[unit][benchmark]")
                                 "--warmup",
                                 "0",
                                 "--order=interleaved",
+                                "--snapshot-every",
+                                "7",
                                 "--backend",
                                 "serial",
                                 "--backend=cuda",
@@ -155,6 +158,7 @@ TEST_CASE("Benchmark parses every option", "[unit][benchmark]")
     CHECK(options.repeat == 3);
     CHECK(options.warmup == 0);
     CHECK(options.order == fdtd::BenchmarkOrder::Interleaved);
+    CHECK(options.snapshot_every == 7);
     CHECK(options.backends == std::vector<BackendType>{BackendType::Serial, BackendType::Cuda});
     CHECK(options.variants == std::vector<std::string>{"default", "fast"});
     CHECK(options.threads == std::vector<std::size_t>{2, 8});
@@ -188,6 +192,7 @@ TEST_CASE("Benchmark rejects bad arguments", "[unit][benchmark]")
     CHECK_THROWS_AS(parse({"--warmup", "nan"}), std::invalid_argument);
     CHECK_THROWS_AS(parse({"--order", "random"}), std::invalid_argument);
     CHECK_THROWS_AS(parse({"--order="}), std::invalid_argument);
+    CHECK_THROWS_AS(parse({"--snapshot-every", "-1"}), std::invalid_argument);
     CHECK_THROWS_AS(parse({"--backend", "gpu"}), std::invalid_argument);
     CHECK_THROWS_AS(parse({"--variant="}), std::invalid_argument);
     CHECK_THROWS_AS(parse({"--threads", "x"}), std::invalid_argument);
@@ -311,6 +316,23 @@ TEST_CASE("Benchmark interleaves the configurations", "[unit][benchmark]")
     std::ostringstream log;
     fdtd::run_benchmark(options, out, log);
     CHECK(lines(log.str()).size() == count);
+}
+
+// Verify that taking snapshots leaves the checksum of every backend and variant unchanged.
+TEST_CASE("Benchmark takes snapshots", "[unit][benchmark]")
+{
+    auto options = small();
+    options.repeat = 1;
+    options.variants = {"default", "tiled+async", "fused+async+graph"};
+    std::string csv;
+    const auto plain = run(options, csv);
+    options.snapshot_every = 6;
+    const auto snapped = run(options, csv);
+    REQUIRE(snapped.size() == plain.size());
+    for (std::size_t k = 0; k < plain.size(); ++k) {
+        INFO(fdtd::TMz::backend_name(plain[k].backend) << " " << plain[k].variant);
+        CHECK(snapped[k].checksum == plain[k].checksum);
+    }
 }
 
 // Verify that ny defaults to nx and that serial runs once whatever the thread counts.

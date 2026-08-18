@@ -86,6 +86,38 @@ namespace fdtd
                                          std::size_t height, const Stream &stream);
 
                 /**
+                 * Queue a copy of rows from the device to the host, without waiting for it.
+                 *
+                 * Pitches and width are in bytes. The host memory holds the rows once the work
+                 * queued before the copy and the copy are done; it should be page-locked (see
+                 * HostPin), or the call waits as for copy_rows_to_host().
+                 *
+                 * @param target Host memory of height rows.
+                 * @param targetPitch Bytes from one target row to the next.
+                 * @param source Device memory of height rows.
+                 * @param sourcePitch Bytes from one source row to the next.
+                 * @param width Bytes to copy per row.
+                 * @param height Rows to copy.
+                 * @param stream Stream to queue the copy on.
+                 * @throws CudaError When CUDA rejects the copy.
+                 */
+                void queue_rows_to_host(void *target, std::size_t targetPitch, const void *source,
+                                        std::size_t sourcePitch, std::size_t width,
+                                        std::size_t height, const Stream &stream);
+
+                /**
+                 * Queue a copy of bytes from device memory to device memory.
+                 *
+                 * @param target Device memory of at least bytes.
+                 * @param source Device memory of at least bytes.
+                 * @param bytes Bytes to copy.
+                 * @param stream Stream to queue the copy on.
+                 * @throws CudaError When CUDA rejects the copy.
+                 */
+                void copy_on_device(void *target, const void *source, std::size_t bytes,
+                                    const Stream &stream);
+
+                /**
                  * Copy rows from the device to the host, after the work queued before it.
                  *
                  * Pitches and width are in bytes. The host memory holds the rows when the call

@@ -353,6 +353,7 @@ namespace fdtd
         parsed.cuda_block_y = defaults.cuda_block_y;
         parsed.cuda_coeffs = defaults.cuda_coeffs;
         parsed.cuda_graph = defaults.cuda_graph;
+        parsed.cuda_async_snapshots = defaults.cuda_async_snapshots;
         if (text == "default") {
             options = parsed;
             return;
@@ -361,6 +362,7 @@ namespace fdtd
         std::string_view suffixes = text.substr(head.size());
         bool table = false;
         bool graph = false;
+        bool async = false;
         while (!suffixes.empty()) {
             suffixes.remove_prefix(1);
             const std::string_view suffix = suffixes.substr(0, suffixes.find('+'));
@@ -369,12 +371,15 @@ namespace fdtd
                 table = true;
             } else if (suffix == "graph" && !graph) {
                 graph = true;
+            } else if (suffix == "async" && !async) {
+                async = true;
             } else {
-                malformed_variant(name, text, "expected +table or +graph, each once");
+                malformed_variant(name, text, "expected +table, +graph or +async, each once");
             }
         }
         parsed.cuda_coeffs = table ? TMz::CudaCoeffs::Table : TMz::CudaCoeffs::Arrays;
         parsed.cuda_graph = graph;
+        parsed.cuda_async_snapshots = async;
 
         const std::size_t colon = head.find(':');
         const std::string_view kernel = head.substr(0, colon);
@@ -409,6 +414,9 @@ namespace fdtd
         }
         if (options.cuda_graph) {
             name << "+graph";
+        }
+        if (options.cuda_async_snapshots) {
+            name << "+async";
         }
         return name.str();
     }

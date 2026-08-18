@@ -156,6 +156,36 @@ TEST_CASE("Backends model the traffic of a step", "[unit][backend]")
     }
 }
 
+// Verify that a step with snapshots hands over each one in order and checks the steps.
+TEST_CASE("Backends hand over snapshots and check their steps", "[unit][backend]")
+{
+    const Grid grid(10, 8);
+    const Coeffs coeffs(Material(grid), fdtd::TMz::courant_dt(grid, 0.9));
+    const std::vector<PointInjection> points{{Component::Ez, grid.index(5, 4)}};
+    const std::vector<FloatType> values(6, FloatType(1));
+    for (const auto type : fdtd::TMz::available_backends()) {
+        INFO(fdtd::TMz::backend_name(type));
+        const auto backend = fdtd::TMz::make_backend(type, grid);
+        backend->upload(coeffs);
+        std::vector<std::size_t> taken;
+        std::vector<FloatType> centre;
+        const std::vector<std::size_t> snapshots{1, 2, 6};
+        backend->step(6, points, values, snapshots, [&](std::size_t steps, const Fields &fields) {
+            taken.push_back(steps);
+            centre.push_back(fields.ez()[grid.index(5, 4)]);
+        });
+        CHECK(taken == snapshots);
+        CHECK(centre[0] == FloatType(1));
+        for (const std::vector<std::size_t> &bad :
+             {std::vector<std::size_t>{0}, std::vector<std::size_t>{7},
+              std::vector<std::size_t>{2, 2}, std::vector<std::size_t>{3, 1}}) {
+            CHECK_THROWS_AS(
+                backend->step(6, points, values, bad, [](std::size_t, const Fields &) {}),
+                std::invalid_argument);
+        }
+    }
+}
+
 // Verify the backend names.
 TEST_CASE("Backend types have lowercase names", "[unit][backend]")
 {

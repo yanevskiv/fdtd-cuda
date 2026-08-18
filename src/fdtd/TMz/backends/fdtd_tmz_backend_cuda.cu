@@ -35,6 +35,7 @@
 #include <cstddef>
 #include <cstdint>
 #include <limits>
+#include <memory>
 #include <optional>
 #include <span>
 #include <sstream>
@@ -162,6 +163,12 @@ namespace fdtd::TMz::backends
         __global__ void next_step_kernel(int *step)
         {
             ++*step;
+        }
+
+        // Set the step on the device.
+        __global__ void set_step_kernel(int *step, int value)
+        {
+            *step = value;
         }
 
         // Add to a cell's new H the values of the magnetic sources on it, as add_sources_kernel
@@ -500,6 +507,49 @@ namespace fdtd::TMz::backends
                               std::span<const FloatType> values)
     {
         require_coeffs();
+        const std::size_t magnetic = put_sources(nsteps, points, values);
+        const std::size_t electric = points.size() - magnetic;
+        queue_steps(device_coeffs(), 0, nsteps, magnetic, electric);
+        collect_records(nsteps);
+    }
+
+    // Copy each snapshot out on the copy stream while the steps after it run, and hand it over
+    // once the next one is queued, so the handler runs while the device steps.
+    void CudaBackend::advance_snapshots(std::size_t nsteps, std::span<const PointInjection> points,
+                                        std::span<const FloatType> values,
+                                        std::span<const std::size_t> snapshots,
+                                        const SnapshotHandler &handler)
+    {
+        if (!m_options.cuda_async_snapshots || snapshots.empty()) {
+            Backend::advance_snapshots(nsteps, points, values, snapshots, handler);
+            return;
+        }
+        require_coeffs();
+        const std::size_t magnetic = put_sources(nsteps, points, values);
+        const std::size_t electric = points.size() - magnetic;
+        const gpu::DeviceCoeffs coeffs = device_coeffs();
+        if (!m_async) {
+            m_async = std::make_unique<AsyncSnapshots>(m_grid, m_pitch);
+        }
+        std::size_t done = 0;
+        for (std::size_t s = 0; s < snapshots.size(); ++s) {
+            queue_steps(coeffs, done, snapshots[s], magnetic, electric);
+            done = snapshots[s];
+            queue_snapshot(m_async->slots[s % 2], done);
+            if (s > 0) {
+                deliver(m_async->slots[(s - 1) % 2], handler);
+            }
+        }
+        queue_steps(coeffs, done, nsteps, magnetic, electric);
+        deliver(m_async->slots[(snapshots.size() - 1) % 2], handler);
+        collect_records(nsteps);
+    }
+
+    // Copy the source cells and values to the device, magnetic cells first, and make room for
+    // the records.
+    std::size_t CudaBackend::put_sources(std::size_t nsteps, std::span<const PointInjection> points,
+                                         std::span<const FloatType> values)
+    {
         std::vector<gpu::DevicePoint> sources;
         sources.reserve(points.size());
         for (std::size_t k = 0; k < points.size(); ++k) {
@@ -513,17 +563,21 @@ namespace fdtd::TMz::backends
             std::stable_partition(sources.begin(), sources.end(), [](const gpu::DevicePoint &p) {
                 return p.component != Component::Ez;
             });
-        const auto magnetic = static_cast<std::size_t>(firstElectric - sources.begin());
         reserve(m_device_sources, sources.size());
         gpu::upload(m_device_sources, std::span<const gpu::DevicePoint>(sources), m_stream);
         reserve(m_device_values, values.size());
         gpu::upload(m_device_values, values, m_stream);
         reserve(m_device_records, nsteps * m_probes.size());
+        return static_cast<std::size_t>(firstElectric - sources.begin());
+    }
 
-        const gpu::DeviceCoeffs coeffs = device_coeffs();
-        const std::size_t electric = sources.size() - magnetic;
-        std::size_t n = 0;
-        if (m_options.cuda_graph && nsteps >= GRAPH_STEPS) {
+    // Replay the graph over whole runs of GRAPH_STEPS steps when it is on, and launch the rest
+    // step by step.
+    void CudaBackend::queue_steps(const gpu::DeviceCoeffs &coeffs, std::size_t from, std::size_t to,
+                                  std::size_t magnetic, std::size_t electric)
+    {
+        std::size_t n = from;
+        if (m_options.cuda_graph && to - from >= GRAPH_STEPS) {
             const GraphKey key{
                 .magnetic = magnetic,
                 .electric = electric,
@@ -544,19 +598,88 @@ namespace fdtd::TMz::backends
                 });
                 m_graph_key = key;
             }
-            m_device_step.zero(m_stream);
-            for (; n + GRAPH_STEPS <= nsteps; n += GRAPH_STEPS) {
+            set_step_kernel<<<1, 1, 0, m_stream.handle()>>>(m_device_step.data(),
+                                                            static_cast<int>(from));
+            check_launch();
+            for (; n + GRAPH_STEPS <= to; n += GRAPH_STEPS) {
                 m_graph.launch(m_stream);
             }
         }
-        for (; n < nsteps; ++n) {
+        for (; n < to; ++n) {
             launch_step(coeffs, n, magnetic, electric, false);
         }
+    }
 
+    // Append the records of the advance and wait for the device.
+    void CudaBackend::collect_records(std::size_t nsteps)
+    {
         const std::size_t first = m_records.size();
         m_records.resize(first + nsteps * m_probes.size());
         gpu::download(std::span<FloatType>(m_records).subspan(first), m_device_records, m_stream);
         m_stream.synchronize();
+    }
+
+    // Copy the fields to the slot's device arrays on the stream, then to its host fields on the
+    // copy stream once that is done.
+    void CudaBackend::queue_snapshot(SnapshotSlot &slot, std::size_t steps)
+    {
+        const std::size_t bytes = m_pitch * m_grid.ny() * sizeof(FloatType);
+        gpu::copy_on_device(slot.ez.data(), m_ez.data(), bytes, m_stream);
+        gpu::copy_on_device(slot.hx.data(), m_hx.data(), bytes, m_stream);
+        gpu::copy_on_device(slot.hy.data(), m_hy.data(), bytes, m_stream);
+        gpu::copy_on_device(slot.ezx.data(), m_ezx.data(), bytes, m_stream);
+        gpu::copy_on_device(slot.ezy.data(), m_ezy.data(), bytes, m_stream);
+        slot.copied.record(m_stream);
+        slot.copied.hold(m_async->stream);
+
+        const std::size_t width = m_grid.nx() * sizeof(FloatType);
+        const std::size_t host = m_grid.pitch() * sizeof(FloatType);
+        const std::size_t device = m_pitch * sizeof(FloatType);
+        const std::size_t ny = m_grid.ny();
+        const gpu::Stream &copies = m_async->stream;
+        gpu::queue_rows_to_host(slot.fields.ez().data(), host, slot.ez.data(), device, width, ny,
+                                copies);
+        gpu::queue_rows_to_host(slot.fields.hx().data(), host, slot.hx.data(), device, width, ny,
+                                copies);
+        gpu::queue_rows_to_host(slot.fields.hy().data(), host, slot.hy.data(), device, width, ny,
+                                copies);
+        gpu::queue_rows_to_host(slot.fields.ezx().data(), host, slot.ezx.data(), device, width, ny,
+                                copies);
+        gpu::queue_rows_to_host(slot.fields.ezy().data(), host, slot.ezy.data(), device, width, ny,
+                                copies);
+        slot.landed.record(copies);
+        slot.steps = steps;
+    }
+
+    // Wait for the slot's copy to land and hand it over.
+    void CudaBackend::deliver(const SnapshotSlot &slot, const SnapshotHandler &handler)
+    {
+        slot.landed.synchronize();
+        handler(slot.steps, slot.fields);
+    }
+
+    // Allocate the device arrays and host fields of a slot, and pin the host fields.
+    CudaBackend::SnapshotSlot::SnapshotSlot(const Grid &grid, std::size_t pitch)
+        : ez(pitch * grid.ny())
+        , hx(pitch * grid.ny())
+        , hy(pitch * grid.ny())
+        , ezx(pitch * grid.ny())
+        , ezy(pitch * grid.ny())
+        , fields(grid)
+    {
+        const std::size_t bytes = grid.size() * sizeof(FloatType);
+        pins.emplace_back(fields.ez().data(), bytes);
+        pins.emplace_back(fields.hx().data(), bytes);
+        pins.emplace_back(fields.hy().data(), bytes);
+        pins.emplace_back(fields.ezx().data(), bytes);
+        pins.emplace_back(fields.ezy().data(), bytes);
+    }
+
+    // Make the copy stream and the two slots.
+    CudaBackend::AsyncSnapshots::AsyncSnapshots(const Grid &grid, std::size_t pitch)
+        : slots{SnapshotSlot(grid, pitch), SnapshotSlot(grid, pitch)}
+    {
+        // Empty.
     }
 
     // Throw unless coefficients were uploaded.

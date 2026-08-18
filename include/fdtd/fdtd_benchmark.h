@@ -64,6 +64,9 @@ namespace fdtd
         /** Order of the samples. */
         BenchmarkOrder order = BenchmarkOrder::Grouped;
 
+        /** Steps between the snapshots a sample takes and copies to the host, or zero for none. */
+        std::size_t snapshot_every = 0;
+
         /** Backends to measure in order; none means every compiled backend. */
         std::vector<TMz::BackendType> backends;
 
@@ -193,10 +196,11 @@ namespace fdtd
      * count. A backend runs the variants it reads, or "default" when it reads none; serial reads
      * "default" only. Serial and CUDA run with one thread, OpenMP with each thread count. Each
      * configuration is warmed up with untimed runs, then measured repeat times; every sample
-     * builds a new Simulation and times only Simulation::run. Grouped takes the samples of a
-     * configuration in a row after its warm-up; interleaved warms every configuration up, then
-     * takes one sample of each per round. A summary line per configuration goes to the log once
-     * its samples are taken.
+     * builds a new Simulation and times only Simulation::run, which with snapshot_every takes a
+     * snapshot every so many steps and hands it to a handler that drops it. Grouped takes the
+     * samples of a configuration in a row after its warm-up; interleaved warms every configuration
+     * up, then takes one sample of each per round. A summary line per configuration goes to the log
+     * once its samples are taken.
      *
      * @param options Settings of the run.
      * @param out Stream for the CSV when no output file is set.

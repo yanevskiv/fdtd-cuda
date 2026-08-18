@@ -22,7 +22,9 @@
 
 #include "fdtd/TMz/backends/gpu/fdtd_tmz_backend_gpu_buffer.h"
 #include "fdtd/TMz/backends/gpu/fdtd_tmz_backend_gpu_cell.h"
+#include "fdtd/TMz/backends/gpu/fdtd_tmz_backend_gpu_event.h"
 #include "fdtd/TMz/backends/gpu/fdtd_tmz_backend_gpu_graph.h"
+#include "fdtd/TMz/backends/gpu/fdtd_tmz_backend_gpu_pinned.h"
 #include "fdtd/TMz/backends/gpu/fdtd_tmz_backend_gpu_stream.h"
 #include "fdtd/TMz/fdtd_tmz_backend.h"
 #include "fdtd/TMz/fdtd_tmz_boundary.h"
@@ -35,6 +37,7 @@
 
 #include <cstddef>
 #include <cstdint>
+#include <memory>
 #include <optional>
 #include <span>
 #include <string_view>
@@ -195,6 +198,28 @@ namespace fdtd
                 void advance(std::size_t nsteps, std::span<const PointInjection> points,
                              std::span<const FloatType> values) override;
 
+                /**
+                 * Advance the fields on the device, add the sources and hand over the snapshots.
+                 *
+                 * With cuda_async_snapshots, a snapshot is copied to device arrays of its own on
+                 * the stream, then to page-locked host fields on a second stream, and handed
+                 * over once the steps up to the next snapshot are queued, so the copy to the host
+                 * and the handler run while the device steps. Two slots take turns. Without it,
+                 * as Backend::advance_snapshots().
+                 *
+                 * @param nsteps Number of time steps.
+                 * @param points Distinct cells inside the grid.
+                 * @param values One value per point per step, step-major.
+                 * @param snapshots Increasing step counts from 1 to nsteps.
+                 * @param handler Receives each snapshot.
+                 * @throws std::logic_error When no coefficients were uploaded.
+                 * @throws CudaError When a kernel or a copy fails.
+                 */
+                void advance_snapshots(std::size_t nsteps, std::span<const PointInjection> points,
+                                       std::span<const FloatType> values,
+                                       std::span<const std::size_t> snapshots,
+                                       const SnapshotHandler &handler) override;
+
             private:
                 /**
                  * Check that coefficients were uploaded, before a step.
@@ -242,6 +267,115 @@ namespace fdtd
                  */
                 void launch_split_e(const gpu::DeviceFields &fields,
                                     const gpu::DeviceCoeffs &coeffs);
+
+                /** A snapshot on its way out: its device copy, its host copy, and the events
+                 * that mark the two copies done. */
+                struct SnapshotSlot
+                {
+                    /**
+                     * Allocate the arrays and fields, and page-lock the fields.
+                     *
+                     * @param grid Grid of the backend.
+                     * @param pitch Row pitch of the device arrays.
+                     */
+                    SnapshotSlot(const Grid &grid, std::size_t pitch);
+
+                    /** Device copy of Ez. */
+                    gpu::DeviceBuffer<FloatType> ez;
+
+                    /** Device copy of Hx. */
+                    gpu::DeviceBuffer<FloatType> hx;
+
+                    /** Device copy of Hy. */
+                    gpu::DeviceBuffer<FloatType> hy;
+
+                    /** Device copy of Ezx. */
+                    gpu::DeviceBuffer<FloatType> ezx;
+
+                    /** Device copy of Ezy. */
+                    gpu::DeviceBuffer<FloatType> ezy;
+
+                    /** Host copy, handed over. */
+                    Fields fields;
+
+                    /** Page locks of the host copy's arrays. */
+                    std::vector<gpu::HostPin> pins;
+
+                    /** Marks the device copy done. */
+                    gpu::Event copied;
+
+                    /** Marks the host copy done. */
+                    gpu::Event landed;
+
+                    /** Steps of the advance the snapshot was taken after. */
+                    std::size_t steps = 0;
+                };
+
+                /** What cuda_async_snapshots needs, made by the first advance that takes a
+                 * snapshot. */
+                struct AsyncSnapshots
+                {
+                    /**
+                     * Make the copy stream and the slots.
+                     *
+                     * @param grid Grid of the backend.
+                     * @param pitch Row pitch of the device arrays.
+                     */
+                    AsyncSnapshots(const Grid &grid, std::size_t pitch);
+
+                    /** Stream the copies to the host run on. */
+                    gpu::Stream stream;
+
+                    /** Slots that take turns. */
+                    SnapshotSlot slots[2];
+                };
+
+                /**
+                 * Copy the source cells and values of an advance to the device, the magnetic
+                 * cells first, and make room for its probe records.
+                 *
+                 * @param nsteps Number of time steps.
+                 * @param points Distinct cells inside the grid.
+                 * @param values One value per point per step, step-major.
+                 * @return The number of magnetic sources.
+                 */
+                std::size_t put_sources(std::size_t nsteps, std::span<const PointInjection> points,
+                                        std::span<const FloatType> values);
+
+                /**
+                 * Queue the steps from one step of the advance to another.
+                 *
+                 * @param coeffs View of the device coefficients.
+                 * @param from First step, from zero.
+                 * @param to Step to stop before.
+                 * @param magnetic Sources that add to Hx or Hy.
+                 * @param electric Sources that add to Ez.
+                 */
+                void queue_steps(const gpu::DeviceCoeffs &coeffs, std::size_t from, std::size_t to,
+                                 std::size_t magnetic, std::size_t electric);
+
+                /**
+                 * Append the probe records of an advance and wait for the device.
+                 *
+                 * @param nsteps Steps of the advance.
+                 */
+                void collect_records(std::size_t nsteps);
+
+                /**
+                 * Queue the copies of the fields as they will be after the work queued so far.
+                 *
+                 * @param slot Slot to copy into, its last snapshot handed over.
+                 * @param steps Steps of the advance the snapshot is taken after.
+                 */
+                void queue_snapshot(SnapshotSlot &slot, std::size_t steps);
+
+                /**
+                 * Wait for a slot's copy to reach the host and hand it over.
+                 *
+                 * @param slot Slot to hand over.
+                 * @param handler Receives it.
+                 */
+                static void deliver(const SnapshotSlot &slot, const SnapshotHandler &handler);
 
                 /**
                  * Run one step's kernels on the stream, on the device fields as they are then.
@@ -405,6 +539,9 @@ namespace fdtd
 
                 /** What m_graph was captured with, captured again when this changes. */
                 GraphKey m_graph_key;
+
+                /** Copy stream and slots of cuda_async_snapshots, made when first needed. */
+                std::unique_ptr<AsyncSnapshots> m_async;
             };
         }
     }

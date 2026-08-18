@@ -26,8 +26,9 @@
 // CUDA runtime.
 #include <cuda_runtime.h>
 
-// Device buffers and streams.
+// Device buffers, streams and events.
 #include "fdtd/TMz/backends/gpu/fdtd_tmz_backend_gpu_buffer.h"
+#include "fdtd/TMz/backends/gpu/fdtd_tmz_backend_gpu_event.h"
 #include "fdtd/TMz/backends/gpu/fdtd_tmz_backend_gpu_stream.h"
 
 // Standard library for sizes, sorting and lists.
@@ -63,39 +64,6 @@ namespace fdtd::TMz::backends::gpu
             check(cudaDeviceGetAttribute(&value, attr, device), "cudaDeviceGetAttribute");
             return value;
         }
-
-        // An event that is destroyed with its scope.
-        class Event
-        {
-        public:
-            // Create the event.
-            Event()
-            {
-                check(cudaEventCreate(&m_event), "cudaEventCreate");
-            }
-
-            // Destroy the event, ignoring errors.
-            ~Event()
-            {
-                cudaEventDestroy(m_event);
-            }
-
-            // Events are not copied.
-            Event(const Event &) = delete;
-
-            // Events are not copied.
-            Event &operator=(const Event &) = delete;
-
-            // The event.
-            cudaEvent_t get() const noexcept
-            {
-                return m_event;
-            }
-
-        private:
-            // The event.
-            cudaEvent_t m_event = nullptr;
-        };
     }
 
     // Count the devices, clearing the error a failed query leaves behind.
@@ -148,13 +116,12 @@ namespace fdtd::TMz::backends::gpu
         Event stop;
         std::vector<double> rates;
         for (std::size_t r = 0; r <= repeats; ++r) {
-            check(cudaEventRecord(start.get(), stream.handle()), "cudaEventRecord");
+            start.record(stream);
             copy_kernel<<<blocks, COPY_BLOCK, 0, stream.handle()>>>(in.data(), out.data(), n);
             check(cudaGetLastError(), "copy_kernel");
-            check(cudaEventRecord(stop.get(), stream.handle()), "cudaEventRecord");
-            check(cudaEventSynchronize(stop.get()), "cudaEventSynchronize");
-            float ms = 0;
-            check(cudaEventElapsedTime(&ms, start.get(), stop.get()), "cudaEventElapsedTime");
+            stop.record(stream);
+            stop.synchronize();
+            const float ms = stop.milliseconds_since(start);
             if (r > 0) {
                 rates.push_back(2.0 * static_cast<double>(n * sizeof(float4)) / (1e-3 * ms));
             }

@@ -645,6 +645,57 @@ TEST_CASE("CUDA models the traffic of the tiled kernel", "[unit][backend][cuda]"
     CHECK(table.step_traffic().bytes == tiled.step_traffic().bytes - 6 * 3 * word);
 }
 
+// Verify that snapshots copied out while the steps go on equal those of a run that stops for
+// each, bit for bit: every kernel, with and without graphs, snapshots on consecutive steps (the
+// two slots taking turns), across a graph's span and on the last step, over two runs.
+TEST_CASE("CUDA async snapshots match the stopping ones bit for bit", "[backend][cuda]")
+{
+    require_cuda();
+    struct Taken
+    {
+        std::vector<std::size_t> steps;
+        std::vector<FloatType> fields;
+        std::vector<FloatType> probes;
+    };
+    const auto boundary = GENERATE(Boundary::Pmc, Boundary::Pml);
+    for (const CudaKernel kernel : KERNELS) {
+        for (const bool graph : {false, true}) {
+            INFO("kernel " << static_cast<int>(kernel) << ", graph " << graph);
+            Taken taken[2];
+            for (const bool async : {false, true}) {
+                auto options = cuda_options(kernel, {32, 8});
+                options.backend = BackendType::Cuda;
+                options.boundary = boundary;
+                options.pml_thickness = 6;
+                options.cuda_graph = graph;
+                options.cuda_async_snapshots = async;
+                Simulation sim(53, 41, options);
+                sim.add_source(20, 20, Component::Ez, fdtd::TMz::Gaussian::from_steps(sim.dt(), 6));
+                sim.add_source(30, 12, Component::Hy, fdtd::TMz::Gaussian::from_steps(sim.dt(), 6));
+                sim.add_probe(25, 25, Component::Ez);
+                for (const std::size_t step :
+                     std::vector<std::size_t>{1, 2, 3, 20, 37, 40, 41, 60}) {
+                    sim.add_snapshot(step);
+                }
+                Taken &into = taken[async ? 1 : 0];
+                const auto keep = [&](std::size_t step, const Fields &fields) {
+                    into.steps.push_back(step);
+                    append_fields(into.fields, fields);
+                };
+                sim.run(40, keep);
+                sim.run(20, keep);
+                sim.download();
+                append_fields(into.fields, sim.fields());
+                append(into.probes, sim.probe_data(0));
+            }
+            CHECK(taken[0].steps == std::vector<std::size_t>{1, 2, 3, 20, 37, 40, 41, 60});
+            CHECK(taken[1].steps == taken[0].steps);
+            CHECK(taken[1].fields == taken[0].fields);
+            CHECK(taken[1].probes == taken[0].probes);
+        }
+    }
+}
+
 // Verify that the backend has its name and rejects settings it cannot run.
 TEST_CASE("CUDA backend checks its options", "[unit][backend][cuda]")
 {

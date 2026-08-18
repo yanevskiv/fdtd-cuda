@@ -28,6 +28,7 @@
 #include "fdtd/fdtd_float.h"
 
 #include <cstddef>
+#include <functional>
 #include <span>
 #include <string_view>
 #include <vector>
@@ -224,6 +225,34 @@ namespace fdtd
                       std::span<const FloatType> values);
 
             /**
+             * Receives a snapshot taken during a step() call: the steps of the call run before
+             * it, and the fields then. The fields are valid only during the call.
+             */
+            using SnapshotHandler = std::function<void(std::size_t steps, const Fields &fields)>;
+
+            /**
+             * Advance the fields, add soft point sources, and hand over the fields after given
+             * steps of the call.
+             *
+             * As step() with sources, and after each step count in snapshots the handler
+             * receives the fields, in order. A backend may copy the fields out while it goes on
+             * stepping, and call the handler while the steps after the snapshot run.
+             *
+             * @param nsteps Number of time steps.
+             * @param points Distinct cells to add to.
+             * @param values One value per point per step, step-major.
+             * @param snapshots Step counts of the call to take the fields after, increasing,
+             *        each from 1 to nsteps.
+             * @param handler Receives each snapshot.
+             * @throws std::invalid_argument As step(), or when the snapshot steps are out of
+             *         order or range.
+             * @throws std::logic_error When no coefficients were uploaded.
+             */
+            void step(std::size_t nsteps, std::span<const PointInjection> points,
+                      std::span<const FloatType> values, std::span<const std::size_t> snapshots,
+                      const SnapshotHandler &handler);
+
+            /**
              * Replace the probes and drop everything recorded so far.
              *
              * Every step after this appends the value of each probe at the end of the
@@ -284,6 +313,26 @@ namespace fdtd
             virtual void advance(std::size_t nsteps, std::span<const PointInjection> points,
                                  std::span<const FloatType> values) = 0;
 
+            /**
+             * Advance the fields, add the sources and hand over the snapshots; called by step()
+             * after its checks.
+             *
+             * The default advances to each snapshot, downloads the fields into a copy of its
+             * own and hands them over before it goes on.
+             *
+             * @param nsteps Number of time steps.
+             * @param points Distinct cells inside the grid.
+             * @param values One value per point per step, step-major.
+             * @param snapshots Increasing step counts from 1 to nsteps.
+             * @param handler Receives each snapshot.
+             * @throws std::logic_error When no coefficients were uploaded.
+             */
+            virtual void advance_snapshots(std::size_t nsteps,
+                                           std::span<const PointInjection> points,
+                                           std::span<const FloatType> values,
+                                           std::span<const std::size_t> snapshots,
+                                           const SnapshotHandler &handler);
+
             /** Create a backend. */
             Backend() = default;
 
@@ -306,6 +355,19 @@ namespace fdtd
              * @return This backend.
              */
             Backend &operator=(Backend &&) = default;
+
+        private:
+            /**
+             * Check the sources of a step() call.
+             *
+             * @param nsteps Number of time steps.
+             * @param points Cells to add to.
+             * @param values Values to add.
+             * @throws std::invalid_argument When the values do not match the points and
+             *         steps, a point lies outside the grid, or two points are the same.
+             */
+            void check_sources(std::size_t nsteps, std::span<const PointInjection> points,
+                               std::span<const FloatType> values) const;
         };
 
         /**

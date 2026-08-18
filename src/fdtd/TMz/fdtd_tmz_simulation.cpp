@@ -276,6 +276,36 @@ namespace fdtd::TMz
             return;
         }
         std::vector<PointInjection> points;
+        std::vector<FloatType> values;
+        sample_sources(nsteps, points, values);
+        m_backend->step(nsteps, points, values);
+        m_step_count += nsteps;
+    }
+
+    // Take the scheduled snapshots of the run, then step the backend once, handing them over.
+    void Simulation::run(std::size_t nsteps, const SnapshotHandler &handler)
+    {
+        const std::size_t start = m_step_count;
+        std::vector<std::size_t> snapshots;
+        while (!m_snapshot_steps.empty() && m_snapshot_steps.front() <= start + nsteps) {
+            snapshots.push_back(m_snapshot_steps.front() - start);
+            m_snapshot_steps.erase(m_snapshot_steps.begin());
+        }
+        std::vector<PointInjection> points;
+        std::vector<FloatType> values;
+        sample_sources(nsteps, points, values);
+        m_backend->step(nsteps, points, values, snapshots,
+                        [&](std::size_t steps, const Fields &fields) {
+                            handler(start + steps, fields);
+                        });
+        m_step_count += nsteps;
+    }
+
+    // Find the distinct cells of the sources and sum the sources' samples on each.
+    void Simulation::sample_sources(std::size_t nsteps, std::vector<PointInjection> &points,
+                                    std::vector<FloatType> &values) const
+    {
+        points.clear();
         std::vector<std::size_t> slots;
         slots.reserve(m_sources.size());
         for (const Source &source : m_sources) {
@@ -291,7 +321,7 @@ namespace fdtd::TMz
         }
 
         const std::size_t npoints = points.size();
-        std::vector<FloatType> values(nsteps * npoints, FloatType(0));
+        values.assign(nsteps * npoints, FloatType(0));
         for (std::size_t s = 0; s < m_sources.size(); ++s) {
             const Source &source = m_sources[s];
             const double offset = source.point.component == Component::Ez ? 1.0 : 0.5;
@@ -301,9 +331,6 @@ namespace fdtd::TMz
                 values[n * npoints + slots[s]] += samples[n];
             }
         }
-
-        m_backend->step(nsteps, points, values);
-        m_step_count += nsteps;
     }
 
     // Return the step count.

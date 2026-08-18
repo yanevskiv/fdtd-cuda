@@ -146,13 +146,12 @@ namespace fdtd
             return name.str();
         }
 
-        // Write a snapshot of the current fields and log it.
-        void write_current(const TMz::Simulation &sim, const std::filesystem::path &dir,
-                           std::ostream &log)
+        // Write the snapshot of a step and log it.
+        void write_fields(const std::filesystem::path &dir, std::size_t step,
+                          const TMz::Fields &fields, double dt, std::ostream &log)
         {
-            const auto snap = sim.snapshot();
-            const auto path = dir / snapshot_name(snap.step);
-            TMz::write_snapshot(path, snap.fields, snap.step, sim.dt());
+            const auto path = dir / snapshot_name(step);
+            TMz::write_snapshot(path, fields, step, dt);
             log << "wrote ";
             log << path.string();
             log << '\n';
@@ -211,8 +210,8 @@ namespace fdtd
         usage << "  --variant V           Variant of the backend: for OpenMP\n";
         usage << "                        SCHEDULE[:WxH][+simd][+phase], SCHEDULE rows,\n";
         usage << "                        collapse2, tiles or tasks; for CUDA\n";
-        usage << "                        KERNEL[:BXxBY][+table][+graph], KERNEL fused,\n";
-        usage << "                        split or tiled (default: default)\n";
+        usage << "                        KERNEL[:BXxBY][+table][+graph][+async], KERNEL\n";
+        usage << "                        fused, split or tiled (default: default)\n";
         usage << "  --output DIR          Directory for the files (default: out)\n";
         usage << "  -h, --help            Show this message and exit\n";
         usage << "  -v, --version         Show the version and exit\n";
@@ -224,7 +223,7 @@ namespace fdtd
         return usage.str();
     }
 
-    // Build the simulation, run it in pieces between snapshots, then write the probes.
+    // Build the simulation, run it, writing the snapshots as they come, then write the probes.
     void run_driver(const DriverOptions &options, std::ostream &log)
     {
         TMz::Simulation::Options simOptions;
@@ -280,15 +279,16 @@ namespace fdtd
 
         const std::size_t every = options.snapshot_every;
         if (every > 0) {
-            write_current(sim, options.output, log);
-        }
-        while (sim.step_count() < options.steps) {
-            const std::size_t left = options.steps - sim.step_count();
-            sim.run(every > 0 && every < left ? every : left);
-            if (every > 0) {
-                write_current(sim, options.output, log);
+            const auto first = sim.snapshot();
+            write_fields(options.output, first.step, first.fields, sim.dt(), log);
+            for (std::size_t step = every; step < options.steps; step += every) {
+                sim.add_snapshot(step);
             }
+            sim.add_snapshot(options.steps);
         }
+        sim.run(options.steps, [&](std::size_t step, const TMz::Fields &fields) {
+            write_fields(options.output, step, fields, sim.dt(), log);
+        });
 
         for (std::size_t k = 0; k < options.probes.size(); ++k) {
             const DriverProbeSpec &probe = options.probes[k];

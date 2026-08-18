@@ -53,6 +53,48 @@ namespace fdtd::TMz
     void Backend::step(std::size_t nsteps, std::span<const PointInjection> points,
                        std::span<const FloatType> values)
     {
+        check_sources(nsteps, points, values);
+        advance(nsteps, points, values);
+    }
+
+    // Check the sources and the snapshot steps, then advance and take the snapshots.
+    void Backend::step(std::size_t nsteps, std::span<const PointInjection> points,
+                       std::span<const FloatType> values, std::span<const std::size_t> snapshots,
+                       const SnapshotHandler &handler)
+    {
+        check_sources(nsteps, points, values);
+        for (std::size_t k = 0; k < snapshots.size(); ++k) {
+            if (snapshots[k] == 0 || snapshots[k] > nsteps ||
+                (k > 0 && snapshots[k] <= snapshots[k - 1])) {
+                throw std::invalid_argument(
+                    "Backend: snapshot steps must increase within 1 to the step count");
+            }
+        }
+        advance_snapshots(nsteps, points, values, snapshots, handler);
+    }
+
+    // Step to each snapshot, download the fields and hand them over, then step to the end.
+    void Backend::advance_snapshots(std::size_t nsteps, std::span<const PointInjection> points,
+                                    std::span<const FloatType> values,
+                                    std::span<const std::size_t> snapshots,
+                                    const SnapshotHandler &handler)
+    {
+        const std::size_t npoints = points.size();
+        Fields fields(grid());
+        std::size_t done = 0;
+        for (const std::size_t at : snapshots) {
+            advance(at - done, points, values.subspan(done * npoints, (at - done) * npoints));
+            done = at;
+            download(fields);
+            handler(at, fields);
+        }
+        advance(nsteps - done, points, values.subspan(done * npoints));
+    }
+
+    // Check that the values match the points and steps, and the points are distinct cells.
+    void Backend::check_sources(std::size_t nsteps, std::span<const PointInjection> points,
+                                std::span<const FloatType> values) const
+    {
         const std::size_t npoints = points.size();
         if (npoints != 0 && nsteps > std::numeric_limits<std::size_t>::max() / npoints) {
             throw std::invalid_argument("Backend: too many source values");
@@ -74,8 +116,6 @@ namespace fdtd::TMz
         if (std::adjacent_find(keys.begin(), keys.end()) != keys.end()) {
             throw std::invalid_argument("Backend: source points must be distinct");
         }
-
-        advance(nsteps, points, values);
     }
 
     // Check the probe cells, then replace the probes.

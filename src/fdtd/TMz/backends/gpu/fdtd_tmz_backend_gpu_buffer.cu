@@ -97,6 +97,29 @@ namespace fdtd::TMz::backends::gpu
         stream.synchronize();
     }
 
+    // Queue the device-to-host copy of the rows.
+    void queue_rows_to_host(void *target, std::size_t targetPitch, const void *source,
+                            std::size_t sourcePitch, std::size_t width, std::size_t height,
+                            const Stream &stream)
+    {
+        if (width == 0 || height == 0) {
+            return;
+        }
+        check(cudaMemcpy2DAsync(target, targetPitch, source, sourcePitch, width, height,
+                                cudaMemcpyDeviceToHost, stream.handle()),
+              "cudaMemcpy2DAsync");
+    }
+
+    // Queue the device-to-device copy of the bytes.
+    void copy_on_device(void *target, const void *source, std::size_t bytes, const Stream &stream)
+    {
+        if (bytes == 0) {
+            return;
+        }
+        check(cudaMemcpyAsync(target, source, bytes, cudaMemcpyDeviceToDevice, stream.handle()),
+              "cudaMemcpyAsync");
+    }
+
     // Queue the zeroing of the bytes.
     void fill_zero(void *target, std::size_t bytes, const Stream &stream)
     {

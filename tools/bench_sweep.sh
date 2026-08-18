@@ -85,6 +85,7 @@ done
 WEAK_NX="${BENCH_WEAK_NX:-}"
 ORDER="${BENCH_ORDER:-interleaved}"
 BOUNDARY="${BENCH_BOUNDARY:-pml}"
+SNAPSHOT_EVERY="${BENCH_SNAPSHOT_EVERY:-0}"
 LABEL="${BENCH_LABEL:-}"
 
 [ "${OUT#/}" != "$OUT" ] || OUT="$PWD/$OUT"
@@ -103,7 +104,7 @@ mkdir -p "$DIR" || exit 1
 : > "$LOG"
 
 log "==> config $CONFIG: steps=$BENCH_STEPS repeat=$BENCH_REPEAT order=$ORDER\
- boundary=$BOUNDARY backends=($BENCH_BACKENDS) threads=($BENCH_THREADS) variants=($BENCH_VARIANTS)\
+ boundary=$BOUNDARY snapshot_every=$SNAPSHOT_EVERY backends=($BENCH_BACKENDS) threads=($BENCH_THREADS) variants=($BENCH_VARIANTS)\
  sizes=($BENCH_SIZES) weak_nx=($WEAK_NX) label=$LABEL"
 
 # Print the description of the run: the machine, then the label when one is set
@@ -128,7 +129,7 @@ log "==> peaks"
 for size in $BENCH_SIZES; do
     log "==> nx=ny=$size steps=$BENCH_STEPS repeat=$BENCH_REPEAT"
     "$PROG" --nx "$size" --steps "$BENCH_STEPS" --repeat "$BENCH_REPEAT" --order "$ORDER" \
-        --boundary "$BOUNDARY" "${BACKENDS[@]}" "${THREADS[@]}" "${VARIANTS[@]}" --no-header 2>&1 >> "$CSV" \
+        --boundary "$BOUNDARY" --snapshot-every "$SNAPSHOT_EVERY" "${BACKENDS[@]}" "${THREADS[@]}" "${VARIANTS[@]}" --no-header 2>&1 >> "$CSV" \
         | tee -a "$LOG" >&2 || exit 1
 done
 load_at_end >> "$CSV"

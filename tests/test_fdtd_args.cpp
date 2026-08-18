@@ -214,9 +214,12 @@ TEST_CASE("CUDA variant names round-trip", "[unit][args]")
     CHECK(both.cuda_graph);
     CHECK(fdtd::cuda_variant_name(both) == "split:32x8+table+graph");
     CHECK(cuda_variant("tiled").cuda_kernel == CudaKernel::Tiled);
+    CHECK(cuda_variant("fused+async").cuda_async_snapshots);
+    CHECK_FALSE(cuda_variant("fused+graph").cuda_async_snapshots);
     for (const std::string name :
          {"fused:32x8", "fused:1x1", "split:128x1", "split:7x5", "split:16x16+graph",
-          "fused:32x8+table", "fused:64x4+table+graph", "tiled:32x8", "tiled:16x16+table+graph"}) {
+          "fused:32x8+table", "fused:64x4+table+graph", "tiled:32x8", "tiled:16x16+table+graph",
+          "split:32x8+async", "tiled:32x8+table+graph+async"}) {
         CAPTURE(name);
         CHECK(fdtd::cuda_variant_name(cuda_variant(name)) == name);
     }
@@ -255,7 +258,8 @@ TEST_CASE("CUDA variant names reject malformed text", "[unit][args]")
                              "fused+graph:32x8",
                              "default+graph",
                              "fused+table+table",
-                             "fused+tables"}) {
+                             "fused+tables",
+                             "fused+async+async"}) {
         CAPTURE(name);
         Simulation::Options unchanged;
         unchanged.cuda_kernel = CudaKernel::Split;

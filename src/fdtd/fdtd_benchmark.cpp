@@ -156,6 +156,8 @@ namespace fdtd
                 options.warmup = parse_nonnegative_arg(name, value);
             } else if (name == "--order") {
                 options.order = parse_order(name, value);
+            } else if (name == "--snapshot-every") {
+                options.snapshot_every = parse_size_arg(name, value);
             } else if (name == "--backend") {
                 if (value == "all") {
                     for (const auto type : TMz::available_backends()) {
@@ -228,9 +230,13 @@ namespace fdtd
             TMz::Simulation sim(options.nx, ny, simOptions);
             sim.add_source(options.nx / 2, ny / 2, TMz::Component::Ez,
                            TMz::Gaussian::from_steps(sim.dt(), PULSE_WIDTH_STEPS));
+            const std::size_t every = options.snapshot_every;
+            for (std::size_t step = every; every > 0 && step <= options.steps; step += every) {
+                sim.add_snapshot(step);
+            }
 
             const auto start = std::chrono::steady_clock::now();
-            sim.run(options.steps);
+            sim.run(options.steps, [](std::size_t, const TMz::Fields &) {});
             const auto stop = std::chrono::steady_clock::now();
 
             sim.download();
@@ -384,12 +390,14 @@ namespace fdtd
         usage << "  --order O             Sample order, grouped (each configuration's samples\n";
         usage << "                        in a row) or interleaved (one sample of each per\n";
         usage << "                        round) (default: grouped)\n";
+        usage << "  --snapshot-every N    Copy the fields to the host every N steps of a\n";
+        usage << "                        sample, timed with it; 0 for none (default: 0)\n";
         usage << "  --backend B           Backend, serial, openmp, cuda or all; repeatable\n";
         usage << "                        (default: all)\n";
         usage << "  --variant V           OpenMP variant SCHEDULE[:WxH][+simd][+phase], SCHEDULE\n";
         usage << "                        rows, collapse2, tiles or tasks; CUDA variant\n";
-        usage << "                        KERNEL[:BXxBY][+table][+graph], KERNEL fused,\n";
-        usage << "                        split or tiled; or default.\n";
+        usage << "                        KERNEL[:BXxBY][+table][+graph][+async], KERNEL\n";
+        usage << "                        fused, split or tiled; or default.\n";
         usage << "                        Repeatable; a backend runs the names it reads, or\n";
         usage << "                        default (default: default)\n";
         usage << "  --threads N           Thread count, for OpenMP only; repeatable\n";
