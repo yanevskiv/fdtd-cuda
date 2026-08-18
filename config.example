@@ -30,6 +30,15 @@ BENCH_WEAK_NX=""
 # Grid sizes, nx = ny
 BENCH_SIZES="128 256 512 1024 2048"
 
+# Order of the samples: interleaved takes one sample of each configuration per round, so a load
+# spike from another process falls on all of them alike; grouped takes each configuration's
+# samples in a row
+BENCH_ORDER="interleaved"
+
+# Label of the run, written into its CSV; the report tells apart by label the runs that share a
+# configuration, such as runs under different OMP_* settings; empty for none
+BENCH_LABEL=""
+
 # --- Profile run ---
 
 # Tools, any of: perf-stat perf-record callgrind cachegrind memcheck nsys ncu; nsys and ncu

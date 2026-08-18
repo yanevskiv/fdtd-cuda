@@ -56,6 +56,36 @@ namespace fdtd
             }
         }
 
+        // Read the sample order by name.
+        BenchmarkOrder parse_order(std::string_view name, std::string_view value)
+        {
+            if (value == "grouped") {
+                return BenchmarkOrder::Grouped;
+            }
+            if (value == "interleaved") {
+                return BenchmarkOrder::Interleaved;
+            }
+            std::ostringstream message;
+            message << name;
+            message << ": expected grouped or interleaved, got '";
+            message << value;
+            message << "'";
+            throw std::invalid_argument(message.str());
+        }
+
+        // A backend, a variant and a thread count, measured together.
+        struct Configuration
+        {
+            // Backend to run on.
+            TMz::BackendType backend;
+
+            // Variant name as given.
+            std::string variant;
+
+            // Thread count, 1 for serial and CUDA.
+            std::size_t threads;
+        };
+
         // Apply one option and its value to the settings.
         void apply(BenchmarkOptions &options, std::string_view name, std::string_view value)
         {
@@ -69,6 +99,8 @@ namespace fdtd
                 options.repeat = parse_size_arg(name, value);
             } else if (name == "--warmup") {
                 options.warmup = parse_nonnegative_arg(name, value);
+            } else if (name == "--order") {
+                options.order = parse_order(name, value);
             } else if (name == "--backend") {
                 if (value == "all") {
                     for (const auto type : TMz::available_backends()) {
@@ -289,6 +321,9 @@ namespace fdtd
         usage << "  --repeat N            Samples per configuration (default: 10)\n";
         usage << "  --warmup S            Seconds of untimed runs first, 0 for none\n";
         usage << "                        (default: 0.1)\n";
+        usage << "  --order O             Sample order, grouped (each configuration's samples\n";
+        usage << "                        in a row) or interleaved (one sample of each per\n";
+        usage << "                        round) (default: grouped)\n";
         usage << "  --backend B           Backend, serial, openmp, cuda or all; repeatable\n";
         usage << "                        (default: all)\n";
         usage << "  --variant V           OpenMP variant SCHEDULE[:WxH][+simd][+phase], SCHEDULE\n";
@@ -384,21 +419,49 @@ namespace fdtd
         if (options.header_only) {
             return samples;
         }
+        std::vector<Configuration> configurations;
         for (const auto backend : backends) {
             const std::vector<std::size_t> &counts =
                 backend == TMz::BackendType::OpenMP ? threadCounts : oneThread;
             for (const std::string &variant : variants_of(backend, variants)) {
                 for (const std::size_t threads : counts) {
-                    warm_up(options, ny, backend, variant, threads);
-                    const std::size_t first = samples.size();
-                    for (std::size_t r = 0; r < options.repeat; ++r) {
-                        samples.push_back(measure(options, ny, backend, variant, threads, r));
-                        csv << format_benchmark_row(samples.back());
-                        csv << '\n';
-                        csv << std::flush;
-                    }
-                    summarize(std::span(samples).subspan(first), log);
+                    configurations.push_back({backend, variant, threads});
                 }
+            }
+        }
+
+        auto sample = [&](const Configuration &c, std::size_t r) {
+            samples.push_back(measure(options, ny, c.backend, c.variant, c.threads, r));
+            csv << format_benchmark_row(samples.back());
+            csv << '\n';
+            csv << std::flush;
+        };
+
+        if (options.order == BenchmarkOrder::Grouped) {
+            for (const Configuration &c : configurations) {
+                warm_up(options, ny, c.backend, c.variant, c.threads);
+                const std::size_t first = samples.size();
+                for (std::size_t r = 0; r < options.repeat; ++r) {
+                    sample(c, r);
+                }
+                summarize(std::span(samples).subspan(first), log);
+            }
+        } else {
+            for (const Configuration &c : configurations) {
+                warm_up(options, ny, c.backend, c.variant, c.threads);
+            }
+            for (std::size_t r = 0; r < options.repeat; ++r) {
+                for (const Configuration &c : configurations) {
+                    sample(c, r);
+                }
+            }
+            const std::size_t count = configurations.size();
+            for (std::size_t k = 0; k < count; ++k) {
+                std::vector<BenchmarkSample> own;
+                for (std::size_t r = 0; r < options.repeat; ++r) {
+                    own.push_back(samples[r * count + k]);
+                }
+                summarize(own, log);
             }
         }
         if (!csv) {

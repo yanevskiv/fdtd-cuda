@@ -106,6 +106,7 @@ TEST_CASE("Benchmark defaults", "[unit][benchmark]")
     CHECK(options.steps == 500);
     CHECK(options.repeat == 10);
     CHECK(options.warmup == 0.1);
+    CHECK(options.order == fdtd::BenchmarkOrder::Grouped);
     CHECK(options.backends.empty());
     CHECK(options.variants.empty());
     CHECK(options.threads.empty());
@@ -128,6 +129,7 @@ TEST_CASE("Benchmark parses every option", "[unit][benchmark]")
                                 "--repeat=3",
                                 "--warmup",
                                 "0",
+                                "--order=interleaved",
                                 "--backend",
                                 "serial",
                                 "--backend=cuda",
@@ -150,6 +152,7 @@ TEST_CASE("Benchmark parses every option", "[unit][benchmark]")
     CHECK(options.steps == 40);
     CHECK(options.repeat == 3);
     CHECK(options.warmup == 0);
+    CHECK(options.order == fdtd::BenchmarkOrder::Interleaved);
     CHECK(options.backends == std::vector<BackendType>{BackendType::Serial, BackendType::Cuda});
     CHECK(options.variants == std::vector<std::string>{"default", "fast"});
     CHECK(options.threads == std::vector<std::size_t>{2, 8});
@@ -180,6 +183,8 @@ TEST_CASE("Benchmark rejects bad arguments", "[unit][benchmark]")
     CHECK_THROWS_AS(parse({"--repeat", "1.5"}), std::invalid_argument);
     CHECK_THROWS_AS(parse({"--warmup", "-0.1"}), std::invalid_argument);
     CHECK_THROWS_AS(parse({"--warmup", "nan"}), std::invalid_argument);
+    CHECK_THROWS_AS(parse({"--order", "random"}), std::invalid_argument);
+    CHECK_THROWS_AS(parse({"--order="}), std::invalid_argument);
     CHECK_THROWS_AS(parse({"--backend", "gpu"}), std::invalid_argument);
     CHECK_THROWS_AS(parse({"--variant="}), std::invalid_argument);
     CHECK_THROWS_AS(parse({"--threads", "x"}), std::invalid_argument);
@@ -257,6 +262,47 @@ TEST_CASE("Benchmark warm-up does not leak into samples", "[unit][benchmark]")
         CHECK(warm[k].backend == cold[k].backend);
         CHECK(warm[k].checksum == cold[k].checksum);
     }
+}
+
+// Verify that interleaved writes the rows of grouped, with the same checksums, round by round:
+// grouped holds sample r of configuration k at k * repeat + r, interleaved at r * count + k.
+TEST_CASE("Benchmark interleaves the configurations", "[unit][benchmark]")
+{
+    auto options = small();
+    options.repeat = 3;
+    options.variants = {"default", "collapse2", "split"};
+    options.threads = {1, 2};
+    std::string groupedCsv;
+    const auto grouped = run(options, groupedCsv);
+    options.order = fdtd::BenchmarkOrder::Interleaved;
+    std::string csv;
+    const auto interleaved = run(options, csv);
+    REQUIRE(interleaved.size() == grouped.size());
+    REQUIRE(grouped.size() % options.repeat == 0);
+
+    const std::size_t count = grouped.size() / options.repeat;
+    for (std::size_t k = 0; k < count; ++k) {
+        for (std::size_t r = 0; r < options.repeat; ++r) {
+            const BenchmarkSample &expected = grouped[k * options.repeat + r];
+            const BenchmarkSample &actual = interleaved[r * count + k];
+            INFO("configuration " << k << ", sample " << r);
+            CHECK(actual.backend == expected.backend);
+            CHECK(actual.variant == expected.variant);
+            CHECK(actual.threads == expected.threads);
+            CHECK(actual.repeat == r);
+            CHECK(actual.checksum == expected.checksum);
+        }
+    }
+    const auto rows = lines(csv);
+    REQUIRE(rows.size() == interleaved.size() + 1);
+    for (std::size_t k = 0; k < interleaved.size(); ++k) {
+        CHECK(rows[k + 1] == fdtd::format_benchmark_row(interleaved[k]));
+    }
+
+    std::ostringstream out;
+    std::ostringstream log;
+    fdtd::run_benchmark(options, out, log);
+    CHECK(lines(log.str()).size() == count);
 }
 
 // Verify that ny defaults to nx and that serial runs once whatever the thread counts.

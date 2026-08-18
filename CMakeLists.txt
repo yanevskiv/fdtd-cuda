@@ -26,6 +26,7 @@ option(FDTD_BUILD_TESTS "Build the Catch2 tests" ${PROJECT_IS_TOP_LEVEL})
 option(FDTD_WERROR "Treat compiler warnings as errors" OFF)
 option(FDTD_BUILD_SAMPLES "Build the samples" ${PROJECT_IS_TOP_LEVEL})
 option(FDTD_EXACT "Build the library without contracted multiply-adds, for bit-for-bit backend tests" OFF)
+option(FDTD_NATIVE "Build the library's C++ for the CPU of the build machine (-march=native)" OFF)
 
 # The library.
 add_library(fdtd
@@ -74,6 +75,11 @@ if(FDTD_EXACT)
         $<$<COMPILE_LANGUAGE:CUDA>:--fmad=false>)
 endif()
 
+# The native build: the C++ kernels may use every instruction the build machine has.
+if(FDTD_NATIVE)
+    target_compile_options(fdtd PRIVATE $<$<COMPILE_LANG_AND_ID:CXX,GNU,Clang>:-march=native>)
+endif()
+
 # Argument parsing shared by the programs.
 add_library(fdtd_args STATIC src/fdtd/fdtd_args.cpp)
 target_link_libraries(fdtd_args PUBLIC fdtd::fdtd PRIVATE fdtd_warnings)
@@ -110,17 +116,25 @@ add_custom_target(profile
     VERBATIM)
 
 # The report in FDTD_REPORT_DIR of the runs FDTD_BENCH_DIR and FDTD_PROFILE_DIR, either of which
-# may be empty: figures, Markdown and, with pandoc, a PDF.
+# may be empty: figures, Markdown and, with pandoc, a PDF. FDTD_BENCH_DIR may list several runs,
+# separated by spaces or semicolons.
 set(FDTD_REPORT_DIR "" CACHE STRING "Output directory of the report target")
-set(FDTD_BENCH_DIR "" CACHE STRING "Benchmark run directory of the report target")
+set(FDTD_BENCH_DIR "" CACHE STRING "Benchmark run directories of the report target")
 set(FDTD_PROFILE_DIR "" CACHE STRING "Profile run directory of the report target")
 find_program(FDTD_PANDOC pandoc)
 string(REGEX REPLACE "/+$" "" report_dir "${FDTD_REPORT_DIR}")
-string(REGEX REPLACE "/+$" "" bench_run "${FDTD_BENCH_DIR}")
+string(REPLACE " " ";" bench_list "${FDTD_BENCH_DIR}")
+set(bench_runs)
+foreach(run IN LISTS bench_list)
+    string(REGEX REPLACE "/+$" "" run "${run}")
+    if(run)
+        list(APPEND bench_runs ${run})
+    endif()
+endforeach()
 string(REGEX REPLACE "/+$" "" profile_run "${FDTD_PROFILE_DIR}")
 get_filename_component(report_stamp "${report_dir}" NAME)
 set(report_file ${report_dir}/report_${report_stamp})
-if(NOT report_dir OR (NOT bench_run AND NOT profile_run))
+if(NOT report_dir OR (NOT bench_runs AND NOT profile_run))
     set(report_steps
         COMMAND ${CMAKE_COMMAND} -E echo
             "report: FDTD_REPORT_DIR and FDTD_BENCH_DIR or FDTD_PROFILE_DIR must name directories"
@@ -128,10 +142,12 @@ if(NOT report_dir OR (NOT bench_run AND NOT profile_run))
 else()
     set(report_steps COMMAND ${CMAKE_COMMAND} -E make_directory ${report_dir})
     set(report_runs)
-    if(bench_run)
+    if(bench_runs)
         list(APPEND report_steps
-            COMMAND ${PROJECT_SOURCE_DIR}/tools/plot_benchmark.py ${bench_run} ${report_dir})
-        list(APPEND report_runs -b ${bench_run})
+            COMMAND ${PROJECT_SOURCE_DIR}/tools/plot_benchmark.py ${report_dir} ${bench_runs})
+        foreach(run IN LISTS bench_runs)
+            list(APPEND report_runs -b ${run})
+        endforeach()
     endif()
     if(profile_run)
         list(APPEND report_runs -p ${profile_run})

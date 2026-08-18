@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 #
-# Draw the figures of a benchmark run into a report: throughput, speedup and efficiency.
+# Draw the figures of benchmark runs into a report: throughput, speedup and efficiency.
 #
 # Copyright (C) 2026 Ivan Janevski
 #
@@ -31,10 +31,62 @@ MARKERS = ["o", "s", "^", "D", "v", "P", "X", "*"]
 LEGEND_INSIDE = 8
 
 
-def load(path):
-    """Read the samples of a benchmark CSV, skipping the '#' lines."""
+def label_of(path, stamp):
+    """Return the label a run's CSV gives in its '# label:' line, or the run's timestamp."""
     with open(path, encoding="utf-8") as f:
-        rows = [line for line in f if not line.startswith("#")]
+        for line in f:
+            if line.startswith("# label:"):
+                return line.partition(":")[2].strip()
+
+    return stamp
+
+
+def load(runs):
+    """Read the samples of the CSVs of the runs, a (path, label) pair each, into one array.
+
+    Where the runs differ in precision or label, the variant name carries both, as
+    'fused:32x8 [double / passive]', so that every figure tells the runs apart, and the column
+    'run' holds them for the speedup to pair each sample with the serial samples of its own run.
+    Columns are only ever added at the end of the CSV, so a run that lacks the last ones gets
+    nan in them.
+    """
+    header = []
+    files = []
+    for path, label in runs:
+        with open(path, encoding="utf-8") as f:
+            lines = [line.rstrip("\n") for line in f if not line.startswith("#")]
+
+        columns = lines[0].split(",")
+        if len(columns) > len(header):
+            header = columns
+        files.append((label, lines[1:]))
+
+    variant = header.index("variant")
+    precision = header.index("precision")
+
+    precisions = set()
+    labels = set()
+    for label, lines in files:
+        labels.add(label)
+        for line in lines:
+            precisions.add(line.split(",")[precision])
+
+    rows = [",".join(header + ["run"])]
+    for label, lines in files:
+        for line in lines:
+            values = line.split(",")
+            values += ["nan"] * (len(header) - len(values))
+
+            tags = []
+            if len(precisions) > 1:
+                tags.append(values[precision])
+            if len(labels) > 1:
+                tags.append(label)
+
+            run = " / ".join(tags)
+            if run:
+                values[variant] += f" [{run}]"
+            rows.append(",".join(values + [run or "all"]))
 
     data = np.genfromtxt(
         rows,
@@ -49,32 +101,54 @@ def load(path):
 def calculate(data):
     """Return the throughput, speedup and efficiency of every sample.
 
-    The speedup is over the serial median of the same grid size, and only OpenMP and CUDA
-    samples have one; the others are NaN. The efficiency is the speedup over the threads.
+    The speedup is over the serial median of the same grid size and run, and only OpenMP and
+    CUDA samples have one; the others are NaN. The efficiency is the speedup over the threads.
     """
     throughput = data["nx"] * data["ny"] * data["nsteps"] / data["seconds"] / 1e6
     speedup = np.full(len(data), np.nan)
 
-    for nx in np.unique(data["nx"]):
-        serial = data[(data["backend"] == "serial") & (data["nx"] == nx)]
-        parallel = (data["backend"] != "serial") & (data["nx"] == nx)
-        if len(serial) > 0:
-            speedup[parallel] = np.median(serial["seconds"]) / data["seconds"][parallel]
+    for run in np.unique(data["run"]):
+        for nx in np.unique(data["nx"]):
+            same = (data["run"] == run) & (data["nx"] == nx)
+            serial = data[same & (data["backend"] == "serial")]
+            parallel = same & (data["backend"] != "serial")
+            if len(serial) > 0:
+                speedup[parallel] = np.median(serial["seconds"]) / data["seconds"][parallel]
 
     efficiency = speedup / data["threads"]
     return throughput, speedup, efficiency
 
 
 def statistics(data, values, x_column):
-    """Return the x values and the median of the values at each."""
+    """Return the x values, and the median and the lower and upper quartiles of the values at
+    each."""
     xs = np.unique(data[x_column])
     ys = []
+    lows = []
+    highs = []
 
     for x in xs:
         selected = values[data[x_column] == x]
         ys.append(np.median(selected))
+        lows.append(np.percentile(selected, 25))
+        highs.append(np.percentile(selected, 75))
 
-    return xs, ys
+    return xs, np.array(ys), np.array(lows), np.array(highs)
+
+
+def draw(ax, data, values, x_column, i, label):
+    """Draw the median of the values against a column, with the quartiles as error bars."""
+    x, y, low, high = statistics(data, values, x_column)
+
+    ax.errorbar(
+        x,
+        y,
+        yerr=[y - low, high - y],
+        marker=MARKERS[i % len(MARKERS)],
+        linewidth=1.8,
+        capsize=3,
+        label=label,
+    )
 
 
 def save(fig, args, name):
@@ -133,21 +207,13 @@ def plot_by_size(args, data, values):
                 if not np.any(mask):
                     continue
 
-                x, y = statistics(data[mask], values[mask], "nx")
-
                 label = backend
                 if len(variants) > 1:
                     label += f" {variant}"
                 if len(np.unique(data["threads"][selected])) > 1:
                     label += f", p={p}"
 
-                ax.plot(
-                    x,
-                    y,
-                    marker=MARKERS[i % len(MARKERS)],
-                    linewidth=1.8,
-                    label=label,
-                )
+                draw(ax, data[mask], values[mask], "nx", i, label)
                 i += 1
 
     sizes = np.unique(data["nx"])
@@ -183,19 +249,11 @@ def plot_speedup_by_size(args, data, values):
             p = np.max(data["threads"][mask])
             mask = mask & (data["threads"] == p)
 
-            x, y = statistics(data[mask], values[mask], "nx")
-
             label = f"{backend} {variant}"
             if backend == "openmp":
                 label += f", p={p}"
 
-            ax.plot(
-                x,
-                y,
-                marker=MARKERS[i % len(MARKERS)],
-                linewidth=1.8,
-                label=label,
-            )
+            draw(ax, data[mask], values[mask], "nx", i, label)
             i += 1
 
     sizes = np.unique(data["nx"])
@@ -236,16 +294,9 @@ def plot_by_threads(args, data, values, ylabel, title, filename, ideal):
     for variant in variants:
         for nx in np.unique(omp["nx"][omp["variant"] == variant]):
             mask = (omp["variant"] == variant) & (omp["nx"] == nx)
-            x, y = statistics(omp[mask], omp_values[mask], "threads")
 
             label = f"nx={nx}" if len(variants) == 1 else variant
-            ax.plot(
-                x,
-                y,
-                marker=MARKERS[i % len(MARKERS)],
-                linewidth=1.8,
-                label=label,
-            )
+            draw(ax, omp[mask], omp_values[mask], "threads", i, label)
             i += 1
 
     if ideal == "linear":
@@ -265,13 +316,13 @@ def weak_efficiency(data):
 
     The efficiency is the median time on one thread of the same variant over the sample's time,
     since every thread count carries the same cells per thread; it is NaN without a one-thread
-    sample.
+    sample. The variant names carry the run, so each run is paired with its own.
     """
     efficiency = np.full(len(data), np.nan)
 
     for variant in np.unique(data["variant"]):
-        one = data[(data["variant"] == variant) & (data["threads"] == 1)]
         same = data["variant"] == variant
+        one = data[same & (data["threads"] == 1)]
         if len(one) > 0:
             efficiency[same] = np.median(one["seconds"]) / data["seconds"][same]
 
@@ -284,15 +335,7 @@ def plot_weak(args, data, values):
 
     for i, variant in enumerate(np.unique(data["variant"])):
         mask = (data["variant"] == variant) & ~np.isnan(values)
-        x, y = statistics(data[mask], values[mask], "threads")
-
-        ax.plot(
-            x,
-            y,
-            marker=MARKERS[i % len(MARKERS)],
-            linewidth=1.8,
-            label=variant,
-        )
+        draw(ax, data[mask], values[mask], "threads", i, variant)
 
     ax.axhline(1, color="k", linestyle="--", linewidth=1.3, label="ideal")
 
@@ -319,28 +362,42 @@ def remove(args, name):
 def main():
     """Parse the arguments and draw the figures."""
     parser = argparse.ArgumentParser(
-        description="Plot the figures of a benchmark run DIR into REPORT/images."
+        description="Plot the figures of the benchmark runs DIR into REPORT/images."
     )
 
-    parser.add_argument("dir", help="benchmark run directory, named after its timestamp")
     parser.add_argument("report", help="report directory, named after its timestamp")
+    parser.add_argument(
+        "dirs",
+        nargs="+",
+        help="benchmark run directories, named after their timestamps",
+    )
     parser.add_argument("--dpi", type=int, default=120)
 
     args = parser.parse_args()
 
-    run = os.path.basename(os.path.normpath(args.dir))
     args.stamp = os.path.basename(os.path.normpath(args.report))
     args.output_dir = os.path.join(args.report, "images")
     os.makedirs(args.output_dir, exist_ok=True)
 
-    data = load(os.path.join(args.dir, f"benchmark_{run}.csv"))
+    runs = []
+    weak_runs = []
+    for directory in args.dirs:
+        run = os.path.basename(os.path.normpath(directory))
+        path = os.path.join(directory, f"benchmark_{run}.csv")
+        label = label_of(path, run)
+        runs.append((path, label))
+
+        weak = os.path.join(directory, f"benchmark_weak_{run}.csv")
+        if os.path.exists(weak):
+            weak_runs.append((weak, label))
+
+    data = load(runs)
     throughput, speedup, efficiency = calculate(data)
 
     plot_by_size(args, data, throughput)
 
-    weak = os.path.join(args.dir, f"benchmark_weak_{run}.csv")
-    if os.path.exists(weak):
-        weak_data = load(weak)
+    if weak_runs:
+        weak_data = load(weak_runs)
         plot_weak(args, weak_data, weak_efficiency(weak_data))
     else:
         remove(args, "weak_efficiency")

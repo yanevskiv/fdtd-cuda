@@ -1,6 +1,7 @@
 # Thin wrapper over CMakePresets.json. Settings live in the presets.
 
 PRESET ?= debug
+BENCH_PRESET ?= bench
 BENCH_DIR ?= $(lastword $(sort $(wildcard build/results/benchmarks/*)))
 PROFILE_DIR ?= $(lastword $(sort $(wildcard build/results/profiles/*)))
 REPORT_DIR ?= build/reports/$(shell date +%s%3N)
@@ -29,15 +30,15 @@ workflow:
 	cmake --workflow --preset $(PRESET)
 
 bench:
-	cmake --preset bench
-	cmake --build --preset bench --target bench
+	cmake --preset $(BENCH_PRESET)
+	cmake --build --preset $(BENCH_PRESET) --target bench
 
 profile:
 	cmake --preset profile
 	cmake --build --preset profile --target profile
 
 report:
-	cmake --preset bench -DFDTD_REPORT_DIR=$(REPORT_DIR) -DFDTD_BENCH_DIR=$(BENCH_DIR) \
+	cmake --preset bench -DFDTD_REPORT_DIR=$(REPORT_DIR) -DFDTD_BENCH_DIR="$(BENCH_DIR)" \
 		-DFDTD_PROFILE_DIR=$(PROFILE_DIR)
 	cmake --build --preset bench --target report
 

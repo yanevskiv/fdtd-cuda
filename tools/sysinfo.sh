@@ -105,6 +105,37 @@ get_governor() {
     fi
 }
 
+# Print whether the CPU may run above its base clock: yes, no, or nothing when unknown
+get_turbo() {
+    local value=""
+    if [ -r /sys/devices/system/cpu/intel_pstate/no_turbo ]; then
+        value="$(cat /sys/devices/system/cpu/intel_pstate/no_turbo)"
+        [ "$value" = 0 ] && value=yes || value=no
+    elif [ -r /sys/devices/system/cpu/cpufreq/boost ]; then
+        value="$(cat /sys/devices/system/cpu/cpufreq/boost)"
+        [ "$value" = 1 ] && value=yes || value=no
+    fi
+    emit cpu_turbo "$value"
+}
+
+# Print the load averages over 1, 5 and 15 minutes, which other users' processes raise
+get_load() {
+    local one five fifteen rest
+    if [ -r /proc/loadavg ]; then
+        read -r one five fifteen rest < /proc/loadavg
+        emit load_average "$one $five $fifteen"
+    else
+        emit load_average ""
+    fi
+}
+
+# Print the OpenMP settings of the environment, 'unset' for each one not set
+get_openmp() {
+    emit omp_proc_bind "${OMP_PROC_BIND:-unset}"
+    emit omp_places "${OMP_PLACES:-unset}"
+    emit omp_wait_policy "${OMP_WAIT_POLICY:-unset}"
+}
+
 # Print the name, memory and driver of the first GPU
 get_gpu() {
     local line="" name="" memory="" driver="" capability=""
@@ -154,6 +185,7 @@ get_cmake() {
     emit cuda_architectures "$(cache_value CMAKE_CUDA_ARCHITECTURES)"
     emit cuda_flags "${CACHE:+${flags:-none}}"
     emit fdtd_double "$(cache_value FDTD_DOUBLE)"
+    emit fdtd_native "$(cache_value FDTD_NATIVE)"
     emit fdtd_with_openmp "$(cache_value FDTD_WITH_OPENMP)"
     emit fdtd_with_cuda "$(cache_value FDTD_WITH_CUDA)"
 }
@@ -169,6 +201,9 @@ get_git
 get_cpu
 get_memory
 get_governor
+get_turbo
+get_load
+get_openmp
 get_gpu
 get_compilers
 get_cmake

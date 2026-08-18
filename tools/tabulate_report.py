@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 #
-# Write the Markdown performance report of a benchmark run and a profile run.
+# Write the Markdown performance report of benchmark runs and a profile run.
 #
 # Copyright (C) 2026 Ivan Janevski
 #
@@ -26,7 +26,7 @@ import numpy as np
 
 TEMPLATES = os.path.join(os.path.dirname(__file__), "report")
 
-CONFIG = ["backend", "variant", "precision", "threads", "nx", "ny", "nsteps"]
+CONFIG = ["backend", "variant", "precision", "threads", "nx", "ny", "nsteps", "label"]
 
 FIGURES = [
     ("throughput", "Throughput versus grid size"),
@@ -77,10 +77,29 @@ def load_info(path):
     return info
 
 
-def load_samples(path):
-    """Read the samples of a benchmark CSV, skipping the '#' lines."""
-    with open(path, encoding="utf-8") as f:
-        rows = [line for line in f if not line.startswith("#")]
+def load_samples(runs):
+    """Read the samples of the CSVs of the runs, a (path, label) pair each, into one array.
+
+    The label of each run goes into the column 'label'. Columns are only ever added at the end
+    of the CSV, so a run that lacks the last ones gets nan in them.
+    """
+    header = []
+    files = []
+    for path, label in runs:
+        with open(path, encoding="utf-8") as f:
+            lines = [line.rstrip("\n") for line in f if not line.startswith("#")]
+
+        columns = lines[0].split(",")
+        if len(columns) > len(header):
+            header = columns
+        files.append((label, lines[1:]))
+
+    rows = [",".join(header + ["label"])]
+    for label, lines in files:
+        for line in lines:
+            values = line.split(",")
+            values += ["nan"] * (len(header) - len(values))
+            rows.append(",".join(values + [label]))
 
     data = np.genfromtxt(
         rows,
@@ -172,15 +191,44 @@ def machine_table(runs):
 
 
 def results_table(data):
-    """Return the median time, throughput and checksum of each configuration as a table."""
-    rows = []
+    """
+    Return the median time, its spread, the throughput and the checksum of each configuration
+    as a table.
 
-    for config in np.unique(data[CONFIG]):
+    The spread is the interquartile range as a percent of the median. A column every row holds
+    the same value in, the precision, the steps or the samples, is left out of the table and
+    given in a line above it, so the table fits the page; the run label only shows when the runs
+    have more than one.
+    """
+    columns = [
+        ("Run", "label", "l"),
+        ("Precision", "precision", "l"),
+        ("Steps", "nsteps", "r"),
+        ("Samples", None, "r"),
+    ]
+
+    configs = np.unique(data[CONFIG])
+    counts = [np.sum(data[CONFIG] == config) for config in configs]
+
+    common = []
+    shown = []
+    for title, name, align in columns:
+        values = counts if name is None else [config[name] for config in configs]
+        if len(set(values)) == 1:
+            if name != "label":
+                common.append(f"{title.lower()} {values[0]}")
+        else:
+            shown.append((title, name, align))
+
+    rows = []
+    for config, count in zip(configs, counts):
         samples = data[data[CONFIG] == config]
-        backend, variant, precision, threads, nx, ny, nsteps = config
+        nx = config["nx"]
+        ny = config["ny"]
 
         median = np.median(samples["seconds"])
-        throughput = nx * ny * nsteps / median / 1e6
+        spread = np.percentile(samples["seconds"], 75) - np.percentile(samples["seconds"], 25)
+        throughput = nx * ny * config["nsteps"] / median / 1e6
 
         checksums = np.unique(samples["checksum"])
         if len(checksums) == 1:
@@ -188,25 +236,28 @@ def results_table(data):
         else:
             checksum = f"{len(checksums)} differ"
 
-        rows.append([
-            backend,
-            variant,
-            precision,
-            threads,
+        row = [config["backend"], config["variant"]]
+        for _, name, _ in shown:
+            row.append(count if name is None else config[name])
+        row += [
+            config["threads"],
             f"{nx} x {ny}",
-            nsteps,
-            len(samples),
             f"{median:.6f}",
+            f"{100 * spread / median:.1f}",
             f"{throughput:.1f}",
             checksum,
-        ])
+        ]
+        rows.append(row)
 
-    return table(
-        ["Backend", "Variant", "Precision", "Threads", "Grid", "Steps", "Samples", "Median (s)",
-         "Mcells/s", "Checksum"],
-        "lllrrrrrrr",
-        rows,
-    )
+    titles = ["Backend", "Variant"] + [title for title, _, _ in shown]
+    titles += ["Threads", "Grid", "Median (s)", "IQR (%)", "Mcells/s", "Checksum"]
+    align = "ll" + "".join(a for _, _, a in shown) + "rrrrrr"
+
+    text = ""
+    if common:
+        text = "Every configuration: " + ", ".join(common) + ".\n\n"
+
+    return text + table(titles, align, rows)
 
 
 def figure_list(report, stamp):
@@ -382,20 +433,27 @@ def tool(profile, name, suffix, summarize):
     return "Skipped: " + profile["info"].get(f"skipped_{name}", "not in PROFILE_TOOLS") + "."
 
 
-def benchmark_section(bench, report, stamp):
-    """Return the Benchmark section of the report."""
-    if bench is None:
+def benchmark_section(benches, report, stamp):
+    """Return the Benchmark section of the report from its benchmark runs."""
+    if not benches:
         return "No benchmark run."
 
-    data = bench["samples"]
+    data = load_samples([(bench["path"], bench["label"]) for bench in benches])
 
     weak = "No weak scaling run."
-    if bench["weak"] is not None:
-        weak = results_table(bench["weak"])
+    weak_runs = [(bench["weak"], bench["label"]) for bench in benches if bench["weak"]]
+    if weak_runs:
+        weak = results_table(load_samples(weak_runs))
+
+    names = [f"`{bench['stamp']}`" for bench in benches]
+    if len(names) == 1:
+        intro = f"The run {names[0]} holds"
+    else:
+        intro = "The runs " + ", ".join(names[:-1]) + f" and {names[-1]} hold"
 
     return fill(
         "benchmark_section.md",
-        stamp=bench["stamp"],
+        intro=intro,
         samples=len(data),
         configurations=len(np.unique(data[CONFIG])),
         results=results_table(data),
@@ -438,26 +496,39 @@ def main():
     )
 
     parser.add_argument("report", help="report directory, named after its timestamp")
-    parser.add_argument("-b", "--benchmark", help="benchmark run directory")
+    parser.add_argument(
+        "-b",
+        "--benchmark",
+        action="append",
+        default=[],
+        help="benchmark run directory; repeatable",
+    )
     parser.add_argument("-p", "--profile", help="profile run directory")
 
     args = parser.parse_args()
 
     runs = []
-    bench = None
+    benches = []
     profile = None
 
-    if args.benchmark:
-        stamp = os.path.basename(os.path.normpath(args.benchmark))
-        path = os.path.join(args.benchmark, f"benchmark_{stamp}.csv")
-        weak = os.path.join(args.benchmark, f"benchmark_weak_{stamp}.csv")
-        bench = {
+    for directory in args.benchmark:
+        stamp = os.path.basename(os.path.normpath(directory))
+        path = os.path.join(directory, f"benchmark_{stamp}.csv")
+        weak = os.path.join(directory, f"benchmark_weak_{stamp}.csv")
+        info = load_info(path)
+        benches.append({
             "stamp": stamp,
-            "info": load_info(path),
-            "samples": load_samples(path),
-            "weak": load_samples(weak) if os.path.exists(weak) else None,
-        }
-        runs.append(("Benchmark", bench))
+            "info": info,
+            "label": info.get("label", stamp),
+            "path": path,
+            "weak": weak if os.path.exists(weak) else None,
+        })
+
+    for bench in benches:
+        name = "Benchmark"
+        if len(benches) > 1:
+            name += f" {bench['label']}"
+        runs.append((name, bench))
 
     if args.profile:
         stamp = os.path.basename(os.path.normpath(args.profile))
@@ -475,7 +546,7 @@ def main():
         stamp=stamp,
         sources=sources_table(runs),
         machine=machine_table(runs),
-        benchmark=benchmark_section(bench, args.report, stamp),
+        benchmark=benchmark_section(benches, args.report, stamp),
         profile=profile_section(profile),
     )
 

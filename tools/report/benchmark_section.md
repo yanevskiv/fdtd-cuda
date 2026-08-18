@@ -1,7 +1,8 @@
-The run `$stamp` holds $samples samples of $configurations configurations. Each sample times
+$intro $samples samples of $configurations configurations. Each sample times
 `Simulation::run` alone on a fresh simulation, after a warm-up. The tables and figures give the
 median of the samples of each configuration, and the throughput is the number of cell updates per
-second over that median.
+second over that median. The spread is the interquartile range: the IQR column of the tables, and
+the error bars of the figures, which span the middle half of the samples.
 
 ## Results
 

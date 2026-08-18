@@ -83,6 +83,8 @@ for variant in $BENCH_VARIANTS; do
     VARIANTS+=(--variant "$variant")
 done
 WEAK_NX="${BENCH_WEAK_NX:-}"
+ORDER="${BENCH_ORDER:-interleaved}"
+LABEL="${BENCH_LABEL:-}"
 
 [ "${OUT#/}" != "$OUT" ] || OUT="$PWD/$OUT"
 
@@ -99,27 +101,44 @@ fi
 mkdir -p "$DIR" || exit 1
 : > "$LOG"
 
-log "==> config $CONFIG: steps=$BENCH_STEPS repeat=$BENCH_REPEAT backends=($BENCH_BACKENDS)\
- threads=($BENCH_THREADS) variants=($BENCH_VARIANTS) sizes=($BENCH_SIZES) weak_nx=($WEAK_NX)"
+log "==> config $CONFIG: steps=$BENCH_STEPS repeat=$BENCH_REPEAT order=$ORDER\
+ backends=($BENCH_BACKENDS) threads=($BENCH_THREADS) variants=($BENCH_VARIANTS)\
+ sizes=($BENCH_SIZES) weak_nx=($WEAK_NX) label=$LABEL"
 
-# The machine description and the CSV header come first, then one block of rows per size.
-"$HERE/sysinfo.sh" "$(dirname "$PROG")" > "$CSV"
+# Print the description of the run: the machine, then the label when one is set
+describe() {
+    "$HERE/sysinfo.sh" "$(dirname "$PROG")"
+    [ -z "$LABEL" ] || printf '# label: %s\n' "$LABEL"
+}
+
+# Print the load averages at the end of the run, to set against those at its start
+load_at_end() {
+    local one five fifteen rest
+    read -r one five fifteen rest < /proc/loadavg 2>/dev/null || return 0
+    printf '# load_average_end: %s %s %s\n' "$one" "$five" "$fifteen"
+}
+
+# The run's description and the CSV header come first, then one block of rows per size.
+describe > "$CSV"
 "$PROG" --header-only >> "$CSV" || exit 1
 for size in $BENCH_SIZES; do
     log "==> nx=ny=$size steps=$BENCH_STEPS repeat=$BENCH_REPEAT"
-    "$PROG" --nx "$size" --steps "$BENCH_STEPS" --repeat "$BENCH_REPEAT" "${BACKENDS[@]}" \
-        "${THREADS[@]}" "${VARIANTS[@]}" --no-header 2>&1 >> "$CSV" | tee -a "$LOG" >&2 || exit 1
+    "$PROG" --nx "$size" --steps "$BENCH_STEPS" --repeat "$BENCH_REPEAT" --order "$ORDER" \
+        "${BACKENDS[@]}" "${THREADS[@]}" "${VARIANTS[@]}" --no-header 2>&1 >> "$CSV" \
+        | tee -a "$LOG" >&2 || exit 1
 done
+load_at_end >> "$CSV"
 log "==> wrote $CSV"
 
 # Weak scaling keeps the cells per thread fixed: p threads get p rows of nx by nx blocks.
 [ -n "$WEAK_NX" ] || exit 0
-"$HERE/sysinfo.sh" "$(dirname "$PROG")" > "$WEAK"
+describe > "$WEAK"
 "$PROG" --header-only >> "$WEAK" || exit 1
 for threads in $BENCH_THREADS; do
     log "==> weak nx=$WEAK_NX ny=$((WEAK_NX * threads)) threads=$threads"
     "$PROG" --nx "$WEAK_NX" --ny "$((WEAK_NX * threads))" --steps "$BENCH_STEPS" \
-        --repeat "$BENCH_REPEAT" --backend openmp --threads "$threads" "${VARIANTS[@]}" \
-        --no-header 2>&1 >> "$WEAK" | tee -a "$LOG" >&2 || exit 1
+        --repeat "$BENCH_REPEAT" --order "$ORDER" --backend openmp --threads "$threads" \
+        "${VARIANTS[@]}" --no-header 2>&1 >> "$WEAK" | tee -a "$LOG" >&2 || exit 1
 done
+load_at_end >> "$WEAK"
 log "==> wrote $WEAK"
