@@ -131,8 +131,7 @@ namespace fdtd::TMz::backends
             return step != nullptr ? static_cast<std::ptrdiff_t>(*step) * stride : 0;
         }
 
-        // Add one step's value to the thread's source cell. With a step on the device, the values
-        // are those of all steps and the step picks the row, so a graph can replay the kernel.
+        // Add one step's value to the thread's source cell, the step on the device picking the row.
         __global__ void add_sources_kernel(gpu::DeviceFields fields, const gpu::DevicePoint *points,
                                            int count, const FloatType *values, const int *step,
                                            int stride)
@@ -145,8 +144,7 @@ namespace fdtd::TMz::backends
             }
         }
 
-        // Copy the thread's probe cell into one step's records, the step picking the row as for
-        // the sources.
+        // Copy the thread's probe cell into one step's records, the step picking the row.
         __global__ void record_probes_kernel(gpu::DeviceFields fields,
                                              const gpu::DevicePoint *points, int count,
                                              FloatType *records, const int *step, int stride)
@@ -171,8 +169,7 @@ namespace fdtd::TMz::backends
             *step = value;
         }
 
-        // Add to a cell's new H the values of the magnetic sources on it, as add_sources_kernel
-        // would once the H update is done.
+        // Add the magnetic sources on a cell to its new H, as add_sources_kernel would.
         __device__ inline void add_h_sources(gpu::HValues &h, int k, const gpu::DevicePoint *points,
                                              int count, const FloatType *values, const int *step,
                                              int stride)
@@ -190,11 +187,7 @@ namespace fdtd::TMz::backends
             }
         }
 
-        // Advance H and E of the thread's cell in one pass. The block updates H on its tile, and
-        // on the column left of it and the row below it, which the neighbouring blocks own and
-        // update the same way; the magnetic sources follow, then the tile's E from the new H in
-        // shared memory. Ez, Hx and Hy are read from the fields and written to the next arrays,
-        // so no block reads what another writes; Ezx and Ezy are updated in place.
+        // Advance H and E of the thread's cell in one pass, with the tile's H in shared memory.
         __global__ void update_tiled_kernel(gpu::DeviceFields fields, gpu::DeviceCoeffs coeffs,
                                             Boundary boundary, const gpu::DevicePoint *points,
                                             int magnetic, const FloatType *values, const int *step,
@@ -231,10 +224,10 @@ namespace fdtd::TMz::backends
             __syncthreads();
             if (inside) {
                 const gpu::HAround h{
-                    i + 1 < fields.nx ? tileHy[c] : FloatType(0),
-                    i > 0 ? tileHy[c - 1] : FloatType(0),
-                    j + 1 < fields.ny ? tileHx[c] : FloatType(0),
-                    j > 0 ? tileHx[c - width] : FloatType(0),
+                    .hy = i + 1 < fields.nx ? tileHy[c] : FloatType(0),
+                    .hy_left = i > 0 ? tileHy[c - 1] : FloatType(0),
+                    .hx = j + 1 < fields.ny ? tileHx[c] : FloatType(0),
+                    .hx_below = j > 0 ? tileHx[c - width] : FloatType(0),
                 };
                 fields.ez_next[k] = gpu::e_value(fields, coeffs, i, j, boundary, h);
             }
@@ -513,8 +506,7 @@ namespace fdtd::TMz::backends
         collect_records(nsteps);
     }
 
-    // Copy each snapshot out on the copy stream while the steps after it run, and hand it over
-    // once the next one is queued, so the handler runs while the device steps.
+    // Copy each snapshot out while the steps after it run, and hand it over after the next.
     void CudaBackend::advance_snapshots(std::size_t nsteps, std::span<const PointInjection> points,
                                         std::span<const FloatType> values,
                                         std::span<const std::size_t> snapshots,
@@ -545,8 +537,7 @@ namespace fdtd::TMz::backends
         collect_records(nsteps);
     }
 
-    // Copy the source cells and values to the device, magnetic cells first, and make room for
-    // the records.
+    // Copy the sources to the device, magnetic first, and make room for the records.
     std::size_t CudaBackend::put_sources(std::size_t nsteps, std::span<const PointInjection> points,
                                          std::span<const FloatType> values)
     {
@@ -571,8 +562,7 @@ namespace fdtd::TMz::backends
         return static_cast<std::size_t>(firstElectric - sources.begin());
     }
 
-    // Replay the graph over whole runs of GRAPH_STEPS steps when it is on, and launch the rest
-    // step by step.
+    // Replay the graph over whole runs of GRAPH_STEPS steps, and launch the rest one by one.
     void CudaBackend::queue_steps(const gpu::DeviceCoeffs &coeffs, std::size_t from, std::size_t to,
                                   std::size_t magnetic, std::size_t electric)
     {
@@ -619,8 +609,7 @@ namespace fdtd::TMz::backends
         m_stream.synchronize();
     }
 
-    // Copy the fields to the slot's device arrays on the stream, then to its host fields on the
-    // copy stream once that is done.
+    // Copy the fields to the slot's device arrays, then to its host fields on the copy stream.
     void CudaBackend::queue_snapshot(SnapshotSlot &slot, std::size_t steps)
     {
         const std::size_t bytes = m_pitch * m_grid.ny() * sizeof(FloatType);
@@ -772,9 +761,7 @@ namespace fdtd::TMz::backends
                                stream>>>(fields, coeffs, edges, m_boundary);
     }
 
-    // Queue H, the H sources, E, the Ez sources and the probes of step n, or of the step on the
-    // device, which is then counted. The tiled kernel does H, its sources and E in one pass and
-    // swaps the arrays it read with those it wrote.
+    // Queue the kernels of step n, or of the step on the device, which is then counted.
     void CudaBackend::launch_step(const gpu::DeviceCoeffs &coeffs, std::size_t n,
                                   std::size_t magnetic, std::size_t electric, bool replay)
     {

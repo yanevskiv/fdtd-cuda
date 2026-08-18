@@ -50,8 +50,11 @@ namespace fdtd
                 message << text;
                 throw std::invalid_argument(message.str());
             }
-            return {parse_size_arg("--pulse", fields[0]), parse_size_arg("--pulse", fields[1]),
-                    fields.size() == 3 ? parse_positive_arg("--pulse", fields[2]) : 30.0};
+            return {
+                .i = parse_size_arg("--pulse", fields[0]),
+                .j = parse_size_arg("--pulse", fields[1]),
+                .width = fields.size() == 3 ? parse_positive_arg("--pulse", fields[2]) : 30.0,
+            };
         }
 
         // Parse I,J for a probe.
@@ -64,7 +67,10 @@ namespace fdtd
                 message << text;
                 throw std::invalid_argument(message.str());
             }
-            return {parse_size_arg("--probe", fields[0]), parse_size_arg("--probe", fields[1])};
+            return {
+                .i = parse_size_arg("--probe", fields[0]),
+                .j = parse_size_arg("--probe", fields[1]),
+            };
         }
 
         // Describe the boundary for the log, with the PML thickness when it has one.

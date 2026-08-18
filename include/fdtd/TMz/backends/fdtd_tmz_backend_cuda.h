@@ -345,6 +345,10 @@ namespace fdtd
                 /**
                  * Queue the steps from one step of the advance to another.
                  *
+                 * With cuda_graph, whole runs of GRAPH_STEPS steps replay one captured graph,
+                 * captured again when its key changes; the steps left over are launched one by
+                 * one.
+                 *
                  * @param coeffs View of the device coefficients.
                  * @param from First step, from zero.
                  * @param to Step to stop before.
@@ -364,6 +368,9 @@ namespace fdtd
                 /**
                  * Queue the copies of the fields as they will be after the work queued so far.
                  *
+                 * The fields go to the slot's device arrays on the stream, then to its page-locked
+                 * host fields on the copy stream once those copies are done.
+                 *
                  * @param slot Slot to copy into, its last snapshot handed over.
                  * @param steps Steps of the advance the snapshot is taken after.
                  */
@@ -379,6 +386,10 @@ namespace fdtd
 
                 /**
                  * Run one step's kernels on the stream, on the device fields as they are then.
+                 *
+                 * H, the magnetic sources, E, the Ez sources and the probes, in that order. The
+                 * tiled kernel does H, its sources and E in one pass, then the arrays it read
+                 * are swapped with those it wrote.
                  *
                  * @param coeffs View of the device coefficients.
                  * @param n Step of this advance, from zero; unused when replay is set.

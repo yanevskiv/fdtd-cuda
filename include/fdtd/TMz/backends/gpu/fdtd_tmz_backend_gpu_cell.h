@@ -274,19 +274,29 @@ namespace fdtd
                     const int width = fields.nx - 2;
                     const int band = depth * width;
                     if (t < band) {
-                        return {1 + t % width, 1 + t / width};
+                        return {
+                            .i = 1 + t % width,
+                            .j = 1 + t / width,
+                        };
                     }
                     if (t < 2 * band) {
-                        return {1 + (t - band) % width,
-                                fields.ny - fields.pml + (t - band) / width};
+                        return {
+                            .i = 1 + (t - band) % width,
+                            .j = fields.ny - fields.pml + (t - band) / width,
+                        };
                     }
                     const int side = depth * (fields.ny - 2 * fields.pml);
                     const int u = t - 2 * band;
                     if (u < side) {
-                        return {1 + u % depth, fields.pml + u / depth};
+                        return {
+                            .i = 1 + u % depth,
+                            .j = fields.pml + u / depth,
+                        };
                     }
-                    return {fields.nx - fields.pml + (u - side) % depth,
-                            fields.pml + (u - side) / depth};
+                    return {
+                        .i = fields.nx - fields.pml + (u - side) % depth,
+                        .j = fields.pml + (u - side) / depth,
+                    };
                 }
 
                 /**
@@ -315,15 +325,24 @@ namespace fdtd
                                                             int t) noexcept
                 {
                     if (t < fields.nx) {
-                        return {t, 0};
+                        return {
+                            .i = t,
+                            .j = 0,
+                        };
                     }
                     const int rows = fields.ny > 1 ? 2 : 1;
                     if (t < rows * fields.nx) {
-                        return {t - fields.nx, fields.ny - 1};
+                        return {
+                            .i = t - fields.nx,
+                            .j = fields.ny - 1,
+                        };
                     }
                     const int u = t - rows * fields.nx;
                     const int side = fields.ny - 2;
-                    return {u < side ? 0 : fields.nx - 1, 1 + u % side};
+                    return {
+                        .i = u < side ? 0 : fields.nx - 1,
+                        .j = 1 + u % side,
+                    };
                 }
 
                 /**
@@ -389,7 +408,10 @@ namespace fdtd
                 {
                     if (coeffs.source == CoeffSource::Uniform) {
                         if (is_core_cell(fields, i, j)) {
-                            return {true, coeffs.uniform};
+                            return {
+                                .found = true,
+                                .tuple = coeffs.uniform,
+                            };
                         }
                     } else if (coeffs.source == CoeffSource::Indexed) {
 #ifdef __CUDA_ARCH__
@@ -398,10 +420,16 @@ namespace fdtd
                         const std::uint8_t entry = coeffs.index[k];
 #endif
                         if (entry != CoeffTable::ARRAYS) {
-                            return {true, coeffs.table[entry]};
+                            return {
+                                .found = true,
+                                .tuple = coeffs.table[entry],
+                            };
                         }
                     }
-                    return {false, {}};
+                    return {
+                        .found = false,
+                        .tuple = {},
+                    };
                 }
 
                 /** New Hx and Hy of a cell. */
@@ -460,7 +488,10 @@ namespace fdtd
                     const int k = j * fields.pitch + i;
                     const CellTuple table = cell_tuple(fields, coeffs, k, i, j);
                     const FloatType *Ez = fields.ez;
-                    HValues h{fields.hx[k], fields.hy[k]};
+                    HValues h{
+                        .hx = fields.hx[k],
+                        .hy = fields.hy[k],
+                    };
                     if (j < fields.ny - 1) {
                         const FloatType c1 =
                             table.found ? table.tuple.hx_1 : read_only(coeffs.coeff_hx_1, k);
@@ -511,8 +542,12 @@ namespace fdtd
                  */
                 FDTD_HOST_DEVICE inline HAround h_around(const DeviceFields &fields, int k) noexcept
                 {
-                    return {read_only(fields.hy, k), read_only(fields.hy, k - 1),
-                            read_only(fields.hx, k), read_only(fields.hx, k - fields.pitch)};
+                    return {
+                        .hy = read_only(fields.hy, k),
+                        .hy_left = read_only(fields.hy, k - 1),
+                        .hx = read_only(fields.hx, k),
+                        .hx_below = read_only(fields.hx, k - fields.pitch),
+                    };
                 }
 
                 /**
@@ -528,10 +563,12 @@ namespace fdtd
                                                               int j) noexcept
                 {
                     const int k = j * fields.pitch + i;
-                    return {i + 1 < fields.nx ? read_only(fields.hy, k) : FloatType(0),
-                            i > 0 ? read_only(fields.hy, k - 1) : FloatType(0),
-                            j + 1 < fields.ny ? read_only(fields.hx, k) : FloatType(0),
-                            j > 0 ? read_only(fields.hx, k - fields.pitch) : FloatType(0)};
+                    return {
+                        .hy = i + 1 < fields.nx ? read_only(fields.hy, k) : FloatType(0),
+                        .hy_left = i > 0 ? read_only(fields.hy, k - 1) : FloatType(0),
+                        .hx = j + 1 < fields.ny ? read_only(fields.hx, k) : FloatType(0),
+                        .hx_below = j > 0 ? read_only(fields.hx, k - fields.pitch) : FloatType(0),
+                    };
                 }
 
                 /**
@@ -590,8 +627,10 @@ namespace fdtd
                         table.found ? table.tuple.ez_1 : read_only(coeffs.coeff_ez_y1, k);
                     const FloatType y2 =
                         table.found ? table.tuple.ez_2 : read_only(coeffs.coeff_ez_y2, k);
-                    return {x1 * ezx + x2 * fields.inv_dx * (h.hy - h.hy_left),
-                            y1 * ezy - y2 * fields.inv_dy * (h.hx - h.hx_below)};
+                    return {
+                        .ezx = x1 * ezx + x2 * fields.inv_dx * (h.hy - h.hy_left),
+                        .ezy = y1 * ezy - y2 * fields.inv_dy * (h.hx - h.hx_below),
+                    };
                 }
 
                 /**

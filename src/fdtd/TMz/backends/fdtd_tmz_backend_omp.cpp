@@ -74,8 +74,7 @@ namespace fdtd::TMz::backends
             return cpu::Partition::tiles(grid, options.omp_tile_x, options.omp_tile_y);
         }
 
-        // Run every step as a static omp for over the parts per phase, in one region or one per
-        // phase.
+        // Run every step as a static omp for over the parts, in one region or one per phase.
         template <bool Simd, OmpRegion Region>
         void run_loops(const cpu::Stepper &stepper, std::size_t parts, std::size_t nsteps,
                        int threads)

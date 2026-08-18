@@ -103,7 +103,12 @@ namespace fdtd::TMz
             throw std::out_of_range("Material: cell outside the grid");
         }
         const std::size_t k = m_grid.index(i, j);
-        return {m_eps_r[k], m_mu_r[k], m_sigma_e[k], m_sigma_m[k]};
+        return {
+            .eps_r = m_eps_r[k],
+            .mu_r = m_mu_r[k],
+            .sigma_e = m_sigma_e[k],
+            .sigma_m = m_sigma_m[k],
+        };
     }
 
     // Fill the whole grid through fill_rect.
