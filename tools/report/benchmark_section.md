@@ -19,9 +19,12 @@ $bandwidth
 The bandwidth is the modelled traffic of a step over the median time of a step, at each
 backend's largest grid. The model counts every array element a kernel touches as read once and
 written once, with the neighbours of a cell from cache, so it is the traffic the kernels cannot
-avoid; bytes per cell is that traffic over the cells. The peak of the CUDA backend is the copy
-kernel's bandwidth, that of the CPU backends the STREAM triad's, both measured by
-`benchmark --peaks` before the run.
+avoid; bytes per cell is that traffic over the cells. The peak of the CUDA backend is the
+card's, from its memory clock and bus width, since the stencil, which reads four words for each it
+writes, outruns the copy kernel `benchmark --peaks` measures; that of the CPU backends is the
+STREAM triad's, measured by `benchmark --peaks` before the run. STREAM leaves out the read a store
+makes before it writes, as the model does, so a stencil with fewer stores than the triad can pass
+it.
 
 ## Weak scaling
 

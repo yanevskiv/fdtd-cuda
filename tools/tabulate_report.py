@@ -277,16 +277,17 @@ def peak(infos, key):
 def bandwidth_table(data, infos):
     """
     Return the achieved bandwidth and flops of each configuration at its backend's largest grid,
-    and the bandwidth as a percent of the peak the runs measured, as a table.
+    and the bandwidth as a percent of the peak, as a table.
 
-    The peak of the CUDA backend is the GPU's copy kernel and that of the others the CPU's
-    STREAM triad.
+    The peak of the CUDA backend is the GPU's, from its memory clock and bus, since the stencil,
+    which reads four words for each it writes, outruns a copy kernel; that of the others is the
+    CPU's STREAM triad, the only one the machine gives.
     """
     if "bytes_per_step" not in data.dtype.names or np.all(np.isnan(data["bytes_per_step"])):
         return "The runs hold no modelled traffic."
 
     peaks = {
-        "cuda": peak(infos, "gpu_copy_bandwidth"),
+        "cuda": peak(infos, "gpu_peak_bandwidth"),
         "openmp": peak(infos, "cpu_triad_bandwidth"),
         "serial": peak(infos, "cpu_triad_bandwidth"),
     }

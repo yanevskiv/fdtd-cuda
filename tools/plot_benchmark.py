@@ -435,9 +435,9 @@ def plot_roofline(args, data, infos):
     """Plot each backend and variant at its largest grid on the roofline of the machine.
 
     A point sits at its arithmetic intensity, the modelled flops over the modelled bytes of a
-    step, and at the flops it achieved. The roofs are the measured bandwidths, the GPU's copy
-    and the CPU's triad, capped for the GPU by its peak flops in each precision of the runs; the
-    CPU has no compute roof, since nothing on the machine reports its peak.
+    step, and at the flops it achieved. The roofs are the GPU's peak bandwidth, from its memory
+    clock and bus, capped by its peak flops in each precision of the runs, and the CPU's triad;
+    the CPU has no compute roof, since nothing on the machine reports its peak.
     """
     performance = data["flops_per_step"] * data["nsteps"] / data["seconds"] / 1e9
     fig, ax = plt.subplots(figsize=(8, 5))
@@ -463,11 +463,11 @@ def plot_roofline(args, data, infos):
             i += 1
 
     x = np.logspace(-2, 2, 200)
-    copy = peak(infos, "gpu_copy_bandwidth")
-    if copy is not None:
+    bandwidth = peak(infos, "gpu_peak_bandwidth")
+    if bandwidth is not None:
         for precision in np.unique(data["precision"]):
             flops = peak(infos, f"gpu_peak_flops_{precision}")
-            roof = copy * x if flops is None else np.minimum(copy * x, flops)
+            roof = bandwidth * x if flops is None else np.minimum(bandwidth * x, flops)
             ax.plot(x, roof, "k-", linewidth=1.3, label=f"GPU roof, {precision}")
 
     triad = peak(infos, "cpu_triad_bandwidth")
