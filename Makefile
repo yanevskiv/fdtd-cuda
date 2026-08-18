@@ -9,7 +9,7 @@ REPORT_DIR ?= build/reports/$(shell date +%s%3N)
 SOURCES = $(shell git ls-files --cached --others --exclude-standard 'include/*.h' 'include/*.cuh' 'src/*.h' 'src/*.cpp' 'src/*.cu' 'src/*.cuh' \
 	'tests/*.cpp' 'tests/*.h' 'samples/*.cpp')
 
-.PHONY: all configure build test install workflow bench profile report
+.PHONY: all configure build test install workflow bench bench-double profile report
 .PHONY: lint lint-changed format clean
 
 all: build
@@ -32,6 +32,9 @@ workflow:
 bench:
 	cmake --preset $(BENCH_PRESET)
 	cmake --build --preset $(BENCH_PRESET) --target bench
+
+bench-double:
+	$(MAKE) bench BENCH_PRESET=bench-double
 
 profile:
 	cmake --preset profile

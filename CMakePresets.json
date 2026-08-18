@@ -87,6 +87,12 @@
             }
         },
         {
+            "name": "bench-double",
+            "displayName": "Benchmark in double precision (the bench preset with FDTD_DOUBLE)",
+            "inherits": ["bench"],
+            "cacheVariables": { "FDTD_DOUBLE": "ON" }
+        },
+        {
             "name": "bench-native",
             "displayName": "Benchmark for the CPU of the build machine (the bench preset with -march=native)",
             "inherits": ["bench"],
@@ -111,6 +117,7 @@
         { "name": "cuda", "configurePreset": "cuda" },
         { "name": "exact", "configurePreset": "exact" },
         { "name": "bench", "configurePreset": "bench" },
+        { "name": "bench-double", "configurePreset": "bench-double" },
         { "name": "bench-native", "configurePreset": "bench-native" },
         { "name": "profile", "configurePreset": "profile" }
     ],
