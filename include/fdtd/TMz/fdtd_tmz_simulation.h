@@ -71,7 +71,12 @@ namespace fdtd
 
             /** Three E kernels with no branch on the cell: the interior, the PML slabs and the
              * edge. */
-            Split
+            Split,
+
+            /** One kernel per step: each block updates H on its tile and the tile's lower and
+             * left halo, keeps it in shared memory, and updates E from it, reading Ez, Hx and Hy
+             * once and writing them to a second set of arrays. */
+            Tiled
         };
 
         /** Where the CUDA kernels read the update coefficients of a cell. */

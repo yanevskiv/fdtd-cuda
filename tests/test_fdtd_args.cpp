@@ -213,9 +213,10 @@ TEST_CASE("CUDA variant names round-trip", "[unit][args]")
     CHECK(both.cuda_coeffs == fdtd::TMz::CudaCoeffs::Table);
     CHECK(both.cuda_graph);
     CHECK(fdtd::cuda_variant_name(both) == "split:32x8+table+graph");
+    CHECK(cuda_variant("tiled").cuda_kernel == CudaKernel::Tiled);
     for (const std::string name :
          {"fused:32x8", "fused:1x1", "split:128x1", "split:7x5", "split:16x16+graph",
-          "fused:32x8+table", "fused:64x4+table+graph"}) {
+          "fused:32x8+table", "fused:64x4+table+graph", "tiled:32x8", "tiled:16x16+table+graph"}) {
         CAPTURE(name);
         CHECK(fdtd::cuda_variant_name(cuda_variant(name)) == name);
     }

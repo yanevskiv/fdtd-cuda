@@ -95,6 +95,9 @@ namespace fdtd
 
             /** Whether every cell reads a one-byte table index in each pass. */
             bool index = false;
+
+            /** Whether H and E are updated in one pass, each field read and written once. */
+            bool one_pass = false;
         };
 
         /**
@@ -107,6 +110,12 @@ namespace fdtd
          * and 11 flops; per edge cell 3 words written under PEC and PML, and the interior's
          * count under PMC. With a table, the core cells read no coefficients, in either pass;
          * with an index, every cell reads one byte in each pass.
+         *
+         * In one pass, a cell reads Ez, Hx and Hy once and writes them once (6 words), its H
+         * coefficients as in two passes, and its E coefficients: 2 words in the interior, 4 and
+         * Ezx and Ezy read and written in the PML (8), Ezx and Ezy written on the edge under PEC
+         * and PML or 2 coefficients under PMC (2). The halo a tile computes again is left out,
+         * and the flops are those of two passes.
          *
          * @param grid Grid of the fields.
          * @param pml Thickness of the active PML in cells, zero for none.

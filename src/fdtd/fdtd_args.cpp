@@ -84,9 +84,11 @@ namespace fdtd
                 case TMz::CudaKernel::Fused:
                     return "fused";
                 case TMz::CudaKernel::Split:
+                    return "split";
+                case TMz::CudaKernel::Tiled:
                     break;
             }
-            return "split";
+            return "tiled";
         }
 
         // Read a positive decimal side, the whole field, of a tile or a block.
@@ -380,8 +382,10 @@ namespace fdtd
             parsed.cuda_kernel = TMz::CudaKernel::Fused;
         } else if (kernel == "split") {
             parsed.cuda_kernel = TMz::CudaKernel::Split;
+        } else if (kernel == "tiled") {
+            parsed.cuda_kernel = TMz::CudaKernel::Tiled;
         } else {
-            malformed_variant(name, text, "expected fused or split");
+            malformed_variant(name, text, "expected fused, split or tiled");
         }
         if (colon != std::string_view::npos) {
             const auto [x, y] = parse_sides(name, text, head.substr(colon + 1), "block");

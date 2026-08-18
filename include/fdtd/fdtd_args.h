@@ -146,8 +146,8 @@ namespace fdtd
     /**
      * Parse a CUDA variant name, `<kernel>[:<BX>x<BY>][+table][+graph]`, into cuda_ fields.
      *
-     * The kernel is `fused` or `split`; `:BXxBY` sets the thread block, the default one when it
-     * is left out; `+table` reads the coefficients outside the PML from a table; `+graph`
+     * The kernel is `fused`, `split` or `tiled`; `:BXxBY` sets the thread block, the default one
+     * when it is left out; `+table` reads the coefficients outside the PML from a table; `+graph`
      * replays captured steps as a CUDA graph. The suffixes may come in any order. `default`
      * names the default settings. Whether the device takes the block is left to the backend.
      *

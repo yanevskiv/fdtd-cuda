@@ -64,7 +64,7 @@ namespace
     constexpr double TOLERANCE = FDTD_TEST_CUDA_TOLERANCE;
 
     // Kernel layouts built so far.
-    constexpr CudaKernel KERNELS[] = {CudaKernel::Fused, CudaKernel::Split};
+    constexpr CudaKernel KERNELS[] = {CudaKernel::Fused, CudaKernel::Split, CudaKernel::Tiled};
 
     // Result of a run: the fields and every probe's record.
     struct Run
@@ -573,6 +573,76 @@ TEST_CASE("CUDA models the traffic of the coefficient table", "[unit][backend][c
               arrays.step_traffic().bytes - 6 * core * static_cast<double>(sizeof(FloatType)));
         CHECK(table.step_traffic().flops == arrays.step_traffic().flops);
     }
+}
+
+// Verify that the tiled kernel gives the fused kernel's results bit for bit: H sources on the
+// column and row a tile takes from its neighbours, every step count from 1 to 5 so the arrays
+// end swapped and not, and probes on both H components.
+TEST_CASE("CUDA tiled kernel matches the fused kernel bit for bit", "[backend][cuda]")
+{
+    require_cuda();
+    const auto boundary = GENERATE(Boundary::Pec, Boundary::Pmc, Boundary::Pml);
+    const Grid grid(70, 45, FloatType(1e-3), FloatType(2e-3));
+    Material material(grid);
+    material.set_pml(6, 3, 1e-6);
+    material.fill_circle(40, 20, 6, {.eps_r = 3, .sigma_e = FloatType(0.2)});
+    const Coeffs coeffs(material, fdtd::TMz::courant_dt(grid, 0.9));
+    const std::vector<PointInjection> points{{Component::Hy, grid.index(31, 20)},
+                                             {Component::Hx, grid.index(20, 7)},
+                                             {Component::Hx, grid.index(31, 15)},
+                                             {Component::Hy, grid.index(31, 15)},
+                                             {Component::Ez, grid.index(50, 30)}};
+    const std::vector<PointProbe> probes{{Component::Hy, grid.index(31, 20)},
+                                         {Component::Hx, grid.index(20, 8)},
+                                         {Component::Ez, grid.index(32, 16)}};
+    for (const bool table : {false, true}) {
+        for (std::size_t steps = 1; steps <= 5; ++steps) {
+            INFO("table " << table << ", steps " << steps);
+            Run runs[2];
+            for (const CudaKernel kernel : {CudaKernel::Fused, CudaKernel::Tiled}) {
+                auto options = cuda_options(kernel, {32, 8});
+                if (table) {
+                    options.cuda_coeffs = fdtd::TMz::CudaCoeffs::Table;
+                }
+                Fields fields(grid);
+                fill_distinct(fields);
+                const auto backend = fdtd::TMz::make_backend(BackendType::Cuda, grid, options);
+                backend->upload(fields);
+                backend->upload(coeffs);
+                backend->set_boundary(boundary);
+                backend->set_probes(probes);
+                std::vector<FloatType> values(steps * points.size());
+                for (std::size_t k = 0; k < values.size(); ++k) {
+                    values[k] = FloatType(1 + k % 4) / FloatType(4);
+                }
+                backend->step(steps, std::span(points), std::span(values));
+                backend->download(fields);
+                Run &run = runs[kernel == CudaKernel::Tiled ? 1 : 0];
+                append_fields(run.fields, fields);
+                run.probes = backend->fetch_probes();
+            }
+            CHECK(runs[1].fields == runs[0].fields);
+            CHECK(runs[1].probes == runs[0].probes);
+        }
+    }
+}
+
+// Verify the traffic model of the tiled kernel: one pass reads and writes each field once.
+TEST_CASE("CUDA models the traffic of the tiled kernel", "[unit][backend][cuda]")
+{
+    require_cuda();
+    Simulation::Options options;
+    options.backend = BackendType::Cuda;
+    options.boundary = Boundary::Pml;
+    options.pml_thickness = 2;
+    options.cuda_kernel = CudaKernel::Tiled;
+    const Simulation tiled(8, 6, options);
+    const double word = sizeof(FloatType);
+    CHECK(tiled.step_traffic().bytes == (6 * 48 + 2 * 82 + 2 * 8 + 8 * 16 + 2 * 24) * word);
+    CHECK(tiled.step_traffic().flops == 5 * 82 + 8 * 8 + 16 * 11);
+    options.cuda_coeffs = fdtd::TMz::CudaCoeffs::Table;
+    const Simulation table(8, 6, options);
+    CHECK(table.step_traffic().bytes == tiled.step_traffic().bytes - 6 * 3 * word);
 }
 
 // Verify that the backend has its name and rejects settings it cannot run.

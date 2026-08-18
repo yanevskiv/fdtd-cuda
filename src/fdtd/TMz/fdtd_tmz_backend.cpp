@@ -107,9 +107,11 @@ namespace fdtd::TMz
 
         const double core = std::max(nx - 2 * lo - 1, 0.0) * std::max(ny - 2 * lo - 1, 0.0);
         const double tabled = model.table ? core : 0;
-        const double words = nx * ny + 4 * (hx + hy) - 4 * tabled + 6 * interior - 2 * tabled +
-                             11 * split + (pmc ? 6 : 3) * edge;
-        const double index = model.index ? 2 * nx * ny : 0;
+        const double words = model.one_pass ? 6 * nx * ny + 2 * (hx + hy) - 4 * tabled +
+                                                  2 * interior - 2 * tabled + 8 * split + 2 * edge
+                                            : nx * ny + 4 * (hx + hy) - 4 * tabled + 6 * interior -
+                                                  2 * tabled + 11 * split + (pmc ? 6 : 3) * edge;
+        const double index = model.index ? (model.one_pass ? 1 : 2) * nx * ny : 0;
         const double flops = 5 * (hx + hy) + 8 * interior + 11 * split + (pmc ? 8 : 0) * edge;
         return {.bytes = words * static_cast<double>(sizeof(FloatType)) + index, .flops = flops};
     }

@@ -153,9 +153,11 @@ namespace fdtd
                 std::vector<FloatType> fetch_probes() const override;
 
                 /**
-                 * Modelled traffic of one step, two passes over per-cell coefficient arrays.
+                 * Modelled traffic of one step of the kernel and coefficients in use.
                  *
-                 * @return two_pass_traffic() of the grid, the active PML and the boundary.
+                 * @return two_pass_traffic() of the grid, the active PML and the boundary, one
+                 *         pass for Tiled, with the table of CudaCoeffs::Table and its index when
+                 *         the interior's core does not share one tuple.
                  */
                 StepTraffic step_traffic() const noexcept override;
 
@@ -242,9 +244,8 @@ namespace fdtd
                                     const gpu::DeviceCoeffs &coeffs);
 
                 /**
-                 * Run one step's kernels on the stream.
+                 * Run one step's kernels on the stream, on the device fields as they are then.
                  *
-                 * @param fields View of the device fields.
                  * @param coeffs View of the device coefficients.
                  * @param n Step of this advance, from zero; unused when replay is set.
                  * @param magnetic Sources that add to Hx or Hy, first in the device sources.
@@ -252,9 +253,8 @@ namespace fdtd
                  * @param replay Whether the kernels read the step from the device counter and
                  *        count it, so a graph can replay them, instead of being given n.
                  */
-                void launch_step(const gpu::DeviceFields &fields, const gpu::DeviceCoeffs &coeffs,
-                                 std::size_t n, std::size_t magnetic, std::size_t electric,
-                                 bool replay);
+                void launch_step(const gpu::DeviceCoeffs &coeffs, std::size_t n,
+                                 std::size_t magnetic, std::size_t electric, bool replay);
 
                 /** What a captured graph depends on besides the backend's fixed arrays. */
                 struct GraphKey
@@ -273,6 +273,9 @@ namespace fdtd
 
                     /** PML thickness in force. */
                     int pml = 0;
+
+                    /** Device Ez, which of the two arrays the tiled kernel swaps between. */
+                    const void *ez = nullptr;
 
                     /** Device sources. */
                     const void *sources = nullptr;
@@ -320,6 +323,15 @@ namespace fdtd
 
                 /** Device Ezy. */
                 gpu::DeviceBuffer<FloatType> m_ezy;
+
+                /** Device Ez the tiled kernel writes a step to, swapped with m_ez after it. */
+                gpu::DeviceBuffer<FloatType> m_ez_next;
+
+                /** Device Hx the tiled kernel writes a step to, swapped with m_hx after it. */
+                gpu::DeviceBuffer<FloatType> m_hx_next;
+
+                /** Device Hy the tiled kernel writes a step to, swapped with m_hy after it. */
+                gpu::DeviceBuffer<FloatType> m_hy_next;
 
                 /** Device Ez decay factors along x. */
                 gpu::DeviceBuffer<FloatType> m_coeff_ez_x1;
