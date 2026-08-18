@@ -303,7 +303,7 @@ namespace fdtd::TMz::backends
         }
     }
 
-    // Check the options, allocate the padded arrays and zero them.
+    // Check the options, allocate the padded arrays and zero them, and make the snapshot slots.
     CudaBackend::CudaBackend(const Grid &grid, const Simulation::Options &options)
         : m_options(checked(grid, options))
         , m_grid(grid)
@@ -333,6 +333,9 @@ namespace fdtd::TMz::backends
                 *buffer = gpu::DeviceBuffer<FloatType>(m_pitch * grid.ny());
                 buffer->zero(m_stream);
             }
+        }
+        if (m_options.cuda_async_snapshots) {
+            m_async = std::make_unique<AsyncSnapshots>(m_grid, m_pitch);
         }
         m_stream.synchronize();
     }
@@ -520,9 +523,6 @@ namespace fdtd::TMz::backends
         const std::size_t magnetic = put_sources(nsteps, points, values);
         const std::size_t electric = points.size() - magnetic;
         const gpu::DeviceCoeffs coeffs = device_coeffs();
-        if (!m_async) {
-            m_async = std::make_unique<AsyncSnapshots>(m_grid, m_pitch);
-        }
         std::size_t done = 0;
         for (std::size_t s = 0; s < snapshots.size(); ++s) {
             queue_steps(coeffs, done, snapshots[s], magnetic, electric);

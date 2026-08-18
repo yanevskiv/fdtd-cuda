@@ -311,8 +311,8 @@ namespace fdtd
                     std::size_t steps = 0;
                 };
 
-                /** What cuda_async_snapshots needs, made by the first advance that takes a
-                 * snapshot. */
+                /** What cuda_async_snapshots needs, made with the backend so that no run pays
+                 * for it. */
                 struct AsyncSnapshots
                 {
                     /**
@@ -551,7 +551,7 @@ namespace fdtd
                 /** What m_graph was captured with, captured again when this changes. */
                 GraphKey m_graph_key;
 
-                /** Copy stream and slots of cuda_async_snapshots, made when first needed. */
+                /** Copy stream and slots of cuda_async_snapshots, or null without it. */
                 std::unique_ptr<AsyncSnapshots> m_async;
             };
         }
