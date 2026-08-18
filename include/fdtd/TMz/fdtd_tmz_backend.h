@@ -71,6 +71,40 @@ namespace fdtd
         };
 
         /**
+         * Modelled memory traffic and arithmetic of one time step.
+         *
+         * The model counts each array element a kernel touches as read once and written once
+         * per pass, with the neighbours of a cell coming from cache, so it is the traffic to
+         * main memory a kernel cannot avoid. Sources and probes are left out.
+         */
+        struct StepTraffic
+        {
+            /** Bytes read from and written to memory. */
+            double bytes = 0;
+
+            /** Floating-point operations, a multiply-add counted as two. */
+            double flops = 0;
+        };
+
+        /**
+         * Traffic of one step of the kernels with per-cell coefficient arrays and separate H and E
+         * passes, the serial backend's.
+         *
+         * The H pass reads Ez once per cell, and per Hx or Hy update reads the field and its two
+         * coefficients and writes the field: 4 words and 5 flops. The E pass takes per interior
+         * cell 6 words (Hx, Hy, Ez and two coefficients read, Ez written) and 8 flops; per PML
+         * cell 11 words (Hx, Hy, Ezx, Ezy and four coefficients read, Ezx, Ezy and Ez written)
+         * and 11 flops; per edge cell 3 words written under PEC and PML, and the interior's
+         * count under PMC.
+         *
+         * @param grid Grid of the fields.
+         * @param pml Thickness of the active PML in cells, zero for none.
+         * @param boundary Outer boundary condition.
+         * @return The traffic, a word being sizeof(FloatType) bytes.
+         */
+        StepTraffic two_pass_traffic(const Grid &grid, std::size_t pml, Boundary boundary);
+
+        /**
          * A backend that owns a copy of the fields and advances them in time.
          *
          * Fields move in with upload() and out with download(); step() works on the
@@ -200,6 +234,13 @@ namespace fdtd
              *         is at n * probe_count() + k.
              */
             virtual std::vector<FloatType> fetch_probes() const = 0;
+
+            /**
+             * Modelled traffic of one step with the coefficients and boundary set now.
+             *
+             * @return The traffic of the backend's kernels.
+             */
+            virtual StepTraffic step_traffic() const noexcept = 0;
 
         protected:
             /**

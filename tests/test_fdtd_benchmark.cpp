@@ -114,6 +114,7 @@ TEST_CASE("Benchmark defaults", "[unit][benchmark]")
     CHECK(options.output.empty());
     CHECK_FALSE(options.header_only);
     CHECK_FALSE(options.no_header);
+    CHECK_FALSE(options.peaks);
     CHECK_FALSE(options.help);
     CHECK_FALSE(options.version);
 }
@@ -145,6 +146,7 @@ TEST_CASE("Benchmark parses every option", "[unit][benchmark]")
                                 "bench.csv",
                                 "--header-only",
                                 "--no-header",
+                                "--peaks",
                                 "-h",
                                 "--version"});
     CHECK(options.nx == 64);
@@ -160,6 +162,7 @@ TEST_CASE("Benchmark parses every option", "[unit][benchmark]")
     CHECK(options.output == "bench.csv");
     CHECK(options.header_only);
     CHECK(options.no_header);
+    CHECK(options.peaks);
     CHECK(options.help);
     CHECK(options.version);
 }
@@ -199,11 +202,13 @@ TEST_CASE("Benchmark rejects bad arguments", "[unit][benchmark]")
 TEST_CASE("Benchmark CSV header and row format", "[unit][benchmark]")
 {
     CHECK(fdtd::benchmark_csv_header() ==
-          "backend,variant,precision,threads,nx,ny,nsteps,repeat,seconds,checksum");
-    const BenchmarkSample sample{BackendType::Serial, "default", 1, 64, 32, 100, 3, 0.25, 0.1};
+          "backend,variant,precision,threads,nx,ny,nsteps,repeat,seconds,checksum,"
+          "bytes_per_step,flops_per_step");
+    const BenchmarkSample sample{
+        BackendType::Serial, "default", 1, 64, 32, 100, 3, 0.25, 0.1, 2688, 650};
     const std::string expected =
-        FDTD_DOUBLE ? "serial,default,double,1,64,32,100,3,0.250000000,0.10000000000000001"
-                    : "serial,default,float,1,64,32,100,3,0.250000000,0.10000000000000001";
+        FDTD_DOUBLE ? "serial,default,double,1,64,32,100,3,0.250000000,0.10000000000000001,2688,650"
+                    : "serial,default,float,1,64,32,100,3,0.250000000,0.10000000000000001,2688,650";
     CHECK(fdtd::format_benchmark_row(sample) == expected);
 }
 
@@ -241,6 +246,9 @@ TEST_CASE("Benchmark checksum matches Simulation run by hand", "[unit][benchmark
     std::string csv;
     const double pml = run(options, csv).front().checksum;
     CHECK(pml == workload_checksum(48, 44, 20, Boundary::Pml));
+    const auto traffic = fdtd::TMz::two_pass_traffic(fdtd::TMz::Grid(48, 44), 20, Boundary::Pml);
+    CHECK(run(options, csv).front().bytes_per_step == traffic.bytes);
+    CHECK(run(options, csv).front().flops_per_step == traffic.flops);
     options.boundary = Boundary::Pec;
     const double pec = run(options, csv).front().checksum;
     CHECK(pec == workload_checksum(48, 44, 20, Boundary::Pec));
@@ -416,6 +424,28 @@ TEST_CASE("Benchmark header flags", "[unit][benchmark]")
     REQUIRE(samples.size() == fdtd::TMz::available_backends().size());
     CHECK(lines(csv).size() == samples.size());
     CHECK(lines(csv).front() == fdtd::format_benchmark_row(samples.front()));
+}
+
+// Verify that --peaks writes only '# key: value' lines, with the keys of the backends built in.
+TEST_CASE("Benchmark writes the machine's peaks", "[unit][benchmark]")
+{
+    auto options = small();
+    options.peaks = true;
+    std::string csv;
+    CHECK(run(options, csv).empty());
+    for (const std::string &line : lines(csv)) {
+        CHECK(line.starts_with("# "));
+        CHECK(line.find(": ") != std::string::npos);
+    }
+    if (fdtd::TMz::is_backend_available(BackendType::OpenMP)) {
+        CHECK(csv.find("# cpu_triad_bandwidth: ") != std::string::npos);
+        CHECK(csv.find("# cpu_triad_threads: ") != std::string::npos);
+    }
+    if (fdtd::TMz::is_backend_available(BackendType::Cuda)) {
+        CHECK(csv.find("# gpu_copy_bandwidth: ") != std::string::npos);
+        CHECK(csv.find("# gpu_peak_bandwidth: ") != std::string::npos);
+        CHECK(csv.find("# gpu_peak_flops_float: ") != std::string::npos);
+    }
 }
 
 // Verify that the library rejects the settings the parser lets through.

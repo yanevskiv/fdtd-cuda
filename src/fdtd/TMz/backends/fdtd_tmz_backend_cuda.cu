@@ -323,6 +323,13 @@ namespace fdtd::TMz::backends
         return m_records;
     }
 
+    // Model the kernels: Fused and Split both make an H pass and an E pass over the arrays.
+    StepTraffic CudaBackend::step_traffic() const noexcept
+    {
+        return two_pass_traffic(m_grid, m_boundary == Boundary::Pml ? m_pml_thickness : 0,
+                                m_boundary);
+    }
+
     // Return the options.
     const Simulation::Options &CudaBackend::options() const noexcept
     {

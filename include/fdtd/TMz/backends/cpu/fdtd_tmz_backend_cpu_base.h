@@ -116,6 +116,13 @@ namespace fdtd
                      */
                     std::vector<FloatType> fetch_probes() const override;
 
+                    /**
+                     * Modelled traffic of one step, two passes over per-cell coefficient arrays.
+                     *
+                     * @return two_pass_traffic() of the grid, the active PML and the boundary.
+                     */
+                    StepTraffic step_traffic() const noexcept override;
+
                 protected:
                     /**
                      * Create the backend with zeroed fields.

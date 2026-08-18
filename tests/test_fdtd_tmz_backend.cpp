@@ -120,6 +120,42 @@ TEST_CASE("Serial backend ignores the OpenMP options", "[unit][backend][serial]"
     CHECK(std::equal(a.hy().begin(), a.hy().end(), b.hy().begin()));
 }
 
+// Verify the traffic model of every available backend against a count by hand on an 8 by 6
+// grid with a PML 2 cells thick: 48 Ez reads, 40 Hx and 42 Hy updates at 4 words and 5 flops,
+// 24 edge cells, and 24 cells off the edge, 8 of them interior and 16 in the PML when it is
+// active.
+TEST_CASE("Backends model the traffic of a step", "[unit][backend]")
+{
+    const double word = sizeof(FloatType);
+    struct Case
+    {
+        Boundary boundary;
+        double words;
+        double flops;
+    };
+    const std::array cases{
+        Case{Boundary::Pml, 48 + 4 * 82 + 8 * 6 + 16 * 11 + 24 * 3, 5 * 82 + 8 * 8 + 16 * 11},
+        Case{Boundary::Pec, 48 + 4 * 82 + 24 * 6 + 24 * 3, 5 * 82 + 24 * 8},
+        Case{Boundary::Pmc, 48 + 4 * 82 + 24 * 6 + 24 * 6, 5 * 82 + 24 * 8 + 24 * 8},
+    };
+    for (const auto type : fdtd::TMz::available_backends()) {
+        for (const Case &c : cases) {
+            INFO(fdtd::TMz::backend_name(type) << ", boundary " << static_cast<int>(c.boundary));
+            fdtd::TMz::Simulation::Options options;
+            options.backend = type;
+            options.boundary = c.boundary;
+            options.pml_thickness = 2;
+            const fdtd::TMz::Simulation sim(8, 6, options);
+            const auto traffic = sim.step_traffic();
+            CHECK(traffic.bytes == c.words * word);
+            CHECK(traffic.flops == c.flops);
+            const auto model = fdtd::TMz::two_pass_traffic(
+                Grid(8, 6), c.boundary == Boundary::Pml ? 2 : 0, c.boundary);
+            CHECK(model.bytes == traffic.bytes);
+        }
+    }
+}
+
 // Verify the backend names.
 TEST_CASE("Backend types have lowercase names", "[unit][backend]")
 {

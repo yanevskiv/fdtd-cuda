@@ -26,9 +26,11 @@
 // OpenMP runtime for the default thread count.
 #include <omp.h>
 
-// Standard library for bounds, sizes, views, errors and the dependence tokens.
+// Standard library for bounds, timing, sizes, views, errors and the dependence tokens.
 #include <algorithm>
+#include <chrono>
 #include <cstddef>
+#include <memory>
 #include <span>
 #include <stdexcept>
 #include <string_view>
@@ -205,6 +207,62 @@ namespace fdtd::TMz::backends
             run_loops<true>(stepper, parts, nsteps, threads, m_options.omp_region);
         } else {
             run_loops<false>(stepper, parts, nsteps, threads, m_options.omp_region);
+        }
+    }
+
+    // Time each pass of the triad and take the median.
+    TriadResult triad_bandwidth(std::size_t bytes, std::size_t repeats, std::size_t threads)
+    {
+        const int team = threads > 0 ? static_cast<int>(threads) : omp_get_max_threads();
+        const std::size_t n = bytes / sizeof(double);
+        const auto count = static_cast<std::ptrdiff_t>(n);
+        const auto a = std::make_unique_for_overwrite<double[]>(n);
+        const auto b = std::make_unique_for_overwrite<double[]>(n);
+        const auto c = std::make_unique_for_overwrite<double[]>(n);
+        double *pa = a.get();
+        double *pb = b.get();
+        double *pc = c.get();
+#pragma omp parallel for schedule(static) num_threads(team)
+        for (std::ptrdiff_t k = 0; k < count; ++k) {
+            pa[k] = 0;
+            pb[k] = 1;
+            pc[k] = 2;
+        }
+
+        const double scalar = 3;
+        std::vector<double> rates;
+        for (std::size_t r = 0; r <= repeats; ++r) {
+            const auto start = std::chrono::steady_clock::now();
+#pragma omp parallel for schedule(static) num_threads(team)
+            for (std::ptrdiff_t k = 0; k < count; ++k) {
+                pa[k] = pb[k] + scalar * pc[k];
+            }
+            const auto stop = std::chrono::steady_clock::now();
+            if (r > 0) {
+                const double seconds = std::chrono::duration<double>(stop - start).count();
+                rates.push_back(3.0 * static_cast<double>(n * sizeof(double)) / seconds);
+            }
+        }
+        std::sort(rates.begin(), rates.end());
+        return {
+            .bandwidth = rates[rates.size() / 2],
+            .threads = static_cast<std::size_t>(team),
+        };
+    }
+
+    // Double the thread count up to the most, and keep the fastest.
+    TriadResult best_triad_bandwidth(std::size_t bytes, std::size_t repeats)
+    {
+        const auto most = static_cast<std::size_t>(omp_get_max_threads());
+        TriadResult best{.bandwidth = 0, .threads = 1};
+        for (std::size_t threads = 1;; threads = std::min(2 * threads, most)) {
+            const TriadResult triad = triad_bandwidth(bytes, repeats, threads);
+            if (triad.bandwidth > best.bandwidth) {
+                best = triad;
+            }
+            if (threads == most) {
+                return best;
+            }
         }
     }
 }

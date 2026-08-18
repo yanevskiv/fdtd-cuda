@@ -144,6 +144,12 @@ namespace fdtd::TMz::backends::cpu
         return m_records;
     }
 
+    // Model the block kernels, which make an H pass and an E pass.
+    StepTraffic CpuBase::step_traffic() const noexcept
+    {
+        return two_pass_traffic(grid(), active_pml(), m_boundary);
+    }
+
     // Keep the probe cells and clear the records.
     void CpuBase::reset_probes(std::span<const PointProbe> points)
     {

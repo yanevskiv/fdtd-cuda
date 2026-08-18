@@ -84,6 +84,7 @@ for variant in $BENCH_VARIANTS; do
 done
 WEAK_NX="${BENCH_WEAK_NX:-}"
 ORDER="${BENCH_ORDER:-interleaved}"
+BOUNDARY="${BENCH_BOUNDARY:-pml}"
 LABEL="${BENCH_LABEL:-}"
 
 [ "${OUT#/}" != "$OUT" ] || OUT="$PWD/$OUT"
@@ -102,7 +103,7 @@ mkdir -p "$DIR" || exit 1
 : > "$LOG"
 
 log "==> config $CONFIG: steps=$BENCH_STEPS repeat=$BENCH_REPEAT order=$ORDER\
- backends=($BENCH_BACKENDS) threads=($BENCH_THREADS) variants=($BENCH_VARIANTS)\
+ boundary=$BOUNDARY backends=($BENCH_BACKENDS) threads=($BENCH_THREADS) variants=($BENCH_VARIANTS)\
  sizes=($BENCH_SIZES) weak_nx=($WEAK_NX) label=$LABEL"
 
 # Print the description of the run: the machine, then the label when one is set
@@ -118,13 +119,16 @@ load_at_end() {
     printf '# load_average_end: %s %s %s\n' "$one" "$five" "$fifteen"
 }
 
-# The run's description and the CSV header come first, then one block of rows per size.
+# The run's description, the machine's peaks and the CSV header come first, then one block of
+# rows per size.
 describe > "$CSV"
+log "==> peaks"
+"$PROG" --peaks >> "$CSV" || exit 1
 "$PROG" --header-only >> "$CSV" || exit 1
 for size in $BENCH_SIZES; do
     log "==> nx=ny=$size steps=$BENCH_STEPS repeat=$BENCH_REPEAT"
     "$PROG" --nx "$size" --steps "$BENCH_STEPS" --repeat "$BENCH_REPEAT" --order "$ORDER" \
-        "${BACKENDS[@]}" "${THREADS[@]}" "${VARIANTS[@]}" --no-header 2>&1 >> "$CSV" \
+        --boundary "$BOUNDARY" "${BACKENDS[@]}" "${THREADS[@]}" "${VARIANTS[@]}" --no-header 2>&1 >> "$CSV" \
         | tee -a "$LOG" >&2 || exit 1
 done
 load_at_end >> "$CSV"
@@ -137,8 +141,9 @@ describe > "$WEAK"
 for threads in $BENCH_THREADS; do
     log "==> weak nx=$WEAK_NX ny=$((WEAK_NX * threads)) threads=$threads"
     "$PROG" --nx "$WEAK_NX" --ny "$((WEAK_NX * threads))" --steps "$BENCH_STEPS" \
-        --repeat "$BENCH_REPEAT" --order "$ORDER" --backend openmp --threads "$threads" \
-        "${VARIANTS[@]}" --no-header 2>&1 >> "$WEAK" | tee -a "$LOG" >&2 || exit 1
+        --repeat "$BENCH_REPEAT" --order "$ORDER" --boundary "$BOUNDARY" --backend openmp \
+        --threads "$threads" "${VARIANTS[@]}" --no-header 2>&1 >> "$WEAK" \
+        | tee -a "$LOG" >&2 || exit 1
 done
 load_at_end >> "$WEAK"
 log "==> wrote $WEAK"

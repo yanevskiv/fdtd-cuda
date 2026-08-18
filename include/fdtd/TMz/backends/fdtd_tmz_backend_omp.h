@@ -109,6 +109,43 @@ namespace fdtd
                 /** Parts the threads share. */
                 cpu::Partition m_partition;
             };
+
+            /** Result of the STREAM triad. */
+            struct TriadResult
+            {
+                /** Median bandwidth in bytes per second. */
+                double bandwidth;
+
+                /** Threads of the parallel regions. */
+                std::size_t threads;
+            };
+
+            /**
+             * Measure the memory bandwidth of the CPU with the STREAM triad, a = b + s c, on a
+             * given number of threads.
+             *
+             * Each thread first touches the parts of the arrays it later updates. The bytes of a
+             * pass are those of the three arrays, as STREAM counts them, so the read a store
+             * makes before it writes is left out.
+             *
+             * @param bytes Size of each array, rounded down to a double.
+             * @param repeats Timed passes after one untimed, at least one.
+             * @param threads Threads of the parallel regions, 0 for the OpenMP default.
+             * @return The median bandwidth and the thread count.
+             */
+            TriadResult triad_bandwidth(std::size_t bytes, std::size_t repeats,
+                                        std::size_t threads);
+
+            /**
+             * Measure the triad on 1, 2, 4 and so on up to every thread OpenMP gives a parallel
+             * region, and keep the fastest; on a machine shared with other processes, every
+             * thread can be slower than fewer.
+             *
+             * @param bytes Size of each array, rounded down to a double.
+             * @param repeats Timed passes per thread count after one untimed, at least one.
+             * @return The best median bandwidth and its thread count.
+             */
+            TriadResult best_triad_bandwidth(std::size_t bytes, std::size_t repeats);
         }
     }
 }

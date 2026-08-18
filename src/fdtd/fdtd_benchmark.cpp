@@ -28,6 +28,14 @@
 #include "fdtd/TMz/fdtd_tmz_waveform.h"
 #include "fdtd/fdtd_float.h"
 
+// The machine's peaks: the CPU triad and the GPU's queries and copy.
+#if FDTD_WITH_OPENMP
+#include "fdtd/TMz/backends/fdtd_tmz_backend_omp.h"
+#endif
+#if FDTD_WITH_CUDA
+#include "fdtd/TMz/backends/gpu/fdtd_tmz_backend_gpu_device.h"
+#endif
+
 // Standard library for timing, sorting, string building, files and errors.
 #include <algorithm>
 #include <chrono>
@@ -35,6 +43,7 @@
 #include <iomanip>
 #include <sstream>
 #include <stdexcept>
+#include <utility>
 
 // Namespace for the fdtd library.
 namespace fdtd
@@ -47,6 +56,52 @@ namespace fdtd
 
         // Precision of this build as the CSV names it.
         constexpr std::string_view PRECISION = FDTD_DOUBLE ? "double" : "float";
+
+        // Bytes of each array the peak measurements move.
+        constexpr std::size_t PEAK_BYTES = std::size_t(1) << 27;
+
+        // Timed runs of each peak measurement.
+        constexpr std::size_t PEAK_REPEATS = 10;
+
+        // Write one '# key: value unit' line, the value with the given decimals.
+        void peak_line(std::ostream &out, std::string_view key, double value, int decimals,
+                       std::string_view unit)
+        {
+            std::ostringstream line;
+            line << "# ";
+            line << key;
+            line << ": ";
+            line << std::fixed;
+            line << std::setprecision(decimals);
+            line << value;
+            if (!unit.empty()) {
+                line << ' ';
+                line << unit;
+            }
+            line << '\n';
+            out << line.str();
+        }
+
+#if FDTD_WITH_CUDA
+
+        // FP32 and FP64 lanes per multiprocessor of a compute capability, zero when not known.
+        std::pair<int, int> lanes_per_sm(int major, int minor)
+        {
+            if (major == 6) {
+                return minor == 0 ? std::pair{64, 32} : std::pair{128, 4};
+            }
+            if (major == 7) {
+                return minor == 5 ? std::pair{64, 2} : std::pair{64, 32};
+            }
+            if (major == 8) {
+                return minor == 0 ? std::pair{64, 32} : std::pair{128, 2};
+            }
+            if (major == 9) {
+                return {128, 64};
+            }
+            return {0, 0};
+        }
+#endif
 
         // Add a backend to the list unless it is there already.
         void add_backend(std::vector<TMz::BackendType> &backends, TMz::BackendType type)
@@ -184,6 +239,7 @@ namespace fdtd
                 checksum += static_cast<double>(value);
             }
             const double seconds = std::chrono::duration<double>(stop - start).count();
+            const TMz::StepTraffic traffic = sim.step_traffic();
             return {
                 .backend = backend,
                 .variant = variant_name(backend, simOptions),
@@ -194,6 +250,8 @@ namespace fdtd
                 .repeat = repeat,
                 .seconds = seconds,
                 .checksum = checksum,
+                .bytes_per_step = traffic.bytes,
+                .flops_per_step = traffic.flops,
             };
         }
 
@@ -283,8 +341,8 @@ namespace fdtd
     // Split the arguments, then set the flags and apply each option with its value.
     BenchmarkOptions parse_benchmark_options(std::span<const std::string_view> args)
     {
-        static constexpr std::string_view FLAGS[] = {"-h",        "--help",        "-v",
-                                                     "--version", "--header-only", "--no-header"};
+        static constexpr std::string_view FLAGS[] = {
+            "-h", "--help", "-v", "--version", "--header-only", "--no-header", "--peaks"};
         BenchmarkOptions options;
         for (const Argument &arg : split_arguments(args, FLAGS)) {
             if (arg.name == "-h" || arg.name == "--help") {
@@ -295,6 +353,8 @@ namespace fdtd
                 options.header_only = true;
             } else if (arg.name == "--no-header") {
                 options.no_header = true;
+            } else if (arg.name == "--peaks") {
+                options.peaks = true;
             } else {
                 apply(options, arg.name, arg.value);
             }
@@ -337,6 +397,8 @@ namespace fdtd
         usage << "  --output FILE         Write the CSV to FILE (default: standard output)\n";
         usage << "  --header-only         Write only the CSV header and exit\n";
         usage << "  --no-header           Leave the CSV header out\n";
+        usage << "  --peaks               Write the machine's peak bandwidth and flops as\n";
+        usage << "                        '# key: value' lines and exit\n";
         usage << "  -h, --help            Show this message and exit\n";
         usage << "  -v, --version         Show the version and exit\n";
         usage << "\n";
@@ -350,7 +412,8 @@ namespace fdtd
     // List the columns.
     std::string benchmark_csv_header()
     {
-        return "backend,variant,precision,threads,nx,ny,nsteps,repeat,seconds,checksum";
+        return "backend,variant,precision,threads,nx,ny,nsteps,repeat,seconds,checksum,"
+               "bytes_per_step,flops_per_step";
     }
 
     // Format the columns in header order.
@@ -380,7 +443,46 @@ namespace fdtd
         row << std::defaultfloat;
         row << std::setprecision(17);
         row << sample.checksum;
+        row << ',';
+        row << std::fixed;
+        row << std::setprecision(0);
+        row << sample.bytes_per_step;
+        row << ',';
+        row << sample.flops_per_step;
         return row.str();
+    }
+
+    // Query and measure the GPU, then measure the CPU, each where it is built in.
+    void write_benchmark_peaks(std::ostream &out)
+    {
+#if FDTD_WITH_CUDA
+        if (TMz::is_backend_available(TMz::BackendType::Cuda)) {
+            namespace gpu = TMz::backends::gpu;
+            const gpu::DeviceInfo info = gpu::device_info();
+            const auto [fp32, fp64] = lanes_per_sm(info.major, info.minor);
+            const double sms = static_cast<double>(info.sms);
+            const double bandwidth = 2 * info.memory_clock * static_cast<double>(info.bus_bits) / 8;
+            peak_line(out, "gpu_sm_count", sms, 0, "");
+            peak_line(out, "gpu_clock", info.clock / 1e6, 0, "MHz");
+            peak_line(out, "gpu_l2_cache", static_cast<double>(info.l2_bytes) / (1 << 20), 1,
+                      "MiB");
+            peak_line(out, "gpu_peak_bandwidth", bandwidth / 1e9, 1, "GB/s");
+            const double copy = gpu::copy_bandwidth(2 * PEAK_BYTES, PEAK_REPEATS);
+            peak_line(out, "gpu_copy_bandwidth", copy / 1e9, 1, "GB/s");
+            if (fp32 > 0) {
+                peak_line(out, "gpu_peak_flops_float", 2 * fp32 * sms * info.clock / 1e9, 0,
+                          "GFLOPS");
+                peak_line(out, "gpu_peak_flops_double", 2 * fp64 * sms * info.clock / 1e9, 0,
+                          "GFLOPS");
+            }
+        }
+#endif
+#if FDTD_WITH_OPENMP
+        const auto best = TMz::backends::best_triad_bandwidth(PEAK_BYTES, PEAK_REPEATS);
+        peak_line(out, "cpu_triad_bandwidth", best.bandwidth / 1e9, 1, "GB/s");
+        peak_line(out, "cpu_triad_threads", static_cast<double>(best.threads), 0, "");
+#endif
+        out << std::flush;
     }
 
     // Resolve the defaults, then measure each configuration and write its rows.
@@ -410,6 +512,10 @@ namespace fdtd
             }
         }
         std::ostream &csv = options.output.empty() ? out : file;
+        if (options.peaks) {
+            write_benchmark_peaks(csv);
+            return {};
+        }
         if (!options.no_header || options.header_only) {
             csv << benchmark_csv_header();
             csv << '\n';

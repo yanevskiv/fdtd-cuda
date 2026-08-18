@@ -330,6 +330,12 @@ namespace fdtd::TMz
         m_backend->download(m_fields);
     }
 
+    // Ask the backend for its model.
+    StepTraffic Simulation::step_traffic() const noexcept
+    {
+        return m_backend->step_traffic();
+    }
+
     // Create a backend with the default settings.
     std::unique_ptr<Backend> make_backend(BackendType type, const Grid &grid)
     {

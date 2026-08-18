@@ -69,7 +69,8 @@ set_tests_properties("fdtd program help" "fdtd program rejects bad options" "fdt
     PROPERTIES LABELS "unit;driver")
 
 # The benchmark program end to end: a short run whose output has the CSV header and a row.
-set(bench_header "backend,variant,precision,threads,nx,ny,nsteps,repeat,seconds,checksum")
+set(bench_header
+    "backend,variant,precision,threads,nx,ny,nsteps,repeat,seconds,checksum,bytes_per_step,flops_per_step")
 add_test(NAME "benchmark program smoke"
     COMMAND benchmark --nx 64 --steps 10 --repeat 2 --warmup 0)
 set_tests_properties("benchmark program smoke" PROPERTIES

@@ -50,6 +50,52 @@ namespace fdtd
                  * @throws CudaError When the query fails.
                  */
                 std::size_t max_threads_per_block();
+
+                /** What the current device reports of its size, clocks and memory. */
+                struct DeviceInfo
+                {
+                    /** Multiprocessors. */
+                    std::size_t sms;
+
+                    /** Peak clock of the multiprocessors in hertz. */
+                    double clock;
+
+                    /** Peak clock of the memory in hertz. */
+                    double memory_clock;
+
+                    /** Width of the memory bus in bits. */
+                    std::size_t bus_bits;
+
+                    /** Size of the L2 cache in bytes. */
+                    std::size_t l2_bytes;
+
+                    /** Major number of the compute capability. */
+                    int major;
+
+                    /** Minor number of the compute capability. */
+                    int minor;
+                };
+
+                /**
+                 * Size, clocks and memory of the current device.
+                 *
+                 * @return The device's report.
+                 * @throws CudaError When a query fails.
+                 */
+                DeviceInfo device_info();
+
+                /**
+                 * Measure the memory bandwidth of the current device with a copy kernel.
+                 *
+                 * Copies a buffer to another, each of the given size, and counts the bytes read
+                 * and written.
+                 *
+                 * @param bytes Size of each buffer, rounded down to 16 bytes.
+                 * @param repeats Timed copies after one untimed, at least one.
+                 * @return The median bandwidth in bytes per second.
+                 * @throws CudaError When the device cannot hold the buffers or a call fails.
+                 */
+                double copy_bandwidth(std::size_t bytes, std::size_t repeats);
             }
         }
     }

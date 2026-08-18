@@ -31,14 +31,29 @@ MARKERS = ["o", "s", "^", "D", "v", "P", "X", "*"]
 LEGEND_INSIDE = 8
 
 
-def label_of(path, stamp):
-    """Return the label a run's CSV gives in its '# label:' line, or the run's timestamp."""
+def load_info(path):
+    """Read the '# key: value' lines of a run's CSV as a dict."""
+    info = {}
+
     with open(path, encoding="utf-8") as f:
         for line in f:
-            if line.startswith("# label:"):
-                return line.partition(":")[2].strip()
+            if line.startswith("#"):
+                key, _, value = line[1:].partition(":")
+                info[key.strip()] = value.strip()
 
-    return stamp
+    return info
+
+
+def peak(infos, key):
+    """Return the number a peak line of the first run that has it starts with, or None."""
+    for info in infos:
+        if key in info:
+            try:
+                return float(info[key].split()[0])
+            except (IndexError, ValueError):
+                return None
+
+    return None
 
 
 def load(runs):
@@ -352,6 +367,127 @@ def plot_weak(args, data, values):
     save(fig, args, "weak_efficiency")
 
 
+def largest_threads(data, selected):
+    """Return the samples of each variant at its largest thread count, among those selected."""
+    mask = np.zeros(len(data), dtype=bool)
+
+    for variant in np.unique(data["variant"][selected]):
+        same = selected & (data["variant"] == variant)
+        mask |= same & (data["threads"] == np.max(data["threads"][same]))
+
+    return mask
+
+
+def plot_bandwidth(args, data, infos):
+    """Plot the achieved memory bandwidth against grid size, one curve per backend and variant.
+
+    The bandwidth is the modelled bytes of a step over the time of a step. Each variant is drawn
+    at its largest thread count, under the peaks the runs measured: the GPU's copy kernel and
+    the CPU's STREAM triad, and the GPU's peak from its memory clock and bus.
+    """
+    values = data["bytes_per_step"] * data["nsteps"] / data["seconds"] / 1e9
+    fig, ax = plt.subplots(figsize=(8, 5))
+
+    i = 0
+    for backend in np.unique(data["backend"]):
+        selected = largest_threads(data, data["backend"] == backend)
+        for variant in np.unique(data["variant"][selected]):
+            mask = selected & (data["variant"] == variant)
+            p = data["threads"][mask][0]
+
+            label = f"{backend} {variant}"
+            if backend == "openmp":
+                label += f", p={p}"
+
+            draw(ax, data[mask], values[mask], "nx", i, label)
+            i += 1
+
+    lines = [
+        ("gpu_peak_bandwidth", "GPU peak", ":"),
+        ("gpu_copy_bandwidth", "GPU copy", "--"),
+        ("cpu_triad_bandwidth", "CPU triad", "-."),
+    ]
+    for key, label, style in lines:
+        value = peak(infos, key)
+        if value is not None:
+            ax.axhline(
+                value,
+                color="k",
+                linestyle=style,
+                linewidth=1.3,
+                label=f"{label} {value:g} GB/s",
+            )
+
+    sizes = np.unique(data["nx"])
+    ax.set_xscale("log")
+    ax.set_xticks(sizes)
+    ax.set_xticklabels([str(size) for size in sizes])
+    ax.minorticks_off()
+    log_y(ax)
+
+    setup(ax, "Grid size nx = ny", "Bandwidth (GB/s)", "Achieved memory bandwidth versus grid size")
+    legend(ax)
+
+    save(fig, args, "bandwidth")
+
+
+def plot_roofline(args, data, infos):
+    """Plot each backend and variant at its largest grid on the roofline of the machine.
+
+    A point sits at its arithmetic intensity, the modelled flops over the modelled bytes of a
+    step, and at the flops it achieved. The roofs are the measured bandwidths, the GPU's copy
+    and the CPU's triad, capped for the GPU by its peak flops in each precision of the runs; the
+    CPU has no compute roof, since nothing on the machine reports its peak.
+    """
+    performance = data["flops_per_step"] * data["nsteps"] / data["seconds"] / 1e9
+    fig, ax = plt.subplots(figsize=(8, 5))
+
+    i = 0
+    for backend in np.unique(data["backend"]):
+        selected = data["backend"] == backend
+        selected &= data["nx"] == np.max(data["nx"][selected])
+        selected = largest_threads(data, selected)
+        for variant in np.unique(data["variant"][selected]):
+            mask = selected & (data["variant"] == variant)
+            intensity = data["flops_per_step"][mask][0] / data["bytes_per_step"][mask][0]
+
+            label = f"{backend} {variant}, nx={data['nx'][mask][0]}"
+            ax.plot(
+                intensity,
+                np.median(performance[mask]),
+                marker=MARKERS[i % len(MARKERS)],
+                linestyle="none",
+                markersize=8,
+                label=label,
+            )
+            i += 1
+
+    x = np.logspace(-2, 2, 200)
+    copy = peak(infos, "gpu_copy_bandwidth")
+    if copy is not None:
+        for precision in np.unique(data["precision"]):
+            flops = peak(infos, f"gpu_peak_flops_{precision}")
+            roof = copy * x if flops is None else np.minimum(copy * x, flops)
+            ax.plot(x, roof, "k-", linewidth=1.3, label=f"GPU roof, {precision}")
+
+    triad = peak(infos, "cpu_triad_bandwidth")
+    if triad is not None:
+        ax.plot(x, triad * x, "k--", linewidth=1.3, label="CPU triad roof")
+
+    ax.set_xscale("log")
+    ax.set_yscale("log")
+    setup(
+        ax,
+        "Arithmetic intensity (flop/byte)",
+        "Performance (GFLOPS)",
+        "Roofline at the largest grid size",
+    )
+    ax.grid(which="major", alpha=0.3)
+    legend(ax)
+
+    save(fig, args, "roofline")
+
+
 def remove(args, name):
     """Remove a figure an earlier run of this script left in the report directory."""
     path = os.path.join(args.output_dir, f"{name}_{args.stamp}.png")
@@ -381,11 +517,14 @@ def main():
 
     runs = []
     weak_runs = []
+    infos = []
     for directory in args.dirs:
         run = os.path.basename(os.path.normpath(directory))
         path = os.path.join(directory, f"benchmark_{run}.csv")
-        label = label_of(path, run)
+        info = load_info(path)
+        label = info.get("label", run)
         runs.append((path, label))
+        infos.append(info)
 
         weak = os.path.join(directory, f"benchmark_weak_{run}.csv")
         if os.path.exists(weak):
@@ -395,6 +534,15 @@ def main():
     throughput, speedup, efficiency = calculate(data)
 
     plot_by_size(args, data, throughput)
+
+    if "bytes_per_step" in data.dtype.names and not np.all(np.isnan(data["bytes_per_step"])):
+        modelled = ~np.isnan(data["bytes_per_step"])
+        plot_bandwidth(args, data[modelled], infos)
+        plot_roofline(args, data[modelled], infos)
+    else:
+        remove(args, "bandwidth")
+        remove(args, "roofline")
+        print("==> No modelled traffic in the runs: no bandwidth or roofline plots")
 
     if weak_runs:
         weak_data = load(weak_runs)

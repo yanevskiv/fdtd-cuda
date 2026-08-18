@@ -31,6 +31,8 @@ CONFIG = ["backend", "variant", "precision", "threads", "nx", "ny", "nsteps", "l
 FIGURES = [
     ("throughput", "Throughput versus grid size"),
     ("speedup_size", "Speedup over serial versus grid size"),
+    ("bandwidth", "Achieved memory bandwidth versus grid size"),
+    ("roofline", "Roofline at the largest grid size"),
     ("speedup", "Speedup versus number of threads"),
     ("efficiency", "Efficiency versus number of threads"),
     ("weak_efficiency", "Weak scaling efficiency versus number of threads"),
@@ -260,6 +262,70 @@ def results_table(data):
     return text + table(titles, align, rows)
 
 
+def peak(infos, key):
+    """Return the number a peak line of the first run that has it starts with, or None."""
+    for info in infos:
+        if key in info:
+            try:
+                return float(info[key].split()[0])
+            except (IndexError, ValueError):
+                return None
+
+    return None
+
+
+def bandwidth_table(data, infos):
+    """
+    Return the achieved bandwidth and flops of each configuration at its backend's largest grid,
+    and the bandwidth as a percent of the peak the runs measured, as a table.
+
+    The peak of the CUDA backend is the GPU's copy kernel and that of the others the CPU's
+    STREAM triad.
+    """
+    if "bytes_per_step" not in data.dtype.names or np.all(np.isnan(data["bytes_per_step"])):
+        return "The runs hold no modelled traffic."
+
+    peaks = {
+        "cuda": peak(infos, "gpu_copy_bandwidth"),
+        "openmp": peak(infos, "cpu_triad_bandwidth"),
+        "serial": peak(infos, "cpu_triad_bandwidth"),
+    }
+
+    rows = []
+    for config in np.unique(data[CONFIG]):
+        backend = config["backend"]
+        same = data["backend"] == backend
+        if config["nx"] != np.max(data["nx"][same]):
+            continue
+
+        samples = data[data[CONFIG] == config]
+        median = np.median(samples["seconds"])
+        steps = config["nsteps"] / median
+        bandwidth = samples["bytes_per_step"][0] * steps / 1e9
+        flops = samples["flops_per_step"][0] * steps / 1e9
+
+        fraction = "unknown"
+        if peaks.get(backend) is not None:
+            fraction = f"{100 * bandwidth / peaks[backend]:.1f}"
+
+        rows.append([
+            backend,
+            config["variant"],
+            config["threads"],
+            f"{config['nx']} x {config['ny']}",
+            f"{samples['bytes_per_step'][0] / (config['nx'] * config['ny']):.1f}",
+            f"{bandwidth:.1f}",
+            f"{flops:.1f}",
+            fraction,
+        ])
+
+    return table(
+        ["Backend", "Variant", "Threads", "Grid", "Bytes/cell", "GB/s", "GFLOPS", "Of peak (%)"],
+        "llrrrrrr",
+        rows,
+    )
+
+
 def figure_list(report, stamp):
     """Return the Markdown of the figures plot_benchmark.py drew into REPORT/images."""
     lines = []
@@ -445,6 +511,7 @@ def benchmark_section(benches, report, stamp):
     if weak_runs:
         weak = results_table(load_samples(weak_runs))
 
+    infos = [bench["info"] for bench in benches]
     names = [f"`{bench['stamp']}`" for bench in benches]
     if len(names) == 1:
         intro = f"The run {names[0]} holds"
@@ -457,6 +524,7 @@ def benchmark_section(benches, report, stamp):
         samples=len(data),
         configurations=len(np.unique(data[CONFIG])),
         results=results_table(data),
+        bandwidth=bandwidth_table(data, infos),
         weak=weak,
         figures=figure_list(report, stamp),
     )

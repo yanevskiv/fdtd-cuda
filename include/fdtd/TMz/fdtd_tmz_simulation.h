@@ -357,6 +357,13 @@ namespace fdtd
             /** Copy the fields from the backend into the host copy. */
             void download();
 
+            /**
+             * Modelled memory traffic and arithmetic of one time step on the backend.
+             *
+             * @return The backend's step_traffic().
+             */
+            StepTraffic step_traffic() const noexcept;
+
         private:
             /**
              * Sample the sources and step the backend.

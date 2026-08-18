@@ -35,6 +35,9 @@ BENCH_SIZES="128 256 512 1024 2048"
 # samples in a row
 BENCH_ORDER="interleaved"
 
+# Outer boundary of the workload: pml, the default, or pec or pmc with no PML
+BENCH_BOUNDARY="pml"
+
 # Label of the run, written into its CSV; the report tells apart by label the runs that share a
 # configuration, such as runs under different OMP_* settings; empty for none
 BENCH_LABEL=""

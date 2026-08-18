@@ -86,6 +86,9 @@ namespace fdtd
         /** Whether to leave the CSV header out. */
         bool no_header = false;
 
+        /** Whether to write only the measured and reported peaks of the machine and stop. */
+        bool peaks = false;
+
         /** Whether to print the usage and stop. */
         bool help = false;
 
@@ -122,6 +125,12 @@ namespace fdtd
 
         /** Sum of Ez over the grid after the run, accumulated in double. */
         double checksum;
+
+        /** Modelled bytes moved to and from memory per step (see TMz::StepTraffic). */
+        double bytes_per_step;
+
+        /** Modelled floating-point operations per step. */
+        double flops_per_step;
     };
 
     /**
@@ -160,6 +169,21 @@ namespace fdtd
      * @return The row, with no newline.
      */
     std::string format_benchmark_row(const BenchmarkSample &sample);
+
+    /**
+     * Write the peaks of the machine as '# key: value' lines, for the roofline of a report.
+     *
+     * With CUDA available: the device's multiprocessors, clock and L2 size; its peak memory
+     * bandwidth and peak float and double flops from those; and the bandwidth a copy kernel
+     * measures over two 256 MiB buffers. With OpenMP: the best bandwidth of the STREAM triad over
+     * three 128 MiB arrays on 1, 2, 4 and so on up to every thread, and the thread count of it;
+     * on a machine shared with other processes, every thread can be slower than fewer. Each
+     * measurement is the median of 10 runs.
+     *
+     * @param out Stream for the lines.
+     * @throws CudaError When a CUDA call fails.
+     */
+    void write_benchmark_peaks(std::ostream &out);
 
     /**
      * Measure the workload in every configuration and write a CSV row per sample.

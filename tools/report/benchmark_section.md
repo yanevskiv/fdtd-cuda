@@ -12,6 +12,17 @@ The checksum is the sum of $$E_z$$ over the grid after the run. Every sample of 
 should give the same checksum, and the backends should agree within the tolerance of the
 precision.
 
+## Bandwidth
+
+$bandwidth
+
+The bandwidth is the modelled traffic of a step over the median time of a step, at each
+backend's largest grid. The model counts every array element a kernel touches as read once and
+written once, with the neighbours of a cell from cache, so it is the traffic the kernels cannot
+avoid; bytes per cell is that traffic over the cells. The peak of the CUDA backend is the copy
+kernel's bandwidth, that of the CPU backends the STREAM triad's, both measured by
+`benchmark --peaks` before the run.
+
 ## Weak scaling
 
 $weak
