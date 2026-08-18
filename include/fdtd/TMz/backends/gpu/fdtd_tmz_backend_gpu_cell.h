@@ -21,8 +21,11 @@
 #define FDTD_TMZ_BACKEND_GPU_CELL_H
 
 #include "fdtd/TMz/fdtd_tmz_boundary.h"
+#include "fdtd/TMz/fdtd_tmz_coeff_table.h"
 #include "fdtd/TMz/fdtd_tmz_component.h"
 #include "fdtd/fdtd_float.h"
+
+#include <cstdint>
 
 #ifdef __CUDACC__
 
@@ -90,7 +93,24 @@ namespace fdtd
                     int pml;
                 };
 
-                /** The eight coefficient arrays an update reads, laid out as the fields. */
+                /** Where the updates read a cell's coefficients. */
+                enum class CoeffSource {
+                    /** The eight arrays. */
+                    Arrays,
+
+                    /** One tuple for every core cell, as is_core_cell() finds them; the arrays
+                     * for the others. */
+                    Uniform,
+
+                    /** The table entry of the cell's index, or the arrays for CoeffTable::ARRAYS.
+                     */
+                    Indexed
+                };
+
+                /**
+                 * The coefficients an update reads: eight arrays laid out as the fields, and the
+                 * table that stands in for them outside the PML when the source says so.
+                 */
                 struct DeviceCoeffs
                 {
                     /** Ez decay factors along x. */
@@ -116,6 +136,18 @@ namespace fdtd
 
                     /** Hy curl factors. */
                     const FloatType *coeff_hy_2;
+
+                    /** Where the updates read a cell's coefficients. */
+                    CoeffSource source = CoeffSource::Arrays;
+
+                    /** Tuple of every core cell, under CoeffSource::Uniform. */
+                    CoeffTuple uniform = {};
+
+                    /** Table entries, under CoeffSource::Indexed. */
+                    const CoeffTuple *table = nullptr;
+
+                    /** Entry of each cell, laid out as the fields, under CoeffSource::Indexed. */
+                    const std::uint8_t *index = nullptr;
                 };
 
                 /** A cell of one component that a source adds to or a probe reads, on the device.
@@ -169,6 +201,16 @@ namespace fdtd
                     return array[k];
 #endif
                 }
+
+                /** The table's tuple of a cell, when it has one. */
+                struct CellTuple
+                {
+                    /** Whether the cell reads the tuple rather than the arrays. */
+                    bool found;
+
+                    /** The tuple, when found. */
+                    CoeffTuple tuple;
+                };
 
                 /** A cell of the grid by column and row. */
                 struct CellIndex
@@ -306,6 +348,54 @@ namespace fdtd
                 }
 
                 /**
+                 * Whether a cell lies in the core of the interior: the interior less its last
+                 * column and row, where Hy and Hx sit half a cell into the PML (see
+                 * CoeffTable::uniform_entry()).
+                 *
+                 * @param fields Fields and grid.
+                 * @param i Column of the cell.
+                 * @param j Row of the cell.
+                 * @return True for max(pml, 1) <= i < nx - max(pml, 1) - 1, and the same along j.
+                 */
+                FDTD_HOST_DEVICE inline bool is_core_cell(const DeviceFields &fields, int i,
+                                                          int j) noexcept
+                {
+                    const int lo = interior_lo(fields);
+                    return i >= lo && i < fields.nx - lo - 1 && j >= lo && j < fields.ny - lo - 1;
+                }
+
+                /**
+                 * The table's tuple of a cell, under the source of the coefficients.
+                 *
+                 * @param fields Fields and grid.
+                 * @param coeffs Coefficients and their source.
+                 * @param k Index of the cell, j * pitch + i.
+                 * @param i Column of the cell.
+                 * @param j Row of the cell.
+                 * @return The tuple, or not found when the cell reads the arrays.
+                 */
+                FDTD_HOST_DEVICE inline CellTuple cell_tuple(const DeviceFields &fields,
+                                                             const DeviceCoeffs &coeffs, int k,
+                                                             int i, int j) noexcept
+                {
+                    if (coeffs.source == CoeffSource::Uniform) {
+                        if (is_core_cell(fields, i, j)) {
+                            return {true, coeffs.uniform};
+                        }
+                    } else if (coeffs.source == CoeffSource::Indexed) {
+#ifdef __CUDA_ARCH__
+                        const std::uint8_t entry = __ldg(coeffs.index + k);
+#else
+                        const std::uint8_t entry = coeffs.index[k];
+#endif
+                        if (entry != CoeffTable::ARRAYS) {
+                            return {true, coeffs.table[entry]};
+                        }
+                    }
+                    return {false, {}};
+                }
+
+                /**
                  * Advance Hx and Hy of one cell by one step, as the CPU's update_h_block().
                  *
                  * Hx is updated below the last row and Hy left of the last column; the others lie
@@ -321,18 +411,26 @@ namespace fdtd
                                                            int j) noexcept
                 {
                     const int k = j * fields.pitch + i;
+                    const CellTuple table = cell_tuple(fields, coeffs, k, i, j);
                     const FloatType *Ez = fields.ez;
                     if (j < fields.ny - 1) {
                         FloatType *Hx = fields.hx;
-                        Hx[k] = read_only(coeffs.coeff_hx_1, k) * Hx[k] -
-                                read_only(coeffs.coeff_hx_2, k) * fields.inv_dy *
-                                    (read_only(Ez, k + fields.pitch) - read_only(Ez, k));
+                        const FloatType c1 =
+                            table.found ? table.tuple.hx_1 : read_only(coeffs.coeff_hx_1, k);
+                        const FloatType c2 =
+                            table.found ? table.tuple.hx_2 : read_only(coeffs.coeff_hx_2, k);
+                        Hx[k] =
+                            c1 * Hx[k] - c2 * fields.inv_dy *
+                                             (read_only(Ez, k + fields.pitch) - read_only(Ez, k));
                     }
                     if (i < fields.nx - 1) {
                         FloatType *Hy = fields.hy;
-                        Hy[k] = read_only(coeffs.coeff_hy_1, k) * Hy[k] +
-                                read_only(coeffs.coeff_hy_2, k) * fields.inv_dx *
-                                    (read_only(Ez, k + 1) - read_only(Ez, k));
+                        const FloatType c1 =
+                            table.found ? table.tuple.hy_1 : read_only(coeffs.coeff_hy_1, k);
+                        const FloatType c2 =
+                            table.found ? table.tuple.hy_2 : read_only(coeffs.coeff_hy_2, k);
+                        Hy[k] = c1 * Hy[k] +
+                                c2 * fields.inv_dx * (read_only(Ez, k + 1) - read_only(Ez, k));
                     }
                 }
 
@@ -356,8 +454,12 @@ namespace fdtd
                     const FloatType curl =
                         (read_only(Hy, k) - read_only(Hy, k - 1)) * fields.inv_dx -
                         (read_only(Hx, k) - read_only(Hx, k - fields.pitch)) * fields.inv_dy;
-                    Ez[k] = read_only(coeffs.coeff_ez_x1, k) * Ez[k] +
-                            read_only(coeffs.coeff_ez_x2, k) * curl;
+                    const CellTuple table = cell_tuple(fields, coeffs, k, i, j);
+                    const FloatType c1 =
+                        table.found ? table.tuple.ez_1 : read_only(coeffs.coeff_ez_x1, k);
+                    const FloatType c2 =
+                        table.found ? table.tuple.ez_2 : read_only(coeffs.coeff_ez_x2, k);
+                    Ez[k] = c1 * Ez[k] + c2 * curl;
                 }
 
                 /**
@@ -378,12 +480,19 @@ namespace fdtd
                     const FloatType *Hy = fields.hy;
                     FloatType *Ezx = fields.ezx;
                     FloatType *Ezy = fields.ezy;
-                    Ezx[k] = read_only(coeffs.coeff_ez_x1, k) * Ezx[k] +
-                             read_only(coeffs.coeff_ez_x2, k) * fields.inv_dx *
-                                 (read_only(Hy, k) - read_only(Hy, k - 1));
-                    Ezy[k] = read_only(coeffs.coeff_ez_y1, k) * Ezy[k] -
-                             read_only(coeffs.coeff_ez_y2, k) * fields.inv_dy *
-                                 (read_only(Hx, k) - read_only(Hx, k - fields.pitch));
+                    const CellTuple table = cell_tuple(fields, coeffs, k, i, j);
+                    const FloatType x1 =
+                        table.found ? table.tuple.ez_1 : read_only(coeffs.coeff_ez_x1, k);
+                    const FloatType x2 =
+                        table.found ? table.tuple.ez_2 : read_only(coeffs.coeff_ez_x2, k);
+                    const FloatType y1 =
+                        table.found ? table.tuple.ez_1 : read_only(coeffs.coeff_ez_y1, k);
+                    const FloatType y2 =
+                        table.found ? table.tuple.ez_2 : read_only(coeffs.coeff_ez_y2, k);
+                    Ezx[k] = x1 * Ezx[k] +
+                             x2 * fields.inv_dx * (read_only(Hy, k) - read_only(Hy, k - 1));
+                    Ezy[k] = y1 * Ezy[k] - y2 * fields.inv_dy *
+                                               (read_only(Hx, k) - read_only(Hx, k - fields.pitch));
                     fields.ez[k] = Ezx[k] + Ezy[k];
                 }
 
@@ -421,8 +530,12 @@ namespace fdtd
                         j > 0 ? read_only(Hx, k - fields.pitch) : FloatType(0);
                     const FloatType curl =
                         (hyRight - hyLeft) * fields.inv_dx - (hxTop - hxBottom) * fields.inv_dy;
-                    Ez[k] = read_only(coeffs.coeff_ez_x1, k) * Ez[k] +
-                            read_only(coeffs.coeff_ez_x2, k) * curl;
+                    const CellTuple table = cell_tuple(fields, coeffs, k, i, j);
+                    const FloatType c1 =
+                        table.found ? table.tuple.ez_1 : read_only(coeffs.coeff_ez_x1, k);
+                    const FloatType c2 =
+                        table.found ? table.tuple.ez_2 : read_only(coeffs.coeff_ez_x2, k);
+                    Ez[k] = c1 * Ez[k] + c2 * curl;
                 }
 
                 /**

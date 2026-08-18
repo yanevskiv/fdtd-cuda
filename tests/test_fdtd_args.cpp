@@ -208,8 +208,14 @@ TEST_CASE("CUDA variant names round-trip", "[unit][args]")
     const Simulation::Options graph = cuda_variant("fused+graph");
     CHECK(graph.cuda_graph);
     CHECK(fdtd::cuda_variant_name(graph) == "fused:32x8+graph");
+    CHECK(graph.cuda_coeffs == fdtd::TMz::CudaCoeffs::Arrays);
+    const Simulation::Options both = cuda_variant("split+graph+table");
+    CHECK(both.cuda_coeffs == fdtd::TMz::CudaCoeffs::Table);
+    CHECK(both.cuda_graph);
+    CHECK(fdtd::cuda_variant_name(both) == "split:32x8+table+graph");
     for (const std::string name :
-         {"fused:32x8", "fused:1x1", "split:128x1", "split:7x5", "split:16x16+graph"}) {
+         {"fused:32x8", "fused:1x1", "split:128x1", "split:7x5", "split:16x16+graph",
+          "fused:32x8+table", "fused:64x4+table+graph"}) {
         CAPTURE(name);
         CHECK(fdtd::cuda_variant_name(cuda_variant(name)) == name);
     }
@@ -222,15 +228,33 @@ TEST_CASE("CUDA variant names reject malformed text", "[unit][args]")
     options.omp_schedule = OmpSchedule::Tasks;
     options.cuda_block_x = 7;
     options.cuda_graph = true;
+    options.cuda_coeffs = fdtd::TMz::CudaCoeffs::Table;
     fdtd::parse_cuda_variant_arg("--variant", "split", options);
+    CHECK(options.cuda_coeffs == fdtd::TMz::CudaCoeffs::Arrays);
     CHECK(options.omp_schedule == OmpSchedule::Tasks);
     CHECK(options.cuda_block_x == 32);
     CHECK_FALSE(options.cuda_graph);
 
-    for (const char *name :
-         {"", "Fused", "fast", "rows", "fused:", "fused:32", "fused:0x8", "fused:32x0",
-          "fused:32x8x2", "fused:ax8", "fused+simd", "split:", "default:32x8", "fused+graph+graph",
-          "fused+", "+graph", "fused+graph:32x8", "default+graph"}) {
+    for (const char *name : {"",
+                             "Fused",
+                             "fast",
+                             "rows",
+                             "fused:",
+                             "fused:32",
+                             "fused:0x8",
+                             "fused:32x0",
+                             "fused:32x8x2",
+                             "fused:ax8",
+                             "fused+simd",
+                             "split:",
+                             "default:32x8",
+                             "fused+graph+graph",
+                             "fused+",
+                             "+graph",
+                             "fused+graph:32x8",
+                             "default+graph",
+                             "fused+table+table",
+                             "fused+tables"}) {
         CAPTURE(name);
         Simulation::Options unchanged;
         unchanged.cuda_kernel = CudaKernel::Split;

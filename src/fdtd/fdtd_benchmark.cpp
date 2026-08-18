@@ -388,8 +388,8 @@ namespace fdtd
         usage << "                        (default: all)\n";
         usage << "  --variant V           OpenMP variant SCHEDULE[:WxH][+simd][+phase], SCHEDULE\n";
         usage << "                        rows, collapse2, tiles or tasks; CUDA variant\n";
-        usage << "                        KERNEL[:BXxBY][+graph], KERNEL fused or split; or\n";
-        usage << "                        default.\n";
+        usage << "                        KERNEL[:BXxBY][+table][+graph], KERNEL fused or\n";
+        usage << "                        split; or default.\n";
         usage << "                        Repeatable; a backend runs the names it reads, or\n";
         usage << "                        default (default: default)\n";
         usage << "  --threads N           Thread count, for OpenMP only; repeatable\n";

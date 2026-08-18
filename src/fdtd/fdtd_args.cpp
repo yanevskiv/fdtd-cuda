@@ -349,6 +349,7 @@ namespace fdtd
         parsed.cuda_kernel = defaults.cuda_kernel;
         parsed.cuda_block_x = defaults.cuda_block_x;
         parsed.cuda_block_y = defaults.cuda_block_y;
+        parsed.cuda_coeffs = defaults.cuda_coeffs;
         parsed.cuda_graph = defaults.cuda_graph;
         if (text == "default") {
             options = parsed;
@@ -356,17 +357,21 @@ namespace fdtd
         }
         const std::string_view head = text.substr(0, text.find('+'));
         std::string_view suffixes = text.substr(head.size());
+        bool table = false;
         bool graph = false;
         while (!suffixes.empty()) {
             suffixes.remove_prefix(1);
             const std::string_view suffix = suffixes.substr(0, suffixes.find('+'));
             suffixes.remove_prefix(suffix.size());
-            if (suffix == "graph" && !graph) {
+            if (suffix == "table" && !table) {
+                table = true;
+            } else if (suffix == "graph" && !graph) {
                 graph = true;
             } else {
-                malformed_variant(name, text, "expected +graph, once");
+                malformed_variant(name, text, "expected +table or +graph, each once");
             }
         }
+        parsed.cuda_coeffs = table ? TMz::CudaCoeffs::Table : TMz::CudaCoeffs::Arrays;
         parsed.cuda_graph = graph;
 
         const std::size_t colon = head.find(':');
@@ -395,6 +400,9 @@ namespace fdtd
         name << options.cuda_block_x;
         name << 'x';
         name << options.cuda_block_y;
+        if (options.cuda_coeffs == TMz::CudaCoeffs::Table) {
+            name << "+table";
+        }
         if (options.cuda_graph) {
             name << "+graph";
         }

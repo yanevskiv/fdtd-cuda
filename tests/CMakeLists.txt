@@ -24,6 +24,7 @@ add_executable(fdtd_tests
     test_fdtd_tmz_backend_gpu_cell.cpp
     test_fdtd_tmz_backend_omp.cpp
     test_fdtd_tmz_backend_serial.cpp
+    test_fdtd_tmz_coeff_table.cpp
     test_fdtd_tmz_coeffs.cpp
     test_fdtd_tmz_fields.cpp
     test_fdtd_tmz_grid.cpp

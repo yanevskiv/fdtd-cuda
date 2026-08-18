@@ -211,8 +211,8 @@ namespace fdtd
         usage << "  --variant V           Variant of the backend: for OpenMP\n";
         usage << "                        SCHEDULE[:WxH][+simd][+phase], SCHEDULE rows,\n";
         usage << "                        collapse2, tiles or tasks; for CUDA\n";
-        usage << "                        KERNEL[:BXxBY][+graph], KERNEL fused or split\n";
-        usage << "                        (default: default)\n";
+        usage << "                        KERNEL[:BXxBY][+table][+graph], KERNEL fused or\n";
+        usage << "                        split (default: default)\n";
         usage << "  --output DIR          Directory for the files (default: out)\n";
         usage << "  -h, --help            Show this message and exit\n";
         usage << "  -v, --version         Show the version and exit\n";

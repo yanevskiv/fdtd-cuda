@@ -27,10 +27,15 @@
 // CUDA runtime.
 #include <cuda_runtime.h>
 
+// The table of distinct coefficients.
+#include "fdtd/TMz/fdtd_tmz_coeff_table.h"
+
 // Standard library for partitions, limits, sizes, string building, errors and buffers.
 #include <algorithm>
 #include <cstddef>
+#include <cstdint>
 #include <limits>
+#include <optional>
 #include <span>
 #include <sstream>
 #include <stdexcept>
@@ -217,6 +222,15 @@ namespace fdtd::TMz::backends
         {
             gpu::check(cudaGetLastError(), "kernel launch");
         }
+
+        // Copy of a table entry, or none for a null one.
+        std::optional<CoeffTuple> tuple_of(const CoeffTuple *entry)
+        {
+            if (entry == nullptr) {
+                return std::nullopt;
+            }
+            return *entry;
+        }
     }
 
     // Check the options, allocate the padded arrays and zero them.
@@ -309,9 +323,20 @@ namespace fdtd::TMz::backends
         gpu::upload_rows(m_coeff_hx_2, m_pitch, coeffs.coeff_hx_2(), host, nx, ny, m_stream);
         gpu::upload_rows(m_coeff_hy_1, m_pitch, coeffs.coeff_hy_1(), host, nx, ny, m_stream);
         gpu::upload_rows(m_coeff_hy_2, m_pitch, coeffs.coeff_hy_2(), host, nx, ny, m_stream);
+        if (m_options.cuda_coeffs == CudaCoeffs::Table) {
+            const CoeffTable table(coeffs);
+            reserve(m_table_entries, std::max<std::size_t>(table.entries().size(), 1));
+            gpu::upload(m_table_entries, table.entries(), m_stream);
+            reserve(m_table_index, m_pitch * ny);
+            gpu::upload_rows(m_table_index, m_pitch, table.index(), host, nx, ny, m_stream);
+            m_uniform_pml =
+                tuple_of(table.uniform_entry(std::max<std::size_t>(coeffs.pml_thickness(), 1)));
+            m_uniform_plain = tuple_of(table.uniform_entry(1));
+        }
         m_stream.synchronize();
         m_pml_thickness = coeffs.pml_thickness();
         m_has_coeffs = true;
+        m_graph = gpu::Graph();
     }
 
     // Store the boundary condition.
@@ -347,8 +372,19 @@ namespace fdtd::TMz::backends
     // Model the kernels: Fused and Split both make an H pass and an E pass over the arrays.
     StepTraffic CudaBackend::step_traffic() const noexcept
     {
+        TrafficModel model;
+        if (m_options.cuda_coeffs == CudaCoeffs::Table) {
+            model.table = true;
+            model.index = !uniform_tuple().has_value();
+        }
         return two_pass_traffic(m_grid, m_boundary == Boundary::Pml ? m_pml_thickness : 0,
-                                m_boundary);
+                                m_boundary, model);
+    }
+
+    // Pick the interior's tuple for the boundary in force.
+    const std::optional<CoeffTuple> &CudaBackend::uniform_tuple() const noexcept
+    {
+        return m_boundary == Boundary::Pml ? m_uniform_pml : m_uniform_plain;
     }
 
     // Return the options.
@@ -484,7 +520,7 @@ namespace fdtd::TMz::backends
     // View the device coefficients.
     gpu::DeviceCoeffs CudaBackend::device_coeffs() const noexcept
     {
-        return {
+        gpu::DeviceCoeffs coeffs{
             .coeff_ez_x1 = m_coeff_ez_x1.data(),
             .coeff_ez_x2 = m_coeff_ez_x2.data(),
             .coeff_ez_y1 = m_coeff_ez_y1.data(),
@@ -494,6 +530,18 @@ namespace fdtd::TMz::backends
             .coeff_hy_1 = m_coeff_hy_1.data(),
             .coeff_hy_2 = m_coeff_hy_2.data(),
         };
+        if (m_options.cuda_coeffs == CudaCoeffs::Table) {
+            const std::optional<CoeffTuple> &uniform = uniform_tuple();
+            if (uniform.has_value()) {
+                coeffs.source = gpu::CoeffSource::Uniform;
+                coeffs.uniform = *uniform;
+            } else {
+                coeffs.source = gpu::CoeffSource::Indexed;
+                coeffs.table = m_table_entries.data();
+                coeffs.index = m_table_index.data();
+            }
+        }
+        return coeffs;
     }
 
     // Queue the interior, slab and edge kernels of the Split layout.

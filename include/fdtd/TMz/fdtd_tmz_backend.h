@@ -86,23 +86,36 @@ namespace fdtd
             double flops = 0;
         };
 
+        /** Where the kernels of a traffic model take their coefficients from. */
+        struct TrafficModel
+        {
+            /** Whether the core cells, the interior less its last column and row, read a table
+             * of a few tuples instead of the arrays. */
+            bool table = false;
+
+            /** Whether every cell reads a one-byte table index in each pass. */
+            bool index = false;
+        };
+
         /**
-         * Traffic of one step of the kernels with per-cell coefficient arrays and separate H and E
-         * passes, the serial backend's.
+         * Traffic of one step of the kernels with separate H and E passes, the serial backend's.
          *
          * The H pass reads Ez once per cell, and per Hx or Hy update reads the field and its two
          * coefficients and writes the field: 4 words and 5 flops. The E pass takes per interior
          * cell 6 words (Hx, Hy, Ez and two coefficients read, Ez written) and 8 flops; per PML
          * cell 11 words (Hx, Hy, Ezx, Ezy and four coefficients read, Ezx, Ezy and Ez written)
          * and 11 flops; per edge cell 3 words written under PEC and PML, and the interior's
-         * count under PMC.
+         * count under PMC. With a table, the core cells read no coefficients, in either pass;
+         * with an index, every cell reads one byte in each pass.
          *
          * @param grid Grid of the fields.
          * @param pml Thickness of the active PML in cells, zero for none.
          * @param boundary Outer boundary condition.
+         * @param model Where the coefficients come from; the arrays by default.
          * @return The traffic, a word being sizeof(FloatType) bytes.
          */
-        StepTraffic two_pass_traffic(const Grid &grid, std::size_t pml, Boundary boundary);
+        StepTraffic two_pass_traffic(const Grid &grid, std::size_t pml, Boundary boundary,
+                                     const TrafficModel &model = {});
 
         /**
          * A backend that owns a copy of the fields and advances them in time.

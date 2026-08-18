@@ -74,6 +74,17 @@ namespace fdtd
             Split
         };
 
+        /** Where the CUDA kernels read the update coefficients of a cell. */
+        enum class CudaCoeffs {
+            /** Eight arrays with a value per cell. The default. */
+            Arrays,
+
+            /** A table of the distinct tuples of the cells outside the PML (see CoeffTable), from
+             * the cell's position when the interior shares one tuple and from a byte per cell
+             * otherwise; the PML cells read the arrays. */
+            Table
+        };
+
         /**
          * A 2D TMz simulation: grid, material, fields and the backend that steps them.
          *
@@ -151,6 +162,9 @@ namespace fdtd
                 /** Threads along y of a CUDA thread block, positive, with cuda_block_x *
                  * cuda_block_y within the device's threads per block. */
                 std::size_t cuda_block_y = 8;
+
+                /** Where the CUDA kernels read the coefficients. */
+                CudaCoeffs cuda_coeffs = CudaCoeffs::Arrays;
 
                 /** Whether the CUDA backend replays a graph of 16 captured steps instead of
                  * launching each kernel of each step. */

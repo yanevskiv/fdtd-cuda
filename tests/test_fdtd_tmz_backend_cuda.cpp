@@ -237,6 +237,34 @@ namespace
         return result;
     }
 
+    // Step a backend from distinct fields on a material, with sources and probes, and collect.
+    Run run_material(BackendType type, const Simulation::Options &options, const Material &material,
+                     Boundary boundary)
+    {
+        const Grid &grid = material.grid();
+        const Coeffs coeffs(material, fdtd::TMz::courant_dt(grid, 0.9));
+        Fields fields(grid);
+        fill_distinct(fields);
+        const auto backend = fdtd::TMz::make_backend(type, grid, options);
+        backend->upload(fields);
+        backend->upload(coeffs);
+        backend->set_boundary(boundary);
+        const std::size_t last = grid.index(grid.nx() - 1, grid.ny() - 1);
+        const std::vector<PointProbe> probes{{Component::Ez, last / 2}, {Component::Hx, 7}};
+        backend->set_probes(probes);
+        const std::vector<PointInjection> points{{Component::Ez, last / 3}, {Component::Hy, 9}};
+        std::vector<FloatType> values(STEPS * points.size());
+        for (std::size_t k = 0; k < values.size(); ++k) {
+            values[k] = FloatType(k % 3) / FloatType(8);
+        }
+        backend->step(STEPS, std::span(points), std::span(values));
+        backend->download(fields);
+        Run result;
+        append_fields(result.fields, fields);
+        result.probes = backend->fetch_probes();
+        return result;
+    }
+
     // Relative max-norm difference of two arrays, against the max-norm of the first.
     double relative_difference(std::span<const FloatType> ref, std::span<const FloatType> other)
     {
@@ -466,6 +494,84 @@ TEST_CASE("CUDA graphs match plain launches bit for bit", "[backend][cuda]")
         CHECK(graph.fields == plain.fields);
         CHECK(graph.probes == plain.probes);
         CHECK(plain.probes.size() == 2 * (5 + 16 + 37) + 33);
+    }
+}
+
+// Verify that reading the coefficients from the table gives the arrays' results bit for bit, on
+// vacuum with a PML (one tuple for the interior), on a slab and a lossy circle (a byte per cell),
+// and past the table's capacity (cells that read the arrays among cells that read the table).
+TEST_CASE("CUDA coefficient table matches the arrays bit for bit", "[backend][cuda]")
+{
+    require_cuda();
+    const Grid grid(46, 38, FloatType(1e-3), FloatType(2e-3));
+    Material vacuum(grid);
+    vacuum.set_pml(6, 3, 1e-6);
+    Material media(grid);
+    media.set_pml(5, 3, 1e-6);
+    media.fill_rect(12, 0, 18, 38, {.eps_r = 4});
+    media.fill_circle(30, 19, 6, {.eps_r = 2, .sigma_e = FloatType(0.5)});
+    Material crowded(grid);
+    for (std::size_t k = 0; k < 400; ++k) {
+        const std::size_t i = 3 + k % 40;
+        const std::size_t j = 3 + k / 40;
+        crowded.fill_rect(i, j, i + 1, j + 1, {.eps_r = FloatType(1) + FloatType(k) / 64});
+    }
+    const auto boundary = GENERATE(Boundary::Pec, Boundary::Pmc, Boundary::Pml);
+    for (const Material *material : {&vacuum, &media, &crowded}) {
+        for (const CudaKernel kernel : KERNELS) {
+            for (const Block block : {Block{32, 8}, Block{7, 5}}) {
+                INFO("material " << (material == &vacuum  ? "vacuum"
+                                     : material == &media ? "media"
+                                                          : "crowded")
+                                 << ", kernel " << static_cast<int>(kernel) << ", block " << block.x
+                                 << "x" << block.y);
+                auto options = cuda_options(kernel, block);
+                const Run arrays = run_material(BackendType::Cuda, options, *material, boundary);
+                options.cuda_coeffs = fdtd::TMz::CudaCoeffs::Table;
+                const Run table = run_material(BackendType::Cuda, options, *material, boundary);
+                CHECK(table.fields == arrays.fields);
+                CHECK(table.probes == arrays.probes);
+            }
+        }
+    }
+}
+
+// Verify that the table matches serial within the bound, with graphs too.
+TEST_CASE("CUDA coefficient table matches serial", "[backend][cuda]")
+{
+    require_cuda();
+    const auto size = GENERATE(Size{64, 64}, Size{67, 45});
+    const auto boundary = GENERATE(Boundary::Pec, Boundary::Pmc, Boundary::Pml);
+    const Run serial = run(BackendType::Serial, {}, size, boundary);
+    for (const CudaKernel kernel : KERNELS) {
+        auto options = cuda_options(kernel, {32, 8});
+        options.cuda_coeffs = fdtd::TMz::CudaCoeffs::Table;
+        options.cuda_graph = true;
+        const Run cuda = run(BackendType::Cuda, options, size, boundary);
+        CHECK(relative_difference(serial.fields, cuda.fields) <= bound());
+        CHECK(relative_difference(serial.probes, cuda.probes) <= bound());
+    }
+}
+
+// Verify the traffic model of the table: on vacuum the core, the interior less its last column
+// and row, shares a tuple and reads no coefficients, 6 words a cell fewer than the arrays, and
+// no index.
+TEST_CASE("CUDA models the traffic of the coefficient table", "[unit][backend][cuda]")
+{
+    require_cuda();
+    for (const Boundary boundary : {Boundary::Pec, Boundary::Pmc, Boundary::Pml}) {
+        INFO("boundary " << static_cast<int>(boundary));
+        Simulation::Options options;
+        options.backend = BackendType::Cuda;
+        options.boundary = boundary;
+        options.pml_thickness = 2;
+        const Simulation arrays(8, 6, options);
+        options.cuda_coeffs = fdtd::TMz::CudaCoeffs::Table;
+        const Simulation table(8, 6, options);
+        const double core = boundary == Boundary::Pml ? 3 : 15;
+        CHECK(table.step_traffic().bytes ==
+              arrays.step_traffic().bytes - 6 * core * static_cast<double>(sizeof(FloatType)));
+        CHECK(table.step_traffic().flops == arrays.step_traffic().flops);
     }
 }
 

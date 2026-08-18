@@ -90,7 +90,8 @@ namespace fdtd::TMz
     }
 
     // Count the cells of each kind and weigh them by the words and flops of their updates.
-    StepTraffic two_pass_traffic(const Grid &grid, std::size_t pml, Boundary boundary)
+    StepTraffic two_pass_traffic(const Grid &grid, std::size_t pml, Boundary boundary,
+                                 const TrafficModel &model)
     {
         const double nx = static_cast<double>(grid.nx());
         const double ny = static_cast<double>(grid.ny());
@@ -104,10 +105,13 @@ namespace fdtd::TMz
         const double edge = nx * ny - inner;
         const bool pmc = boundary == Boundary::Pmc;
 
-        const double words =
-            nx * ny + 4 * (hx + hy) + 6 * interior + 11 * split + (pmc ? 6 : 3) * edge;
+        const double core = std::max(nx - 2 * lo - 1, 0.0) * std::max(ny - 2 * lo - 1, 0.0);
+        const double tabled = model.table ? core : 0;
+        const double words = nx * ny + 4 * (hx + hy) - 4 * tabled + 6 * interior - 2 * tabled +
+                             11 * split + (pmc ? 6 : 3) * edge;
+        const double index = model.index ? 2 * nx * ny : 0;
         const double flops = 5 * (hx + hy) + 8 * interior + 11 * split + (pmc ? 8 : 0) * edge;
-        return {.bytes = words * static_cast<double>(sizeof(FloatType)), .flops = flops};
+        return {.bytes = words * static_cast<double>(sizeof(FloatType)) + index, .flops = flops};
     }
 
     // Map a backend type to its name.
