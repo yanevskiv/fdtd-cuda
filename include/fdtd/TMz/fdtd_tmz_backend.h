@@ -318,7 +318,8 @@ namespace fdtd
              * after its checks.
              *
              * The default advances to each snapshot, downloads the fields into a copy of its
-             * own and hands them over before it goes on.
+             * own and hands them over before it goes on. With no snapshots it advances alone,
+             * with no copy to make.
              *
              * @param nsteps Number of time steps.
              * @param points Distinct cells inside the grid.

@@ -79,6 +79,10 @@ namespace fdtd::TMz
                                     std::span<const std::size_t> snapshots,
                                     const SnapshotHandler &handler)
     {
+        if (snapshots.empty()) {
+            advance(nsteps, points, values);
+            return;
+        }
         const std::size_t npoints = points.size();
         Fields fields(grid());
         std::size_t done = 0;
