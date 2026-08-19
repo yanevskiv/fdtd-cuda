@@ -273,6 +273,8 @@ namespace fdtd
         parsed.omp_tile_y = defaults.omp_tile_y;
         parsed.omp_simd = defaults.omp_simd;
         parsed.omp_region = defaults.omp_region;
+        parsed.omp_table = defaults.omp_table;
+        parsed.omp_fuse = defaults.omp_fuse;
         if (text == "default") {
             options = parsed;
             return;
@@ -280,6 +282,8 @@ namespace fdtd
         const std::string_view head = text.substr(0, text.find('+'));
         std::string_view suffixes = text.substr(head.size());
         bool simd = false;
+        bool table = false;
+        bool fuse = false;
         bool phase = false;
         while (!suffixes.empty()) {
             suffixes.remove_prefix(1);
@@ -287,13 +291,19 @@ namespace fdtd
             suffixes.remove_prefix(suffix.size());
             if (suffix == "simd" && !simd) {
                 simd = true;
+            } else if (suffix == "table" && !table) {
+                table = true;
+            } else if (suffix == "fuse" && !fuse) {
+                fuse = true;
             } else if (suffix == "phase" && !phase) {
                 phase = true;
             } else {
-                malformed_variant(name, text, "expected +simd or +phase, each once");
+                malformed_variant(name, text, "expected +simd, +table, +fuse or +phase, each once");
             }
         }
         parsed.omp_simd = simd;
+        parsed.omp_table = table;
+        parsed.omp_fuse = fuse;
         parsed.omp_region = phase ? TMz::OmpRegion::Phase : TMz::OmpRegion::Run;
 
         const std::size_t colon = head.find(':');
@@ -335,6 +345,12 @@ namespace fdtd
         }
         if (options.omp_simd) {
             name << "+simd";
+        }
+        if (options.omp_table) {
+            name << "+table";
+        }
+        if (options.omp_fuse) {
+            name << "+fuse";
         }
         if (options.omp_region == TMz::OmpRegion::Phase) {
             name << "+phase";

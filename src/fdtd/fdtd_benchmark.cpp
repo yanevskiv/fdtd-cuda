@@ -394,8 +394,9 @@ namespace fdtd
         usage << "                        sample, timed with it; 0 for none (default: 0)\n";
         usage << "  --backend B           Backend, serial, openmp, cuda or all; repeatable\n";
         usage << "                        (default: all)\n";
-        usage << "  --variant V           OpenMP variant SCHEDULE[:WxH][+simd][+phase], SCHEDULE\n";
-        usage << "                        rows, collapse2, tiles or tasks; CUDA variant\n";
+        usage << "  --variant V           OpenMP variant\n";
+        usage << "                        SCHEDULE[:WxH][+simd][+table][+fuse][+phase],\n";
+        usage << "                        SCHEDULE rows, collapse2, tiles or tasks; CUDA variant\n";
         usage << "                        KERNEL[:BXxBY][+table][+graph][+async], KERNEL\n";
         usage << "                        fused, split or tiled; or default.\n";
         usage << "                        Repeatable; a backend runs the names it reads, or\n";

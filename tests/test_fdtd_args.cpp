@@ -150,8 +150,16 @@ TEST_CASE("OpenMP variant names round-trip", "[unit][args]")
     CHECK(tiles.omp_threads == 0);
     CHECK(fdtd::omp_variant_name(tiles) == "tiles:64x16+simd+phase");
 
-    for (const std::string name : {"rows", "rows+simd", "collapse2+phase", "tiles:128x32",
-                                   "tasks:8x4+simd", "collapse2+simd+phase"}) {
+    const Simulation::Options fused = variant("rows+fuse+table");
+    CHECK(fused.omp_table);
+    CHECK(fused.omp_fuse);
+    CHECK_FALSE(fused.omp_simd);
+    CHECK(fdtd::omp_variant_name(fused) == "rows+table+fuse");
+
+    for (const std::string name :
+         {"rows", "rows+simd", "collapse2+phase", "tiles:128x32", "tasks:8x4+simd",
+          "collapse2+simd+phase", "rows+table", "rows+simd+table+fuse", "tiles:64x16+table+phase",
+          "rows+fuse+phase"}) {
         CAPTURE(name);
         CHECK(fdtd::omp_variant_name(variant(name)) == name);
     }
@@ -185,6 +193,13 @@ TEST_CASE("OpenMP variant names reject malformed text", "[unit][args]")
         CHECK_THROWS_AS(fdtd::parse_omp_variant_arg("--variant", name, options),
                         std::invalid_argument);
         CHECK(options.omp_schedule == OmpSchedule::Tasks);
+    }
+
+    for (const char *name : {"rows+table+table", "rows+simd+fuse+fuse", "+table"}) {
+        CAPTURE(name);
+        Simulation::Options options;
+        CHECK_THROWS_AS(fdtd::parse_omp_variant_arg("--variant", name, options),
+                        std::invalid_argument);
     }
 }
 

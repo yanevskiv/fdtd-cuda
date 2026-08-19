@@ -116,12 +116,15 @@ namespace fdtd
     TMz::BackendType parse_backend_arg(std::string_view name, std::string_view text);
 
     /**
-     * Parse an OpenMP variant name, `<schedule>[:<W>x<H>][+simd][+phase]`, into omp_ fields.
+     * Parse an OpenMP variant name, `<schedule>[:<W>x<H>][+simd][+table][+fuse][+phase]`, into
+     * omp_ fields.
      *
      * The schedule is `rows`, `collapse2`, `tiles` or `tasks`; `:WxH` sets the tile size,
-     * for `tiles` and `tasks` only; `+simd` and `+phase` turn on SIMD and a region per
-     * phase, each once, in either order. `default` names the default settings. The thread
-     * count is not part of the name: omp_threads is left as it is.
+     * for `tiles` and `tasks` only; `+simd`, `+table`, `+fuse` and `+phase` turn on SIMD, the
+     * coefficient table, row fusion and a region per phase, each once, in any order. The
+     * backend, not the name, rejects the combinations it cannot run, as `tasks+phase`.
+     * `default` names the default settings. The thread count is not part of the name:
+     * omp_threads is left as it is.
      *
      * @param name Option name for the error message.
      * @param text Variant name, as `tiles:64x16+simd`.
@@ -135,8 +138,8 @@ namespace fdtd
      * Canonical OpenMP variant name of simulation options, which parse_omp_variant_arg() reads
      * back.
      *
-     * The tile size is written for `tiles` and `tasks` only, then `+simd`, then `+phase`;
-     * the thread count is left out.
+     * The tile size is written for `tiles` and `tasks` only, then `+simd`, `+table`, `+fuse`
+     * and `+phase` in that order; the thread count is left out.
      *
      * @param options Options to name.
      * @return The name, as `tasks:128x32+simd`.

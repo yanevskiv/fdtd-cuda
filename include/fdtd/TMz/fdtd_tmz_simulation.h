@@ -159,6 +159,15 @@ namespace fdtd
                 /** Where the OpenMP backend opens its parallel regions; Tasks takes Run only. */
                 OmpRegion omp_region = OmpRegion::Run;
 
+                /** Whether the OpenMP backend's core cells, the interior less its last column
+                 * and row, read the one tuple of coefficients they share (see
+                 * CoeffTable::uniform_entry()) instead of the arrays, when they share one. */
+                bool omp_table = false;
+
+                /** Whether each thread of the Rows schedule sweeps its band of rows once a step,
+                 * H then E row by row, instead of an H pass and an E pass; Rows and Run only. */
+                bool omp_fuse = false;
+
                 /** How the CUDA backend lays a step out in kernels. */
                 CudaKernel cuda_kernel = CudaKernel::Fused;
 

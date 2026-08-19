@@ -23,9 +23,12 @@
 #include "fdtd/TMz/backends/cpu/fdtd_tmz_backend_cpu_base.h"
 #include "fdtd/TMz/backends/cpu/fdtd_tmz_backend_cpu_partition.h"
 #include "fdtd/TMz/fdtd_tmz_backend.h"
+#include "fdtd/TMz/fdtd_tmz_coeff_table.h"
+#include "fdtd/TMz/fdtd_tmz_coeffs.h"
 #include "fdtd/TMz/fdtd_tmz_simulation.h"
 
 #include <cstddef>
+#include <optional>
 #include <span>
 #include <string_view>
 
@@ -42,9 +45,10 @@ namespace fdtd
              * Multi-threaded CPU backend: the serial stencil, its parts shared among threads.
              *
              * The schedule of the options picks the partition and how its parts reach the
-             * threads: static loops over rows, ranges or tiles, or tasks over tiles that wait for
-             * their neighbours instead of a barrier. The region and SIMD settings are compiled in
-             * as template instances and picked when the run starts. The arithmetic per cell is the
+             * threads: static loops over rows, ranges or tiles, tasks over tiles that wait for
+             * their neighbours instead of a barrier, or, with omp_fuse, one sweep of each thread's
+             * band of rows per step. The region, SIMD and table settings are compiled in as
+             * template instances and picked when the run starts. The arithmetic per cell is the
              * serial backend's.
              */
             class OmpBackend final : public cpu::CpuBase
@@ -55,10 +59,22 @@ namespace fdtd
                  *
                  * @param grid Grid the backend works on.
                  * @param options Settings of a simulation; the backend reads the omp_ fields.
-                 * @throws std::invalid_argument When a tile side is zero, or the schedule is
-                 *         Tasks with a region per phase.
+                 * @throws std::invalid_argument When a tile side is zero, the schedule is Tasks
+                 *         with a region per phase, or omp_fuse is set with a schedule other than
+                 *         Rows or a region per phase.
                  */
                 OmpBackend(const Grid &grid, const Simulation::Options &options);
+
+                /** The upload of fields, which the upload of coefficients would hide. */
+                using cpu::CpuBase::upload;
+
+                /**
+                 * Copy update coefficients into the backend, and with omp_table find the tuple
+                 * the core cells share, with the PML of the coefficients in force and with none.
+                 *
+                 * @param coeffs Coefficients on the backend's grid.
+                 */
+                void upload(const Coeffs &coeffs) override;
 
                 /**
                  * Short lowercase name of the backend.
@@ -88,6 +104,15 @@ namespace fdtd
                  */
                 std::size_t threads() const noexcept;
 
+                /**
+                 * Modelled traffic of one step: one pass with omp_fuse, two otherwise, and the
+                 * core reading no arrays when omp_table finds a tuple it shares.
+                 *
+                 * @return two_pass_traffic() of the grid, the active PML, the boundary and the
+                 *         model of the options.
+                 */
+                StepTraffic step_traffic() const noexcept override;
+
             protected:
                 /**
                  * Advance the fields and add the sources, part by part on the threads.
@@ -100,6 +125,22 @@ namespace fdtd
                              std::span<const FloatType> values) override;
 
             private:
+                /**
+                 * Tuple the core cells share under the boundary in force, with omp_table.
+                 *
+                 * @return The tuple, or empty when the core does not share one or the option is
+                 *         off.
+                 */
+                const std::optional<CoeffTuple> &uniform_tuple() const noexcept;
+
+                /**
+                 * View of the coefficient arrays, with the uniform tuple and its core when there
+                 * is one.
+                 *
+                 * @return The view the stepper reads.
+                 */
+                cpu::CoeffsView stepper_coeffs() const noexcept;
+
                 /** Settings of the backend. */
                 Simulation::Options m_options;
 
@@ -108,6 +149,12 @@ namespace fdtd
 
                 /** Parts the threads share. */
                 cpu::Partition m_partition;
+
+                /** Tuple the core cells share with the PML of the coefficients in force. */
+                std::optional<CoeffTuple> m_uniform_pml;
+
+                /** Tuple the core cells share with no PML in force. */
+                std::optional<CoeffTuple> m_uniform_plain;
             };
 
             /** Result of the STREAM triad. */

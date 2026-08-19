@@ -80,14 +80,16 @@ namespace fdtd
                      * Run the H phase of a part in step n: its H, then the H sources on its cells.
                      *
                      * @tparam Simd Whether the inner loops carry `omp simd`.
+                     * @tparam Table Whether the core cells read the uniform tuple of the
+                     *         coefficients, when they have one.
                      * @param part Part below the partition's size.
                      * @param n Step of this advance, from zero.
                      */
-                    template <bool Simd = false>
+                    template <bool Simd = false, bool Table = false>
                     inline void h_phase(std::size_t part, std::size_t n) const noexcept
                     {
                         for (const Block &block : m_partition.blocks(part)) {
-                            update_h_block<Simd>(m_fields, m_coeffs, block);
+                            update_h_block<Simd, Table>(m_fields, m_coeffs, block);
                         }
                         add_sources(part, n, true);
                     }
@@ -97,14 +99,17 @@ namespace fdtd
                      * then the probes on its cells.
                      *
                      * @tparam Simd Whether the inner loops carry `omp simd`.
+                     * @tparam Table Whether the core cells read the uniform tuple of the
+                     *         coefficients, when they have one.
                      * @param part Part below the partition's size.
                      * @param n Step of this advance, from zero.
                      */
-                    template <bool Simd = false>
+                    template <bool Simd = false, bool Table = false>
                     inline void e_phase(std::size_t part, std::size_t n) const noexcept
                     {
                         for (const Block &block : m_partition.blocks(part)) {
-                            update_e_block<Simd>(m_fields, m_coeffs, block, m_pml, m_boundary);
+                            update_e_block<Simd, Table>(m_fields, m_coeffs, block, m_pml,
+                                                        m_boundary);
                         }
                         add_sources(part, n, false);
                         record_probes(part, n);

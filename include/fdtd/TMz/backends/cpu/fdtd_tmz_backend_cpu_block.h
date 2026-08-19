@@ -21,6 +21,7 @@
 #define FDTD_TMZ_BACKEND_CPU_BLOCK_H
 
 #include "fdtd/TMz/fdtd_tmz_boundary.h"
+#include "fdtd/TMz/fdtd_tmz_coeff_table.h"
 #include "fdtd/TMz/fdtd_tmz_coeffs.h"
 #include "fdtd/TMz/fdtd_tmz_fields.h"
 #include "fdtd/TMz/fdtd_tmz_grid.h"
@@ -41,11 +42,39 @@ namespace fdtd
             /** Namespace for what the 2D TMz CPU backends share. */
             namespace cpu
             {
+                /** A half-open rectangle of cells, i0 <= i < i1 and j0 <= j < j1. */
+                struct Block
+                {
+                    /** First column. */
+                    std::size_t i0;
+
+                    /** One past the last column. */
+                    std::size_t i1;
+
+                    /** First row. */
+                    std::size_t j0;
+
+                    /** One past the last row. */
+                    std::size_t j1;
+
+                    /**
+                     * Whether the block holds no cell.
+                     *
+                     * @return True when either side is empty.
+                     */
+                    inline bool empty() const noexcept
+                    {
+                        return i0 >= i1 || j0 >= j1;
+                    }
+                };
+
                 /**
-                 * Pointers to the eight coefficient arrays the update kernels read.
+                 * Pointers to the eight coefficient arrays the update kernels read, and the tuple
+                 * that stands in for them on the core cells when the kernels are told to use it.
                  *
                  * The kernels take these rather than a Coeffs so a backend can keep its own
-                 * arrays, as a GPU backend keeps device arrays. A Coeffs converts implicitly.
+                 * arrays, as a GPU backend keeps device arrays. A Coeffs converts implicitly,
+                 * with no tuple.
                  */
                 struct CoeffsView
                 {
@@ -96,32 +125,14 @@ namespace fdtd
 
                     /** Hy curl factors, before 1/dx. */
                     const FloatType *coeff_hy_2;
-                };
 
-                /** A half-open rectangle of cells, i0 <= i < i1 and j0 <= j < j1. */
-                struct Block
-                {
-                    /** First column. */
-                    std::size_t i0;
+                    /** Tuple every cell of core holds in the arrays, which the kernels built with
+                     * Table read there instead; null for none. */
+                    const CoeffTuple *uniform = nullptr;
 
-                    /** One past the last column. */
-                    std::size_t i1;
-
-                    /** First row. */
-                    std::size_t j0;
-
-                    /** One past the last row. */
-                    std::size_t j1;
-
-                    /**
-                     * Whether the block holds no cell.
-                     *
-                     * @return True when either side is empty.
-                     */
-                    inline bool empty() const noexcept
-                    {
-                        return i0 >= i1 || j0 >= j1;
-                    }
+                    /** Cells that read uniform: the core of the interior (see
+                     * CoeffTable::uniform_entry()). */
+                    Block core = {};
                 };
 
                 /**
@@ -185,6 +196,49 @@ namespace fdtd
                 }
 
                 /**
+                 * Call one of two bodies for every index of a row: the tuple body on the cells of
+                 * the view's core when it has a uniform tuple and Table is set, the arrays body
+                 * on the others.
+                 *
+                 * @tparam Simd Whether the loops carry `omp simd`.
+                 * @tparam Table Whether the core takes the tuple body.
+                 * @tparam Arrays Callable taking the index, reading the arrays.
+                 * @tparam Tuple Callable taking the index, reading the uniform tuple.
+                 * @param coeffs Coefficients, with the uniform tuple and its core.
+                 * @param j Row of the indices.
+                 * @param begin First index.
+                 * @param end One past the last index.
+                 * @param arrays Body for the cells that read the arrays.
+                 * @param tuple Body for the cells that read the tuple.
+                 */
+                template <bool Simd, bool Table, typename Arrays, typename Tuple>
+                inline void for_row(const CoeffsView &coeffs, std::size_t j, std::size_t begin,
+                                    std::size_t end, Arrays arrays, Tuple tuple) noexcept
+                {
+                    const Block &core = coeffs.core;
+                    if (Table && coeffs.uniform != nullptr && j >= core.j0 && j < core.j1) {
+                        const std::size_t first = std::min(std::max(core.i0, begin), end);
+                        const std::size_t last = std::min(std::max(core.i1, first), end);
+                        for_range<Simd>(begin, first, arrays);
+                        for_range<Simd>(first, last, tuple);
+                        for_range<Simd>(last, end, arrays);
+                        return;
+                    }
+                    for_range<Simd>(begin, end, arrays);
+                }
+
+                /**
+                 * The uniform tuple of a view, or zeros when it has none.
+                 *
+                 * @param coeffs Coefficients to read.
+                 * @return A copy of the tuple.
+                 */
+                inline CoeffTuple uniform_or_zero(const CoeffsView &coeffs) noexcept
+                {
+                    return coeffs.uniform != nullptr ? *coeffs.uniform : CoeffTuple{};
+                }
+
+                /**
                  * Advance Hx and Hy over a block by one step from the differences of Ez.
                  *
                  * With Hx(i, j) at (i, j + 1/2) and Hy(i, j) at (i + 1/2, j):
@@ -196,11 +250,13 @@ namespace fdtd
                  * column lie outside the domain and are left untouched. Inner loop along x.
                  *
                  * @tparam Simd Whether the inner loops carry `omp simd`.
+                 * @tparam Table Whether the core cells read the view's uniform tuple, when it has
+                 *         one, instead of the arrays; the values are the same.
                  * @param fields Fields to update.
                  * @param coeffs Coefficient arrays on the same grid as the fields.
                  * @param block Cells to update, inside the grid.
                  */
-                template <bool Simd = false>
+                template <bool Simd = false, bool Table = false>
                 inline void update_h_block(Fields &fields, CoeffsView coeffs,
                                            const Block &block) noexcept
                 {
@@ -218,21 +274,36 @@ namespace fdtd
                     const FloatType *__restrict Chx2 = coeffs.coeff_hx_2;
                     const FloatType *__restrict Chy1 = coeffs.coeff_hy_1;
                     const FloatType *__restrict Chy2 = coeffs.coeff_hy_2;
+                    const CoeffTuple tuple = uniform_or_zero(coeffs);
 
                     for (std::size_t j = block.j0; j < hxEnd; ++j) {
                         const std::size_t row = j * pitch;
-                        for_range<Simd>(block.i0, block.i1, [=](std::size_t i) {
-                            const std::size_t k = row + i;
-                            Hx[k] = Chx1[k] * Hx[k] - Chx2[k] * invDy * (Ez[k + pitch] - Ez[k]);
-                        });
+                        for_row<Simd, Table>(
+                            coeffs, j, block.i0, block.i1,
+                            [=](std::size_t i) {
+                                const std::size_t k = row + i;
+                                Hx[k] = Chx1[k] * Hx[k] - Chx2[k] * invDy * (Ez[k + pitch] - Ez[k]);
+                            },
+                            [=](std::size_t i) {
+                                const std::size_t k = row + i;
+                                Hx[k] = tuple.hx_1 * Hx[k] -
+                                        tuple.hx_2 * invDy * (Ez[k + pitch] - Ez[k]);
+                            });
                     }
 
                     for (std::size_t j = block.j0; j < block.j1; ++j) {
                         const std::size_t row = j * pitch;
-                        for_range<Simd>(block.i0, hyEnd, [=](std::size_t i) {
-                            const std::size_t k = row + i;
-                            Hy[k] = Chy1[k] * Hy[k] + Chy2[k] * invDx * (Ez[k + 1] - Ez[k]);
-                        });
+                        for_row<Simd, Table>(
+                            coeffs, j, block.i0, hyEnd,
+                            [=](std::size_t i) {
+                                const std::size_t k = row + i;
+                                Hy[k] = Chy1[k] * Hy[k] + Chy2[k] * invDx * (Ez[k + 1] - Ez[k]);
+                            },
+                            [=](std::size_t i) {
+                                const std::size_t k = row + i;
+                                Hy[k] =
+                                    tuple.hy_1 * Hy[k] + tuple.hy_2 * invDx * (Ez[k + 1] - Ez[k]);
+                            });
                     }
                 }
 
@@ -267,12 +338,14 @@ namespace fdtd
                  * to update_pml_block, the edge Ez to update_boundary_block. Inner loop along x.
                  *
                  * @tparam Simd Whether the inner loop carries `omp simd`.
+                 * @tparam Table Whether the core cells read the view's uniform tuple, when it has
+                 *         one, instead of the arrays; the values are the same.
                  * @param fields Fields to update.
                  * @param coeffs Coefficient arrays on the same grid as the fields.
                  * @param block Cells to update, inside the grid.
                  * @param pml PML thickness in cells, zero for none.
                  */
-                template <bool Simd = false>
+                template <bool Simd = false, bool Table = false>
                 inline void update_e_interior_block(Fields &fields, CoeffsView coeffs,
                                                     const Block &block, std::size_t pml) noexcept
                 {
@@ -290,15 +363,24 @@ namespace fdtd
                     const FloatType *__restrict Hy = fields.hy().data();
                     const FloatType *__restrict Cex1 = coeffs.coeff_ez_x1;
                     const FloatType *__restrict Cex2 = coeffs.coeff_ez_x2;
+                    const CoeffTuple tuple = uniform_or_zero(coeffs);
 
                     for (std::size_t j = cells.j0; j < cells.j1; ++j) {
                         const std::size_t row = j * pitch;
-                        for_range<Simd>(cells.i0, cells.i1, [=](std::size_t i) {
-                            const std::size_t k = row + i;
-                            const FloatType curl =
-                                (Hy[k] - Hy[k - 1]) * invDx - (Hx[k] - Hx[k - pitch]) * invDy;
-                            Ez[k] = Cex1[k] * Ez[k] + Cex2[k] * curl;
-                        });
+                        for_row<Simd, Table>(
+                            coeffs, j, cells.i0, cells.i1,
+                            [=](std::size_t i) {
+                                const std::size_t k = row + i;
+                                const FloatType curl =
+                                    (Hy[k] - Hy[k - 1]) * invDx - (Hx[k] - Hx[k - pitch]) * invDy;
+                                Ez[k] = Cex1[k] * Ez[k] + Cex2[k] * curl;
+                            },
+                            [=](std::size_t i) {
+                                const std::size_t k = row + i;
+                                const FloatType curl =
+                                    (Hy[k] - Hy[k - 1]) * invDx - (Hx[k] - Hx[k - pitch]) * invDy;
+                                Ez[k] = tuple.ez_1 * Ez[k] + tuple.ez_2 * curl;
+                            });
                     }
                 }
 
@@ -403,17 +485,19 @@ namespace fdtd
                  * Advance every Ez of a block by one step: the interior, the PML and the edge.
                  *
                  * @tparam Simd Whether the inner loops carry `omp simd`.
+                 * @tparam Table Whether the core cells read the view's uniform tuple, when it has
+                 *         one, instead of the arrays.
                  * @param fields Fields to update.
                  * @param coeffs Coefficient arrays on the same grid as the fields.
                  * @param block Cells to update, inside the grid.
                  * @param pml PML thickness in cells, zero for none.
                  * @param boundary Outer boundary condition.
                  */
-                template <bool Simd = false>
+                template <bool Simd = false, bool Table = false>
                 inline void update_e_block(Fields &fields, CoeffsView coeffs, const Block &block,
                                            std::size_t pml, Boundary boundary) noexcept
                 {
-                    update_e_interior_block<Simd>(fields, coeffs, block, pml);
+                    update_e_interior_block<Simd, Table>(fields, coeffs, block, pml);
                     update_pml_block<Simd>(fields, coeffs, block, pml);
                     update_boundary_block(fields, coeffs, block, boundary);
                 }
