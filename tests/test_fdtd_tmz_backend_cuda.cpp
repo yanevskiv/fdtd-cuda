@@ -130,6 +130,8 @@ namespace
     {
         Simulation::Options options;
         options.cuda_kernel = kernel;
+        options.cuda_coeffs = fdtd::TMz::CudaCoeffs::Arrays;
+        options.cuda_graph = false;
         options.cuda_block_x = block.x;
         options.cuda_block_y = block.y;
         return options;
@@ -565,6 +567,7 @@ TEST_CASE("CUDA models the traffic of the coefficient table", "[unit][backend][c
         options.backend = BackendType::Cuda;
         options.boundary = boundary;
         options.pml_thickness = 2;
+        options.cuda_coeffs = fdtd::TMz::CudaCoeffs::Arrays;
         const Simulation arrays(8, 6, options);
         options.cuda_coeffs = fdtd::TMz::CudaCoeffs::Table;
         const Simulation table(8, 6, options);
@@ -636,6 +639,7 @@ TEST_CASE("CUDA models the traffic of the tiled kernel", "[unit][backend][cuda]"
     options.boundary = Boundary::Pml;
     options.pml_thickness = 2;
     options.cuda_kernel = CudaKernel::Tiled;
+    options.cuda_coeffs = fdtd::TMz::CudaCoeffs::Arrays;
     const Simulation tiled(8, 6, options);
     const double word = sizeof(FloatType);
     CHECK(tiled.step_traffic().bytes == (6 * 48 + 2 * 82 + 2 * 8 + 8 * 16 + 2 * 24) * word);

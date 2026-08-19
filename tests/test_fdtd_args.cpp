@@ -139,16 +139,14 @@ TEST_CASE("OpenMP variant names round-trip", "[unit][args]")
 {
     const Simulation::Options rows = variant("default");
     CHECK(rows.omp_schedule == OmpSchedule::Rows);
-    CHECK(fdtd::omp_variant_name(rows) == "rows+simd");
+    CHECK(fdtd::omp_variant_name(rows) == "rows+simd+table+fuse");
 
-    const Simulation::Options tiles = variant("tiles:64x16+phase+simd");
-    CHECK(tiles.omp_schedule == OmpSchedule::Tiles);
-    CHECK(tiles.omp_tile_x == 64);
-    CHECK(tiles.omp_tile_y == 16);
-    CHECK(tiles.omp_simd);
-    CHECK(tiles.omp_region == OmpRegion::Phase);
-    CHECK(tiles.omp_threads == 0);
-    CHECK(fdtd::omp_variant_name(tiles) == "tiles:64x16+simd+phase");
+    const Simulation::Options phase = variant("collapse2+phase+simd");
+    CHECK(phase.omp_schedule == OmpSchedule::Collapse2);
+    CHECK(phase.omp_simd);
+    CHECK(phase.omp_region == OmpRegion::Phase);
+    CHECK(phase.omp_threads == 0);
+    CHECK(fdtd::omp_variant_name(phase) == "collapse2+simd+phase");
 
     const Simulation::Options fused = variant("rows+fuse+table");
     CHECK(fused.omp_table);
@@ -157,13 +155,12 @@ TEST_CASE("OpenMP variant names round-trip", "[unit][args]")
     CHECK(fdtd::omp_variant_name(fused) == "rows+table+fuse");
 
     for (const std::string name :
-         {"rows", "rows+simd", "collapse2+phase", "tiles:128x32", "tasks:8x4+simd",
-          "collapse2+simd+phase", "rows+table", "rows+simd+table+fuse", "tiles:64x16+table+phase",
-          "rows+fuse+phase", "rows+simd+table+fuse+close", "tasks:128x32+spread"}) {
+         {"rows", "rows+simd", "collapse2+phase", "collapse2", "collapse2+simd",
+          "collapse2+simd+phase", "rows+table", "rows+simd+table+fuse", "collapse2+table+phase",
+          "rows+fuse+phase", "rows+simd+table+fuse+close", "collapse2+spread"}) {
         CAPTURE(name);
         CHECK(fdtd::omp_variant_name(variant(name)) == name);
     }
-    CHECK(fdtd::omp_variant_name(variant("tasks")) == "tasks:128x32");
 }
 
 // Verify that a variant sets the omp_ fields but the thread count and the other settings.
@@ -172,27 +169,43 @@ TEST_CASE("OpenMP variant names leave the other options alone", "[unit][args]")
     Simulation::Options options;
     options.omp_threads = 3;
     options.boundary = Boundary::Pml;
-    options.omp_tile_x = 7;
     fdtd::parse_omp_variant_arg("--variant", "rows", options);
     CHECK(options.omp_threads == 3);
     CHECK(options.boundary == Boundary::Pml);
-    CHECK(options.omp_tile_x == 128);
     CHECK_FALSE(options.omp_simd);
 }
 
 // Verify that malformed names throw and leave the options unchanged.
 TEST_CASE("OpenMP variant names reject malformed text", "[unit][args]")
 {
-    for (const char *name :
-         {"", "fast", "Rows", "rows:", "rows:4x4", "collapse2:4x4", "tiles:", "tiles:4",
-          "tiles:0x4", "tiles:4x0", "tiles:4x-1", "tiles:4x4x4", "tiles:ax4", "rows+", "rows+fast",
-          "rows+simd+simd", "rows+phase+phase", "+simd", "default+simd"}) {
+    for (const char *name : {"",
+                             "fast",
+                             "Rows",
+                             "tasks",
+                             "tasks:8x8",
+                             "tasks+phase",
+                             "rows:",
+                             "rows:4x4",
+                             "collapse2:4x4",
+                             "tiles:",
+                             "tiles:4",
+                             "tiles:0x4",
+                             "tiles:4x0",
+                             "tiles:4x-1",
+                             "tiles:4x4x4",
+                             "tiles:ax4",
+                             "rows+",
+                             "rows+fast",
+                             "rows+simd+simd",
+                             "rows+phase+phase",
+                             "+simd",
+                             "default+simd"}) {
         CAPTURE(name);
         Simulation::Options options;
-        options.omp_schedule = OmpSchedule::Tasks;
+        options.omp_schedule = OmpSchedule::Collapse2;
         CHECK_THROWS_AS(fdtd::parse_omp_variant_arg("--variant", name, options),
                         std::invalid_argument);
-        CHECK(options.omp_schedule == OmpSchedule::Tasks);
+        CHECK(options.omp_schedule == OmpSchedule::Collapse2);
     }
 
     for (const char *name : {"rows+table+table", "rows+simd+fuse+fuse", "+table",
@@ -208,10 +221,10 @@ TEST_CASE("OpenMP variant names reject malformed text", "[unit][args]")
 TEST_CASE("CUDA variant names round-trip", "[unit][args]")
 {
     const Simulation::Options fused = cuda_variant("default");
-    CHECK(fused.cuda_kernel == CudaKernel::Fused);
+    CHECK(fused.cuda_kernel == CudaKernel::Tiled);
     CHECK(fused.cuda_block_x == 32);
     CHECK(fused.cuda_block_y == 8);
-    CHECK(fdtd::cuda_variant_name(fused) == "fused:32x8");
+    CHECK(fdtd::cuda_variant_name(fused) == "tiled:32x8+table+graph");
 
     const Simulation::Options tiled = cuda_variant("tiled:16x4");
     CHECK(tiled.cuda_kernel == CudaKernel::Tiled);
@@ -220,7 +233,8 @@ TEST_CASE("CUDA variant names round-trip", "[unit][args]")
     CHECK(fdtd::cuda_variant_name(tiled) == "tiled:16x4");
 
     CHECK(fdtd::cuda_variant_name(cuda_variant("tiled")) == "tiled:32x8");
-    CHECK_FALSE(fused.cuda_graph);
+    CHECK(fused.cuda_graph);
+    CHECK(fused.cuda_coeffs == fdtd::TMz::CudaCoeffs::Table);
     const Simulation::Options graph = cuda_variant("fused+graph");
     CHECK(graph.cuda_graph);
     CHECK(fdtd::cuda_variant_name(graph) == "fused:32x8+graph");
@@ -245,13 +259,13 @@ TEST_CASE("CUDA variant names round-trip", "[unit][args]")
 TEST_CASE("CUDA variant names reject malformed text", "[unit][args]")
 {
     Simulation::Options options;
-    options.omp_schedule = OmpSchedule::Tasks;
+    options.omp_schedule = OmpSchedule::Collapse2;
     options.cuda_block_x = 7;
     options.cuda_graph = true;
     options.cuda_coeffs = fdtd::TMz::CudaCoeffs::Table;
     fdtd::parse_cuda_variant_arg("--variant", "tiled", options);
     CHECK(options.cuda_coeffs == fdtd::TMz::CudaCoeffs::Arrays);
-    CHECK(options.omp_schedule == OmpSchedule::Tasks);
+    CHECK(options.omp_schedule == OmpSchedule::Collapse2);
     CHECK(options.cuda_block_x == 32);
     CHECK_FALSE(options.cuda_graph);
 
@@ -294,8 +308,8 @@ TEST_CASE("Variant names belong to their backend", "[unit][args]")
         CHECK(fdtd::backend_reads_variant(backend, "default"));
         CHECK_FALSE(fdtd::backend_reads_variant(backend, "fast"));
     }
-    CHECK(fdtd::backend_reads_variant(BackendType::OpenMP, "tiles:8x8+simd"));
-    CHECK_FALSE(fdtd::backend_reads_variant(BackendType::Cuda, "tiles:8x8+simd"));
+    CHECK(fdtd::backend_reads_variant(BackendType::OpenMP, "collapse2+simd"));
+    CHECK_FALSE(fdtd::backend_reads_variant(BackendType::Cuda, "collapse2+simd"));
     CHECK_FALSE(fdtd::backend_reads_variant(BackendType::Serial, "rows"));
     CHECK(fdtd::backend_reads_variant(BackendType::Cuda, "tiled:16x16"));
     CHECK_FALSE(fdtd::backend_reads_variant(BackendType::OpenMP, "tiled:16x16"));

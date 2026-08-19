@@ -360,12 +360,12 @@ TEST_CASE("Benchmark runs each CUDA variant", "[unit][benchmark][cuda]")
     options.repeat = 1;
     options.backends = {BackendType::Cuda};
     options.threads = {2, 4};
-    options.variants = {"rows", "tiles+simd"};
+    options.variants = {"rows", "collapse2+simd"};
     std::string csv;
     auto samples = run(options, csv);
     REQUIRE(samples.size() == 1);
     CHECK(samples[0].backend == BackendType::Cuda);
-    CHECK(samples[0].variant == "fused:32x8");
+    CHECK(samples[0].variant == "tiled:32x8+table+graph");
     CHECK(samples[0].threads == 1);
     CHECK(samples[0].checksum != 0);
 
@@ -413,16 +413,16 @@ TEST_CASE("Benchmark runs each OpenMP variant", "[unit][benchmark][openmp]")
     auto options = small();
     options.repeat = 1;
     options.backends = {BackendType::Serial, BackendType::OpenMP};
-    options.variants = {"default", "tiles:16x8+simd", "tasks:8x8+simd"};
+    options.variants = {"default", "rows+simd", "collapse2+simd"};
     options.threads = {2};
     std::string csv;
     const auto samples = run(options, csv);
     REQUIRE(samples.size() == 4);
     CHECK(samples[0].backend == BackendType::Serial);
     CHECK(samples[0].variant == "default");
-    CHECK(samples[1].variant == "rows+simd");
-    CHECK(samples[2].variant == "tiles:16x8+simd");
-    CHECK(samples[3].variant == "tasks:8x8+simd");
+    CHECK(samples[1].variant == "rows+simd+table+fuse");
+    CHECK(samples[2].variant == "rows+simd");
+    CHECK(samples[3].variant == "collapse2+simd");
     for (const BenchmarkSample &sample : samples) {
         CHECK(sample.checksum == samples[0].checksum);
     }

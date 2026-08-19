@@ -102,7 +102,8 @@ TEST_CASE("Serial backend ignores the OpenMP options", "[unit][backend][serial]"
 {
     const Grid grid(9, 7);
     fdtd::TMz::Simulation::Options options;
-    options.omp_tile_x = 0;
+    options.omp_region = fdtd::TMz::OmpRegion::Phase;
+    options.omp_fuse = true;
     options.omp_threads = 3;
     auto plain = make_impulse(grid, 0.9, 4, 3, Boundary::Pmc);
     auto backend = fdtd::TMz::make_backend(fdtd::TMz::BackendType::Serial, grid, options);
@@ -143,6 +144,11 @@ TEST_CASE("Backends model the traffic of a step", "[unit][backend]")
             INFO(fdtd::TMz::backend_name(type) << ", boundary " << static_cast<int>(c.boundary));
             fdtd::TMz::Simulation::Options options;
             options.backend = type;
+            options.cuda_kernel = fdtd::TMz::CudaKernel::Fused;
+            options.cuda_coeffs = fdtd::TMz::CudaCoeffs::Arrays;
+            options.cuda_graph = false;
+            options.omp_table = false;
+            options.omp_fuse = false;
             options.boundary = c.boundary;
             options.pml_thickness = 2;
             const fdtd::TMz::Simulation sim(8, 6, options);

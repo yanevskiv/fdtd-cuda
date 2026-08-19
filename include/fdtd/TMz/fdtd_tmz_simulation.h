@@ -46,13 +46,7 @@ namespace fdtd
             Rows,
 
             /** One contiguous range of cells in row-major order per thread. */
-            Collapse2,
-
-            /** A static `omp for` over tiles of omp_tile_x by omp_tile_y cells. */
-            Tiles,
-
-            /** One task per tile per phase, ordered by dependences on the neighbouring tiles. */
-            Tasks
+            Collapse2
         };
 
         /** Where the OpenMP backend opens its parallel regions. */
@@ -79,23 +73,23 @@ namespace fdtd
         /** How the CUDA backend lays the update of a step out in kernels. */
         enum class CudaKernel {
             /** One E kernel for every cell, each thread taking its cell's edge, PML or interior
-             * branch. The default. */
+             * branch. */
             Fused,
 
             /** One kernel per step: each block updates H on its tile and the tile's lower and
              * left halo, keeps it in shared memory, and updates E from it, reading Ez, Hx and Hy
-             * once and writing them to a second set of arrays. */
+             * once and writing them to a second set of arrays. The default. */
             Tiled
         };
 
         /** Where the CUDA kernels read the update coefficients of a cell. */
         enum class CudaCoeffs {
-            /** Eight arrays with a value per cell. The default. */
+            /** Eight arrays with a value per cell. */
             Arrays,
 
             /** A table of the distinct tuples of the cells outside the PML (see CoeffTable), from
              * the cell's position when the interior shares one tuple and from a byte per cell
-             * otherwise; the PML cells read the arrays. */
+             * otherwise; the PML cells read the arrays. The default. */
             Table
         };
 
@@ -154,17 +148,11 @@ namespace fdtd
                 /** Thread count of the OpenMP backend, 0 for the OpenMP default. */
                 std::size_t omp_threads = 0;
 
-                /** Tile width in cells for the Tiles and Tasks schedules, positive. */
-                std::size_t omp_tile_x = 128;
-
-                /** Tile height in cells for the Tiles and Tasks schedules, positive. */
-                std::size_t omp_tile_y = 32;
-
                 /** Whether the OpenMP backend's inner loops carry `omp simd`; on by default,
                  * the fastest on the M5 sweep. */
                 bool omp_simd = true;
 
-                /** Where the OpenMP backend opens its parallel regions; Tasks takes Run only. */
+                /** Where the OpenMP backend opens its parallel regions. */
                 OmpRegion omp_region = OmpRegion::Run;
 
                 /** Affinity policy; enable affinity with OMP_PROC_BIND=true and set
@@ -175,14 +163,14 @@ namespace fdtd
                 /** Whether the OpenMP backend's core cells, the interior less its last column
                  * and row, read the one tuple of coefficients they share (see
                  * CoeffTable::uniform_entry()) instead of the arrays, when they share one. */
-                bool omp_table = false;
+                bool omp_table = true;
 
                 /** Whether each thread of the Rows schedule sweeps its band of rows once a step,
                  * H then E row by row, instead of an H pass and an E pass; Rows and Run only. */
-                bool omp_fuse = false;
+                bool omp_fuse = true;
 
                 /** How the CUDA backend lays a step out in kernels. */
-                CudaKernel cuda_kernel = CudaKernel::Fused;
+                CudaKernel cuda_kernel = CudaKernel::Tiled;
 
                 /** Threads along x of a CUDA thread block, positive. */
                 std::size_t cuda_block_x = 32;
@@ -192,11 +180,11 @@ namespace fdtd
                 std::size_t cuda_block_y = 8;
 
                 /** Where the CUDA kernels read the coefficients. */
-                CudaCoeffs cuda_coeffs = CudaCoeffs::Arrays;
+                CudaCoeffs cuda_coeffs = CudaCoeffs::Table;
 
                 /** Whether the CUDA backend replays a graph of 16 captured steps instead of
                  * launching each kernel of each step. */
-                bool cuda_graph = false;
+                bool cuda_graph = true;
 
                 /** Whether the CUDA backend copies the snapshots of a run out while it goes on
                  * stepping (see run() with a handler), instead of stopping for each. */

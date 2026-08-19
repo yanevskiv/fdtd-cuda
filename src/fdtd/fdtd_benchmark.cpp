@@ -396,8 +396,8 @@ namespace fdtd
         usage << "                        (default: all)\n";
         usage << "  --variant V           OpenMP variant\n";
         usage << "                        "
-                 "SCHEDULE[:WxH][+simd][+table][+fuse][+phase][+close|+spread],\n";
-        usage << "                        SCHEDULE rows, collapse2, tiles or tasks; CUDA variant\n";
+                 "SCHEDULE[+simd][+table][+fuse][+phase][+close|+spread],\n";
+        usage << "                        SCHEDULE rows or collapse2; CUDA variant\n";
         usage << "                        KERNEL[:BXxBY][+table][+graph][+async], KERNEL\n";
         usage << "                        fused or tiled; or default.\n";
         usage << "                        Repeatable; a backend runs the names it reads, or\n";

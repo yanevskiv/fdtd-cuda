@@ -29,7 +29,7 @@
 // The table of distinct coefficients.
 #include "fdtd/TMz/fdtd_tmz_coeff_table.h"
 
-// Standard library for bounds, timing, sizes, views, errors and the dependence tokens.
+// Standard library for bounds, timing, sizes, views, errors and buffers.
 #include <algorithm>
 #include <chrono>
 #include <cstddef>
@@ -46,19 +46,9 @@ namespace fdtd::TMz::backends
     // Helpers private to this file.
     namespace
     {
-        // Tasks made before the producer waits for them, so the tasks in flight stay bounded.
-        constexpr std::size_t TASK_WINDOW = 4096;
-
         // Check the options before anything is built from them.
         const Simulation::Options &checked(const Simulation::Options &options)
         {
-            if (options.omp_tile_x == 0 || options.omp_tile_y == 0) {
-                throw std::invalid_argument("OmpBackend: tile sides must be positive");
-            }
-            if (options.omp_schedule == OmpSchedule::Tasks &&
-                options.omp_region == OmpRegion::Phase) {
-                throw std::invalid_argument("OmpBackend: Tasks run in one region per run");
-            }
             if (options.omp_fuse && options.omp_schedule != OmpSchedule::Rows) {
                 throw std::invalid_argument("OmpBackend: fuse is for the Rows schedule only");
             }
@@ -77,20 +67,14 @@ namespace fdtd::TMz::backends
             return *entry;
         }
 
-        // Cut the grid into the parts of the schedule: rows, one range per thread, or tiles.
+        // Cut the grid into the parts of the schedule: rows or one range per thread.
         cpu::Partition partition_for(const Grid &grid, const Simulation::Options &options,
                                      std::size_t threads)
         {
-            switch (options.omp_schedule) {
-                case OmpSchedule::Rows:
-                    return cpu::Partition::tiles(grid, grid.nx(), 1);
-                case OmpSchedule::Collapse2:
-                    return cpu::Partition::ranges(grid, threads);
-                case OmpSchedule::Tiles:
-                case OmpSchedule::Tasks:
-                    break;
+            if (options.omp_schedule == OmpSchedule::Collapse2) {
+                return cpu::Partition::ranges(grid, threads);
             }
-            return cpu::Partition::tiles(grid, options.omp_tile_x, options.omp_tile_y);
+            return cpu::Partition::tiles(grid, grid.nx(), 1);
         }
 
         // Run a shared body on a team with the requested affinity policy.
@@ -178,50 +162,13 @@ namespace fdtd::TMz::backends
             });
         }
 
-        // Make one task per tile per phase, each waiting for the phases of the tiles it reads.
-        template <bool Simd, bool Table>
-        void run_tasks(const cpu::Stepper &stepper, const cpu::Partition &partition,
-                       std::size_t nsteps, int threads, OmpBind bind)
-        {
-            const std::size_t parts = partition.size();
-            const std::size_t columns = partition.tiles_x();
-            const std::size_t rows = partition.tiles_y();
-            const std::size_t window = std::max<std::size_t>(1, TASK_WINDOW / (2 * parts));
-            std::vector<char> hTokens(parts);
-            std::vector<char> eTokens(parts);
-            char *h = hTokens.data();
-            char *e = eTokens.data();
-            run_team(threads, bind, [&] {
-#pragma omp single
-                for (std::size_t n = 0; n < nsteps; ++n) {
-                    for (std::size_t p = 0; p < parts; ++p) {
-                        const std::size_t right = p % columns + 1 < columns ? p + 1 : p;
-                        const std::size_t up = p / columns + 1 < rows ? p + columns : p;
-#pragma omp task depend(in : e[p], e[right], e[up]) depend(out : h[p])
-                        stepper.h_phase<Simd, Table>(p, n);
-                    }
-                    for (std::size_t p = 0; p < parts; ++p) {
-                        const std::size_t left = p % columns > 0 ? p - 1 : p;
-                        const std::size_t down = p / columns > 0 ? p - columns : p;
-#pragma omp task depend(in : h[p], h[left], h[down]) depend(out : e[p])
-                        stepper.e_phase<Simd, Table>(p, n);
-                    }
-                    if ((n + 1) % window == 0) {
-#pragma omp taskwait
-                    }
-                }
-            });
-        }
-
         // Hand the parts to the threads as the schedule, the fusion and the region say.
         template <bool Simd, bool Table>
         void run_schedule(const cpu::Stepper &stepper, const cpu::Partition &partition,
                           std::size_t nsteps, int threads, const Simulation::Options &options)
         {
             const std::size_t parts = partition.size();
-            if (options.omp_schedule == OmpSchedule::Tasks) {
-                run_tasks<Simd, Table>(stepper, partition, nsteps, threads, options.omp_bind);
-            } else if (options.omp_fuse) {
+            if (options.omp_fuse) {
                 run_fused_rows<Simd, Table>(stepper, parts, nsteps, threads, options.omp_bind);
             } else if (options.omp_region == OmpRegion::Run) {
                 run_loops<Simd, Table, OmpRegion::Run>(stepper, parts, nsteps, threads,

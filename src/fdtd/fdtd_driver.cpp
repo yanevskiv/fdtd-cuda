@@ -215,8 +215,8 @@ namespace fdtd
         usage << "  --threads N           OpenMP threads, 0 for the OpenMP default (default: 0)\n";
         usage << "  --variant V           Variant of the backend: for OpenMP\n";
         usage << "                        "
-                 "SCHEDULE[:WxH][+simd][+table][+fuse][+phase][+close|+spread],\n";
-        usage << "                        SCHEDULE rows, collapse2, tiles or tasks; for CUDA\n";
+                 "SCHEDULE[+simd][+table][+fuse][+phase][+close|+spread],\n";
+        usage << "                        SCHEDULE rows or collapse2; for CUDA\n";
         usage << "                        KERNEL[:BXxBY][+table][+graph][+async], KERNEL\n";
         usage << "                        fused or tiled (default: default)\n";
         usage << "  --output DIR          Directory for the files (default: out)\n";

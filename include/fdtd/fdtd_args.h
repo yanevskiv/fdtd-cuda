@@ -117,19 +117,18 @@ namespace fdtd
 
     /**
      * Parse an OpenMP variant name,
-     * `<schedule>[:<W>x<H>][+simd][+table][+fuse][+phase][+close|+spread]`, into omp_ fields.
+     * `<schedule>[+simd][+table][+fuse][+phase][+close|+spread]`, into omp_ fields.
      *
-     * The schedule is `rows`, `collapse2`, `tiles` or `tasks`; `:WxH` sets the tile size,
-     * for `tiles` and `tasks` only; `+simd`, `+table`, `+fuse` and `+phase` turn on SIMD, the
-     * coefficient table, row fusion and a region per phase, each once, in any order. The
-     * backend, not the name, rejects the combinations it cannot run, as `tasks+phase`.
+     * The schedule is `rows` or `collapse2`; `+simd`, `+table`, `+fuse` and `+phase` turn on SIMD,
+     * the coefficient table, row fusion and a region per phase, each once, in any order. The
+     * backend, not the name, rejects the combinations it cannot run, as `rows+fuse+phase`.
      * `+close` and `+spread` select one affinity policy; enable affinity in the runtime
      * with OMP_PROC_BIND=true and OMP_PLACES=threads.
      * `default` names the default settings. The thread count is not part of the name:
      * omp_threads is left as it is.
      *
      * @param name Option name for the error message.
-     * @param text Variant name, as `tiles:64x16+simd`.
+     * @param text Variant name, as `rows+simd`.
      * @param options Options whose omp_ fields are set; unchanged on an error.
      * @throws std::invalid_argument When the name is malformed.
      */
@@ -140,11 +139,11 @@ namespace fdtd
      * Canonical OpenMP variant name of simulation options, which parse_omp_variant_arg() reads
      * back.
      *
-     * The tile size is written for `tiles` and `tasks` only, then `+simd`, `+table`, `+fuse`
-     * `+phase`, then `+close` or `+spread` in that order; the thread count is left out.
+     * The suffixes are `+simd`, `+table`, `+fuse`, `+phase`, then `+close` or `+spread`
+     * in that order; the thread count is left out.
      *
      * @param options Options to name.
-     * @return The name, as `tasks:128x32+simd`.
+     * @return The name, as `rows+simd`.
      */
     std::string omp_variant_name(const TMz::Simulation::Options &options);
 

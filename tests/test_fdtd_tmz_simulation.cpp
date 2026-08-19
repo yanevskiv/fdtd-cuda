@@ -90,15 +90,15 @@ TEST_CASE("Simulation applies its options", "[unit][simulation]")
     CHECK(sim.options().courant == 0.5);
 }
 
-// Verify the OpenMP defaults: rows, the OpenMP thread count, 128 by 32 tiles, SIMD, one region.
+// Verify the OpenMP defaults: rows, runtime threads, SIMD, table, fusion and one region.
 TEST_CASE("Simulation OpenMP defaults", "[unit][simulation]")
 {
     const Simulation::Options opts;
 
     CHECK(opts.omp_schedule == OmpSchedule::Rows);
     CHECK(opts.omp_threads == 0);
-    CHECK(opts.omp_tile_x == 128);
-    CHECK(opts.omp_tile_y == 32);
+    CHECK(opts.omp_table);
+    CHECK(opts.omp_fuse);
     CHECK(opts.omp_simd);
     CHECK(opts.omp_region == OmpRegion::Run);
 }
@@ -107,12 +107,12 @@ TEST_CASE("Simulation OpenMP defaults", "[unit][simulation]")
 TEST_CASE("Simulation keeps the OpenMP settings", "[unit][simulation]")
 {
     Simulation::Options opts;
-    opts.omp_schedule = OmpSchedule::Tiles;
-    opts.omp_tile_x = 16;
+    opts.omp_schedule = OmpSchedule::Collapse2;
+    opts.omp_fuse = false;
     const Simulation sim(8, 8, opts);
 
-    CHECK(sim.options().omp_schedule == OmpSchedule::Tiles);
-    CHECK(sim.options().omp_tile_x == 16);
+    CHECK(sim.options().omp_schedule == OmpSchedule::Collapse2);
+    CHECK_FALSE(sim.options().omp_fuse);
 }
 
 // Verify that an explicit dt overrides the Courant number.

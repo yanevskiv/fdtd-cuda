@@ -119,11 +119,10 @@ TEST_CASE("Driver parses the PML options", "[unit][driver]")
 // Verify the OpenMP thread count and variant.
 TEST_CASE("Driver parses the OpenMP options", "[unit][driver]")
 {
-    const auto options =
-        parse({"--backend", "openmp", "--threads", "3", "--variant=tiles:16x8+simd"});
+    const auto options = parse({"--backend", "openmp", "--threads", "3", "--variant=rows+simd"});
     CHECK(options.backend == BackendType::OpenMP);
     CHECK(options.threads == 3);
-    CHECK(options.variant == "tiles:16x8+simd");
+    CHECK(options.variant == "rows+simd");
 }
 
 // Verify a CUDA variant, given before or after the backend.
@@ -238,11 +237,11 @@ TEST_CASE("Driver smoke run on OpenMP", "[unit][driver][openmp]")
     std::ostringstream log;
     fdtd::run_driver(options, log);
     options = parse({"--nx", "32", "--steps", "20", "--probe", "20,16", "--backend", "openmp",
-                     "--threads", "2", "--variant", "tasks:8x8"});
+                     "--threads", "2", "--variant", "collapse2"});
     options.output = dir / "openmp";
     fdtd::run_driver(options, log);
 
-    CHECK(log.str().find("on openmp (tasks:8x8, 2 threads)") != std::string::npos);
+    CHECK(log.str().find("on openmp (collapse2, 2 threads)") != std::string::npos);
     std::ifstream serial(dir / "serial" / "probe_0.csv");
     std::ifstream openmp(dir / "openmp" / "probe_0.csv");
     std::ostringstream a;

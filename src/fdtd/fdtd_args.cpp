@@ -68,13 +68,9 @@ namespace fdtd
                 case TMz::OmpSchedule::Rows:
                     return "rows";
                 case TMz::OmpSchedule::Collapse2:
-                    return "collapse2";
-                case TMz::OmpSchedule::Tiles:
-                    return "tiles";
-                case TMz::OmpSchedule::Tasks:
                     break;
             }
-            return "tasks";
+            return "collapse2";
         }
 
         // Name a CUDA kernel layout.
@@ -267,8 +263,6 @@ namespace fdtd
         const TMz::Simulation::Options defaults;
         TMz::Simulation::Options parsed = options;
         parsed.omp_schedule = defaults.omp_schedule;
-        parsed.omp_tile_x = defaults.omp_tile_x;
-        parsed.omp_tile_y = defaults.omp_tile_y;
         parsed.omp_simd = defaults.omp_simd;
         parsed.omp_region = defaults.omp_region;
         parsed.omp_table = defaults.omp_table;
@@ -313,43 +307,21 @@ namespace fdtd
         parsed.omp_fuse = fuse;
         parsed.omp_region = phase ? TMz::OmpRegion::Phase : TMz::OmpRegion::Run;
 
-        const std::size_t colon = head.find(':');
-        const std::string_view schedule = head.substr(0, colon);
-        if (schedule == "rows") {
+        if (head == "rows") {
             parsed.omp_schedule = TMz::OmpSchedule::Rows;
-        } else if (schedule == "collapse2") {
+        } else if (head == "collapse2") {
             parsed.omp_schedule = TMz::OmpSchedule::Collapse2;
-        } else if (schedule == "tiles") {
-            parsed.omp_schedule = TMz::OmpSchedule::Tiles;
-        } else if (schedule == "tasks") {
-            parsed.omp_schedule = TMz::OmpSchedule::Tasks;
         } else {
-            malformed_variant(name, text, "expected rows, collapse2, tiles or tasks");
-        }
-        if (colon != std::string_view::npos) {
-            if (parsed.omp_schedule != TMz::OmpSchedule::Tiles &&
-                parsed.omp_schedule != TMz::OmpSchedule::Tasks) {
-                malformed_variant(name, text, "a tile size is for tiles and tasks only");
-            }
-            const auto [x, y] = parse_sides(name, text, head.substr(colon + 1), "tile");
-            parsed.omp_tile_x = x;
-            parsed.omp_tile_y = y;
+            malformed_variant(name, text, "expected rows or collapse2");
         }
         options = parsed;
     }
 
-    // Write the schedule, the tile size where it counts, then the suffixes.
+    // Write the schedule, then the suffixes.
     std::string omp_variant_name(const TMz::Simulation::Options &options)
     {
         std::ostringstream name;
         name << schedule_name(options.omp_schedule);
-        if (options.omp_schedule == TMz::OmpSchedule::Tiles ||
-            options.omp_schedule == TMz::OmpSchedule::Tasks) {
-            name << ':';
-            name << options.omp_tile_x;
-            name << 'x';
-            name << options.omp_tile_y;
-        }
         if (options.omp_simd) {
             name << "+simd";
         }

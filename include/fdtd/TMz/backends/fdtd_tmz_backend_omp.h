@@ -45,11 +45,10 @@ namespace fdtd
              * Multi-threaded CPU backend: the serial stencil, its parts shared among threads.
              *
              * The schedule of the options picks the partition and how its parts reach the
-             * threads: static loops over rows, ranges or tiles, tasks over tiles that wait for
-             * their neighbours instead of a barrier, or, with omp_fuse, one sweep of each thread's
-             * band of rows per step. The region, SIMD and table settings are compiled in as
-             * template instances and picked when the run starts. The arithmetic per cell is the
-             * serial backend's.
+             * threads: static loops over rows or ranges, or, with omp_fuse, one sweep of
+             * each thread's band of rows per step. The region, SIMD and table settings are compiled
+             * in as template instances and picked when the run starts. The arithmetic per cell is
+             * the serial backend's.
              */
             class OmpBackend final : public cpu::CpuBase
             {
@@ -59,9 +58,8 @@ namespace fdtd
                  *
                  * @param grid Grid the backend works on.
                  * @param options Settings of a simulation; the backend reads the omp_ fields.
-                 * @throws std::invalid_argument When a tile side is zero, the schedule is Tasks
-                 *         with a region per phase, or omp_fuse is set with a schedule other than
-                 *         Rows or a region per phase.
+                 * @throws std::invalid_argument When omp_fuse is set with a
+                 * schedule other than Rows or a region per phase.
                  */
                 OmpBackend(const Grid &grid, const Simulation::Options &options);
 

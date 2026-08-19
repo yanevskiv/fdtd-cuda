@@ -57,8 +57,7 @@ namespace
     constexpr double TOLERANCE = FDTD_TEST_TOLERANCE;
 
     // Schedules built so far.
-    constexpr OmpSchedule SCHEDULES[] = {OmpSchedule::Rows, OmpSchedule::Collapse2,
-                                         OmpSchedule::Tiles, OmpSchedule::Tasks};
+    constexpr OmpSchedule SCHEDULES[] = {OmpSchedule::Rows, OmpSchedule::Collapse2};
 
     // Result of a run: the fields and every probe's record.
     struct Run
@@ -163,8 +162,7 @@ namespace
                     for (const bool fuse : {false, true}) {
                         for (const OmpRegion region : {OmpRegion::Run, OmpRegion::Phase}) {
                             const bool run = region == OmpRegion::Run;
-                            if ((schedule == OmpSchedule::Tasks && !run) ||
-                                (fuse && (schedule != OmpSchedule::Rows || !run))) {
+                            if (fuse && (schedule != OmpSchedule::Rows || !run)) {
                                 continue;
                             }
                             Simulation::Options omp;
@@ -174,8 +172,6 @@ namespace
                             omp.omp_fuse = fuse;
                             omp.omp_region = region;
                             omp.omp_threads = threads;
-                            omp.omp_tile_x = 16;
-                            omp.omp_tile_y = 8;
                             all.push_back(omp);
                         }
                     }
@@ -266,8 +262,8 @@ TEST_CASE("OpenMP runs are deterministic", "[backend][openmp]")
     }
 }
 
-// Verify the extremes: more threads than cells, a tile larger than the grid, one-cell tasks.
-TEST_CASE("OpenMP handles more parts than cells and tiles past the grid", "[backend][openmp]")
+// Verify that ranges and fused rows handle more threads than cells.
+TEST_CASE("OpenMP handles more threads than cells", "[backend][openmp]")
 {
     require_openmp();
     const Size size{9, 7};
@@ -275,19 +271,11 @@ TEST_CASE("OpenMP handles more parts than cells and tiles past the grid", "[back
 
     Simulation::Options ranges;
     ranges.omp_schedule = OmpSchedule::Collapse2;
+    ranges.omp_fuse = false;
     ranges.omp_threads = 80;
     const Run many = run(BackendType::OpenMP, ranges, size, Boundary::Pec);
     CHECK(relative_difference(serial.fields, many.fields) <= bound());
     CHECK(relative_difference(serial.probes, many.probes) <= bound());
-
-    Simulation::Options tiles;
-    tiles.omp_schedule = OmpSchedule::Tiles;
-    tiles.omp_threads = 3;
-    tiles.omp_tile_x = 100;
-    tiles.omp_tile_y = 100;
-    const Run one = run(BackendType::OpenMP, tiles, size, Boundary::Pec);
-    CHECK(relative_difference(serial.fields, one.fields) <= bound());
-    CHECK(relative_difference(serial.probes, one.probes) <= bound());
 
     Simulation::Options fused;
     fused.omp_fuse = true;
@@ -295,15 +283,6 @@ TEST_CASE("OpenMP handles more parts than cells and tiles past the grid", "[back
     const Run sweeps = run(BackendType::OpenMP, fused, size, Boundary::Pec);
     CHECK(relative_difference(serial.fields, sweeps.fields) <= bound());
     CHECK(relative_difference(serial.probes, sweeps.probes) <= bound());
-
-    Simulation::Options cells;
-    cells.omp_schedule = OmpSchedule::Tasks;
-    cells.omp_threads = 4;
-    cells.omp_tile_x = 1;
-    cells.omp_tile_y = 1;
-    const Run tiny = run(BackendType::OpenMP, cells, size, Boundary::Pec);
-    CHECK(relative_difference(serial.fields, tiny.fields) <= bound());
-    CHECK(relative_difference(serial.probes, tiny.probes) <= bound());
 }
 
 // Verify that the backend has its name and rejects options with no meaning.
@@ -316,27 +295,14 @@ TEST_CASE("OpenMP backend checks its options", "[unit][backend][openmp]")
     CHECK(backend->name() == "openmp");
     CHECK(backend->type() == BackendType::OpenMP);
 
-    options.omp_tile_x = 0;
-    CHECK_THROWS_AS(fdtd::TMz::make_backend(BackendType::OpenMP, grid, options),
-                    std::invalid_argument);
-    options.omp_tile_x = 8;
-    options.omp_tile_y = 0;
-    CHECK_THROWS_AS(fdtd::TMz::make_backend(BackendType::OpenMP, grid, options),
-                    std::invalid_argument);
-    options.omp_tile_y = 8;
-    options.omp_schedule = OmpSchedule::Tasks;
     options.omp_region = OmpRegion::Phase;
-    CHECK_THROWS_AS(fdtd::TMz::make_backend(BackendType::OpenMP, grid, options),
-                    std::invalid_argument);
-
     options.omp_schedule = OmpSchedule::Rows;
     options.omp_fuse = true;
     CHECK_THROWS_AS(fdtd::TMz::make_backend(BackendType::OpenMP, grid, options),
                     std::invalid_argument);
     options.omp_region = OmpRegion::Run;
     CHECK_NOTHROW(fdtd::TMz::make_backend(BackendType::OpenMP, grid, options));
-    for (const OmpSchedule schedule :
-         {OmpSchedule::Collapse2, OmpSchedule::Tiles, OmpSchedule::Tasks}) {
+    for (const OmpSchedule schedule : {OmpSchedule::Collapse2}) {
         options.omp_schedule = schedule;
         CHECK_THROWS_AS(fdtd::TMz::make_backend(BackendType::OpenMP, grid, options),
                         std::invalid_argument);
@@ -381,6 +347,8 @@ TEST_CASE("OpenMP models the traffic of the table and fusion", "[unit][backend][
         options.backend = BackendType::OpenMP;
         options.boundary = boundary;
         options.pml_thickness = 2;
+        options.omp_table = false;
+        options.omp_fuse = false;
         const Simulation arrays(8, 6, options);
         options.omp_table = true;
         const Simulation table(8, 6, options);
