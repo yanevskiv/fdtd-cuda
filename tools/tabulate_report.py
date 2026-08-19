@@ -276,12 +276,13 @@ def peak(infos, key):
 
 def bandwidth_table(data, infos):
     """
-    Return the achieved bandwidth and flops of each configuration at its backend's largest grid,
-    and the bandwidth as a percent of the peak, as a table.
+    Return the achieved bandwidth and flops of each configuration at its backend's largest grid
+    in its precision, and the bandwidth as a percent of the peak, as a table.
 
     The peak of the CUDA backend is the GPU's, from its memory clock and bus, since the stencil,
     which reads four words for each it writes, outruns a copy kernel; that of the others is the
-    CPU's STREAM triad, the only one the machine gives.
+    CPU's STREAM triad, the only one the machine gives. The precision and the run label only
+    show when the runs have more than one.
     """
     if "bytes_per_step" not in data.dtype.names or np.all(np.isnan(data["bytes_per_step"])):
         return "The runs hold no modelled traffic."
@@ -292,10 +293,16 @@ def bandwidth_table(data, infos):
         "serial": peak(infos, "cpu_triad_bandwidth"),
     }
 
+    shown = []
+    if len(np.unique(data["label"])) > 1:
+        shown.append(("Run", "label"))
+    if len(np.unique(data["precision"])) > 1:
+        shown.append(("Precision", "precision"))
+
     rows = []
     for config in np.unique(data[CONFIG]):
         backend = config["backend"]
-        same = data["backend"] == backend
+        same = (data["backend"] == backend) & (data["precision"] == config["precision"])
         if config["nx"] != np.max(data["nx"][same]):
             continue
 
@@ -309,22 +316,24 @@ def bandwidth_table(data, infos):
         if peaks.get(backend) is not None:
             fraction = f"{100 * bandwidth / peaks[backend]:.1f}"
 
-        rows.append([
-            backend,
-            config["variant"],
+        row = [backend, config["variant"]]
+        for _, name in shown:
+            row.append(config[name])
+        row += [
             config["threads"],
             f"{config['nx']} x {config['ny']}",
             f"{samples['bytes_per_step'][0] / (config['nx'] * config['ny']):.1f}",
             f"{bandwidth:.1f}",
             f"{flops:.1f}",
             fraction,
-        ])
+        ]
+        rows.append(row)
 
-    return table(
-        ["Backend", "Variant", "Threads", "Grid", "Bytes/cell", "GB/s", "GFLOPS", "Of peak (%)"],
-        "llrrrrrr",
-        rows,
-    )
+    titles = ["Backend", "Variant"] + [title for title, _ in shown]
+    titles += ["Threads", "Grid", "Bytes/cell", "GB/s", "GFLOPS", "Of peak (%)"]
+    align = "ll" + "l" * len(shown) + "rrrrrr"
+
+    return table(titles, align, rows)
 
 
 def figure_list(report, stamp):

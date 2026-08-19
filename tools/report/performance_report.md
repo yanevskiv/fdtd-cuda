@@ -9,7 +9,7 @@ colorlinks: true
 header-includes:
   - \usepackage{float}
   - \floatplacement{figure}{H}
-  - \AtBeginEnvironment{longtable}{\small\setlength{\tabcolsep}{4pt}}
+  - \AtBeginEnvironment{longtable}{\footnotesize\setlength{\tabcolsep}{3pt}}
 ---
 
 # Sources
