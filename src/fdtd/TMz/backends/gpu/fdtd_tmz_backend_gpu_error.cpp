@@ -18,10 +18,10 @@
  */
 
 // Class declaration.
-#include "fdtd/fdtd_cuda_error.h"
+#include "fdtd/TMz/backends/gpu/fdtd_tmz_backend_gpu_error.h"
 
-// Namespace for the fdtd library.
-namespace fdtd
+// Namespace for what the 2D TMz CUDA backend's files share.
+namespace fdtd::TMz::backends::gpu
 {
     // Keep the code beside the message.
     CudaError::CudaError(int code, const std::string &message)

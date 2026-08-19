@@ -214,8 +214,7 @@ namespace fdtd
              *         dt above the Courant limit, or, with an active PML, PML settings that
              *         Material::set_pml() rejects, or backend settings the backend rejects.
              * @throws std::runtime_error When the backend is not compiled in, or is CUDA and no
-             *         device is present.
-             * @throws CudaError When a CUDA call of the backend fails.
+             *         device is present, or a CUDA call of the backend fails.
              */
             Simulation(std::size_t nx, std::size_t ny, const Options &options);
 

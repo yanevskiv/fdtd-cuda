@@ -20,7 +20,7 @@
 #ifndef FDTD_TMZ_BACKEND_GPU_CHECK_CUH
 #define FDTD_TMZ_BACKEND_GPU_CHECK_CUH
 
-#include "fdtd/fdtd_cuda_error.h"
+#include "fdtd/TMz/backends/gpu/fdtd_tmz_backend_gpu_error.h"
 
 #include <cuda_runtime.h>
 

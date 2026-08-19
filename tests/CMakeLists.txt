@@ -14,7 +14,6 @@ add_executable(fdtd_tests
     test_fdtd_args.cpp
     test_fdtd_benchmark.cpp
     test_fdtd_constants.cpp
-    test_fdtd_cuda_error.cpp
     test_fdtd_driver.cpp
     test_fdtd_tmz_backend.cpp
     test_fdtd_tmz_backend_cpu_block.cpp
@@ -38,6 +37,7 @@ if(FDTD_WITH_CUDA)
     target_sources(fdtd_tests PRIVATE
         test_fdtd_tmz_backend_gpu_buffer.cpp
         test_fdtd_tmz_backend_gpu_device.cpp
+        test_fdtd_tmz_backend_gpu_error.cpp
         test_fdtd_tmz_backend_gpu_stream.cpp)
 endif()
 target_link_libraries(fdtd_tests PRIVATE fdtd::fdtd fdtd_args fdtd_benchmark fdtd_driver fdtd_warnings Catch2::Catch2WithMain)

@@ -21,16 +21,16 @@
 #include <catch2/catch_test_macros.hpp>
 
 // Project header under test.
-#include "fdtd/fdtd_cuda_error.h"
+#include "fdtd/TMz/backends/gpu/fdtd_tmz_backend_gpu_error.h"
 
 // Standard library for errors and strings.
 #include <stdexcept>
 #include <string>
 
 // Verify that the error keeps its code and message and is a runtime error.
-TEST_CASE("CudaError keeps its code and message", "[unit]")
+TEST_CASE("CudaError keeps its code and message", "[unit][cuda]")
 {
-    const fdtd::CudaError error(2, "cudaMalloc: out of memory");
+    const fdtd::TMz::backends::gpu::CudaError error(2, "cudaMalloc: out of memory");
     CHECK(error.code() == 2);
     CHECK(std::string(error.what()) == "cudaMalloc: out of memory");
 

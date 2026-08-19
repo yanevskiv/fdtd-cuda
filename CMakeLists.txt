@@ -30,7 +30,6 @@ option(FDTD_NATIVE "Build the library's C++ for the CPU of the build machine (-m
 
 # The library.
 add_library(fdtd
-    src/fdtd/fdtd_cuda_error.cpp
     src/fdtd/TMz/fdtd_tmz_backend.cpp
     src/fdtd/TMz/fdtd_tmz_coeff_table.cpp
     src/fdtd/TMz/fdtd_tmz_coeffs.cpp
@@ -65,6 +64,7 @@ if(FDTD_WITH_CUDA)
         src/fdtd/TMz/backends/fdtd_tmz_backend_cuda.cu
         src/fdtd/TMz/backends/gpu/fdtd_tmz_backend_gpu_buffer.cu
         src/fdtd/TMz/backends/gpu/fdtd_tmz_backend_gpu_device.cu
+        src/fdtd/TMz/backends/gpu/fdtd_tmz_backend_gpu_error.cpp
         src/fdtd/TMz/backends/gpu/fdtd_tmz_backend_gpu_event.cu
         src/fdtd/TMz/backends/gpu/fdtd_tmz_backend_gpu_graph.cu
         src/fdtd/TMz/backends/gpu/fdtd_tmz_backend_gpu_pinned.cu

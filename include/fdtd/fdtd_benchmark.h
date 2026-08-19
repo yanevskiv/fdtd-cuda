@@ -184,7 +184,7 @@ namespace fdtd
      * measurement is the median of 10 runs.
      *
      * @param out Stream for the lines.
-     * @throws CudaError When a CUDA call fails.
+     * @throws std::runtime_error When a CUDA call fails.
      */
     void write_benchmark_peaks(std::ostream &out);
 

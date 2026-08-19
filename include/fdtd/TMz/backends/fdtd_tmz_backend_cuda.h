@@ -76,7 +76,7 @@ namespace fdtd
                  *         limit of 65535, the padded grid reaches 2^31 elements, or its arrays
                  *         need more device memory than is free; all before anything is
                  *         allocated.
-                 * @throws CudaError When the device memory cannot be had.
+                 * @throws gpu::CudaError When the device memory cannot be had.
                  */
                 CudaBackend(const Grid &grid, const Simulation::Options &options);
 
@@ -195,7 +195,7 @@ namespace fdtd
                  * @param points Distinct cells inside the grid.
                  * @param values One value per point per step, step-major.
                  * @throws std::logic_error When no coefficients were uploaded.
-                 * @throws CudaError When a kernel or a copy fails.
+                 * @throws gpu::CudaError When a kernel or a copy fails.
                  */
                 void advance(std::size_t nsteps, std::span<const PointInjection> points,
                              std::span<const FloatType> values) override;
@@ -215,7 +215,7 @@ namespace fdtd
                  * @param snapshots Increasing step counts from 1 to nsteps.
                  * @param handler Receives each snapshot.
                  * @throws std::logic_error When no coefficients were uploaded.
-                 * @throws CudaError When a kernel or a copy fails.
+                 * @throws gpu::CudaError When a kernel or a copy fails.
                  */
                 void advance_snapshots(std::size_t nsteps, std::span<const PointInjection> points,
                                        std::span<const FloatType> values,

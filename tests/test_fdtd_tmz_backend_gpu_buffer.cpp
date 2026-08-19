@@ -24,8 +24,8 @@
 // Project headers under test.
 #include "fdtd/TMz/backends/gpu/fdtd_tmz_backend_gpu_buffer.h"
 #include "fdtd/TMz/backends/gpu/fdtd_tmz_backend_gpu_device.h"
+#include "fdtd/TMz/backends/gpu/fdtd_tmz_backend_gpu_error.h"
 #include "fdtd/TMz/backends/gpu/fdtd_tmz_backend_gpu_stream.h"
-#include "fdtd/fdtd_cuda_error.h"
 #include "fdtd/fdtd_float.h"
 
 // Standard library for sizes, errors, moves and buffers.
@@ -140,6 +140,7 @@ TEST_CASE("Device buffer sizes", "[unit][cuda]")
     const DeviceBuffer<FloatType> none(0);
     CHECK(none.empty());
     CHECK(none.data() == nullptr);
-    CHECK_THROWS_AS(DeviceBuffer<FloatType>(std::size_t(1) << 50), fdtd::CudaError);
+    CHECK_THROWS_AS(DeviceBuffer<FloatType>(std::size_t(1) << 50),
+                    fdtd::TMz::backends::gpu::CudaError);
     CHECK_THROWS_AS(DeviceBuffer<FloatType>(~std::size_t(0)), std::length_error);
 }
