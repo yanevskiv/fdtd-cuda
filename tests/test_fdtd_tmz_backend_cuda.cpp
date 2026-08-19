@@ -64,7 +64,7 @@ namespace
     constexpr double TOLERANCE = FDTD_TEST_CUDA_TOLERANCE;
 
     // Kernel layouts built so far.
-    constexpr CudaKernel KERNELS[] = {CudaKernel::Fused, CudaKernel::Split, CudaKernel::Tiled};
+    constexpr CudaKernel KERNELS[] = {CudaKernel::Fused, CudaKernel::Tiled};
 
     // Result of a run: the fields and every probe's record.
     struct Run
@@ -696,7 +696,8 @@ TEST_CASE("CUDA async snapshots match the stopping ones bit for bit", "[backend]
     }
 }
 
-// Verify that the backend has its name and rejects settings it cannot run.
+// Verify that the backend has its name and rejects settings it cannot run, and a grid of 30000
+// squared, whose 13 arrays the card cannot hold, before it allocates.
 TEST_CASE("CUDA backend checks its options", "[unit][backend][cuda]")
 {
     require_cuda();
@@ -729,4 +730,15 @@ TEST_CASE("CUDA backend checks its options", "[unit][backend][cuda]")
     options.cuda_block_y = 8;
     CHECK_THROWS_AS(fdtd::TMz::make_backend(BackendType::Cuda, Grid(50000, 50000), options),
                     std::invalid_argument);
+    CHECK_THROWS_AS(fdtd::TMz::make_backend(BackendType::Cuda, Grid(30000, 30000), options),
+                    std::invalid_argument);
+}
+
+// Reject a grid beyond the index limit before allocating the simulation's host arrays.
+TEST_CASE("CUDA simulation rejects oversized grids before host allocation", "[unit][cuda]")
+{
+    require_cuda();
+    Simulation::Options options;
+    options.backend = BackendType::Cuda;
+    CHECK_THROWS_AS(Simulation(50000, 50000, options), std::invalid_argument);
 }

@@ -51,6 +51,14 @@ namespace fdtd
                  */
                 std::size_t max_threads_per_block();
 
+                /**
+                 * Device memory free now on the current device, which other processes share.
+                 *
+                 * @return The free bytes.
+                 * @throws CudaError When the query fails.
+                 */
+                std::size_t free_memory();
+
                 /** What the current device reports of its size, clocks and memory. */
                 struct DeviceInfo
                 {

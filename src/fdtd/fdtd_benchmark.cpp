@@ -395,10 +395,11 @@ namespace fdtd
         usage << "  --backend B           Backend, serial, openmp, cuda or all; repeatable\n";
         usage << "                        (default: all)\n";
         usage << "  --variant V           OpenMP variant\n";
-        usage << "                        SCHEDULE[:WxH][+simd][+table][+fuse][+phase],\n";
+        usage << "                        "
+                 "SCHEDULE[:WxH][+simd][+table][+fuse][+phase][+close|+spread],\n";
         usage << "                        SCHEDULE rows, collapse2, tiles or tasks; CUDA variant\n";
         usage << "                        KERNEL[:BXxBY][+table][+graph][+async], KERNEL\n";
-        usage << "                        fused, split or tiled; or default.\n";
+        usage << "                        fused or tiled; or default.\n";
         usage << "                        Repeatable; a backend runs the names it reads, or\n";
         usage << "                        default (default: default)\n";
         usage << "  --threads N           Thread count, for OpenMP only; repeatable\n";

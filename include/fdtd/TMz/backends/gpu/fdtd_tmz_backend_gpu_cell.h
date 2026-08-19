@@ -221,16 +221,6 @@ namespace fdtd
                     CoeffTuple tuple;
                 };
 
-                /** A cell of the grid by column and row. */
-                struct CellIndex
-                {
-                    /** Column. */
-                    int i;
-
-                    /** Row. */
-                    int j;
-                };
-
                 /**
                  * Lower bound of the interior along both axes.
                  *
@@ -240,109 +230,6 @@ namespace fdtd
                 FDTD_HOST_DEVICE inline int interior_lo(const DeviceFields &fields) noexcept
                 {
                     return fields.pml > 1 ? fields.pml : 1;
-                }
-
-                /**
-                 * Number of PML cells off the edge, in the four slabs that update_e_split_cell()
-                 * takes.
-                 *
-                 * @param fields Fields and grid, with 2 pml below nx and ny when pml is set.
-                 * @return The count, zero for a PML under two cells thick.
-                 */
-                FDTD_HOST_DEVICE inline int slab_cell_count(const DeviceFields &fields) noexcept
-                {
-                    if (fields.pml < 2) {
-                        return 0;
-                    }
-                    const int depth = fields.pml - 1;
-                    return 2 * depth * (fields.nx - 2) + 2 * depth * (fields.ny - 2 * fields.pml);
-                }
-
-                /**
-                 * PML cell number t, counting the bottom slab, the top slab, then the left and
-                 * right slabs between them, each row by row along x, as the CPU's
-                 * update_pml_block().
-                 *
-                 * @param fields Fields and grid.
-                 * @param t Number of the cell, below slab_cell_count().
-                 * @return The cell.
-                 */
-                FDTD_HOST_DEVICE inline CellIndex slab_cell(const DeviceFields &fields,
-                                                            int t) noexcept
-                {
-                    const int depth = fields.pml - 1;
-                    const int width = fields.nx - 2;
-                    const int band = depth * width;
-                    if (t < band) {
-                        return {
-                            .i = 1 + t % width,
-                            .j = 1 + t / width,
-                        };
-                    }
-                    if (t < 2 * band) {
-                        return {
-                            .i = 1 + (t - band) % width,
-                            .j = fields.ny - fields.pml + (t - band) / width,
-                        };
-                    }
-                    const int side = depth * (fields.ny - 2 * fields.pml);
-                    const int u = t - 2 * band;
-                    if (u < side) {
-                        return {
-                            .i = 1 + u % depth,
-                            .j = fields.pml + u / depth,
-                        };
-                    }
-                    return {
-                        .i = fields.nx - fields.pml + (u - side) % depth,
-                        .j = fields.pml + (u - side) / depth,
-                    };
-                }
-
-                /**
-                 * Number of cells on the edge of the grid.
-                 *
-                 * @param fields Fields and grid.
-                 * @return 2 (nx + ny) - 4 on a grid at least 2 by 2, every cell on a thinner one.
-                 */
-                FDTD_HOST_DEVICE inline int edge_cell_count(const DeviceFields &fields) noexcept
-                {
-                    const int rows = fields.ny > 1 ? 2 : 1;
-                    const int columns = fields.nx > 1 ? 2 : 1;
-                    const int side = fields.ny > 2 ? fields.ny - 2 : 0;
-                    return rows * fields.nx + columns * side;
-                }
-
-                /**
-                 * Edge cell number t: the bottom row, the top row, then the left and right columns
-                 * between them.
-                 *
-                 * @param fields Fields and grid.
-                 * @param t Number of the cell, below edge_cell_count().
-                 * @return The cell.
-                 */
-                FDTD_HOST_DEVICE inline CellIndex edge_cell(const DeviceFields &fields,
-                                                            int t) noexcept
-                {
-                    if (t < fields.nx) {
-                        return {
-                            .i = t,
-                            .j = 0,
-                        };
-                    }
-                    const int rows = fields.ny > 1 ? 2 : 1;
-                    if (t < rows * fields.nx) {
-                        return {
-                            .i = t - fields.nx,
-                            .j = fields.ny - 1,
-                        };
-                    }
-                    const int u = t - rows * fields.nx;
-                    const int side = fields.ny - 2;
-                    return {
-                        .i = u < side ? 0 : fields.nx - 1,
-                        .j = 1 + u % side,
-                    };
                 }
 
                 /**

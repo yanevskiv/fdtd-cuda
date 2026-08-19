@@ -116,13 +116,15 @@ namespace fdtd
     TMz::BackendType parse_backend_arg(std::string_view name, std::string_view text);
 
     /**
-     * Parse an OpenMP variant name, `<schedule>[:<W>x<H>][+simd][+table][+fuse][+phase]`, into
-     * omp_ fields.
+     * Parse an OpenMP variant name,
+     * `<schedule>[:<W>x<H>][+simd][+table][+fuse][+phase][+close|+spread]`, into omp_ fields.
      *
      * The schedule is `rows`, `collapse2`, `tiles` or `tasks`; `:WxH` sets the tile size,
      * for `tiles` and `tasks` only; `+simd`, `+table`, `+fuse` and `+phase` turn on SIMD, the
      * coefficient table, row fusion and a region per phase, each once, in any order. The
      * backend, not the name, rejects the combinations it cannot run, as `tasks+phase`.
+     * `+close` and `+spread` select one affinity policy; enable affinity in the runtime
+     * with OMP_PROC_BIND=true and OMP_PLACES=threads.
      * `default` names the default settings. The thread count is not part of the name:
      * omp_threads is left as it is.
      *
@@ -139,7 +141,7 @@ namespace fdtd
      * back.
      *
      * The tile size is written for `tiles` and `tasks` only, then `+simd`, `+table`, `+fuse`
-     * and `+phase` in that order; the thread count is left out.
+     * `+phase`, then `+close` or `+spread` in that order; the thread count is left out.
      *
      * @param options Options to name.
      * @return The name, as `tasks:128x32+simd`.
@@ -150,14 +152,14 @@ namespace fdtd
      * Parse a CUDA variant name, `<kernel>[:<BX>x<BY>][+table][+graph][+async]`, into cuda_
      * fields.
      *
-     * The kernel is `fused`, `split` or `tiled`; `:BXxBY` sets the thread block, the default one
+     * The kernel is `fused` or `tiled`; `:BXxBY` sets the thread block, the default one
      * when it is left out; `+table` reads the coefficients outside the PML from a table; `+graph`
      * replays captured steps as a CUDA graph; `+async` copies snapshots out while the steps go
      * on. The suffixes may come in any order. `default` names the default settings. Whether the
      * device takes the block is left to the backend.
      *
      * @param name Option name for the error message.
-     * @param text Variant name, as `split:16x16`.
+     * @param text Variant name, as `tiled:16x16+table`.
      * @param options Options whose cuda_ fields are set; unchanged on an error.
      * @throws std::invalid_argument When the name is malformed.
      */

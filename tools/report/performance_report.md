@@ -15,7 +15,7 @@ header-includes:
 # Sources
 
 The report `$stamp` is made from the runs below, each named after its start in milliseconds since
-1970 and kept under `build/results/`.
+1970. The input directories contain the raw CSV samples and their machine metadata.
 
 $sources
 

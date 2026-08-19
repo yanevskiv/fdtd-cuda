@@ -82,9 +82,9 @@ namespace fdtd::TMz
         : m_options(options)
         , m_grid(nx, ny, options.dx, options.dy)
         , m_dt(options_dt(m_grid, options))
+        , m_backend(make_backend(options.backend, m_grid, options))
         , m_material(m_grid)
         , m_fields(m_grid)
-        , m_backend(make_backend(options.backend, m_grid, options))
     {
         apply_pml(m_material, m_options);
         m_backend->upload(Coeffs(m_material, m_dt));

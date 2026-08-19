@@ -129,7 +129,7 @@ TEST_CASE("Driver parses the OpenMP options", "[unit][driver]")
 // Verify a CUDA variant, given before or after the backend.
 TEST_CASE("Driver parses a CUDA variant", "[unit][driver]")
 {
-    CHECK(parse({"--backend", "cuda", "--variant", "split:16x16"}).variant == "split:16x16");
+    CHECK(parse({"--backend", "cuda", "--variant", "tiled:16x16"}).variant == "tiled:16x16");
     const auto options = parse({"--variant=fused", "--backend=cuda"});
     CHECK(options.backend == BackendType::Cuda);
     CHECK(options.variant == "fused");
@@ -266,11 +266,11 @@ TEST_CASE("Driver smoke run on CUDA", "[unit][driver][cuda]")
     std::ostringstream log;
     fdtd::run_driver(options, log);
     options = parse({"--nx", "32", "--steps", "20", "--probe", "20,16", "--backend", "cuda",
-                     "--variant", "split:16x16"});
+                     "--variant", "tiled:16x16"});
     options.output = dir / "cuda";
     fdtd::run_driver(options, log);
 
-    CHECK(log.str().find("on cuda (split:16x16)") != std::string::npos);
+    CHECK(log.str().find("on cuda (tiled:16x16)") != std::string::npos);
     std::ifstream serial(dir / "serial" / "probe_0.csv");
     std::ifstream cuda(dir / "cuda" / "probe_0.csv");
     std::string line;

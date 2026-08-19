@@ -88,6 +88,15 @@ namespace fdtd::TMz::backends::gpu
         return static_cast<std::size_t>(threads);
     }
 
+    // Ask the runtime for the free and total memory and keep the free.
+    std::size_t free_memory()
+    {
+        std::size_t free = 0;
+        std::size_t total = 0;
+        check(cudaMemGetInfo(&free, &total), "cudaMemGetInfo");
+        return free;
+    }
+
     // Read the attributes, the clocks given in kilohertz.
     DeviceInfo device_info()
     {

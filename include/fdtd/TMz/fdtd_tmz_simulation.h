@@ -64,15 +64,23 @@ namespace fdtd
             Phase
         };
 
+        /** Affinity policy of the OpenMP backend's parallel regions. */
+        enum class OmpBind {
+            /** Use the runtime's policy. */
+            Default,
+
+            /** Keep the team's threads on nearby places. */
+            Close,
+
+            /** Spread the team's threads across the available places. */
+            Spread
+        };
+
         /** How the CUDA backend lays the update of a step out in kernels. */
         enum class CudaKernel {
             /** One E kernel for every cell, each thread taking its cell's edge, PML or interior
              * branch. The default. */
             Fused,
-
-            /** Three E kernels with no branch on the cell: the interior, the PML slabs and the
-             * edge. */
-            Split,
 
             /** One kernel per step: each block updates H on its tile and the tile's lower and
              * left halo, keeps it in shared memory, and updates E from it, reading Ez, Hx and Hy
@@ -158,6 +166,11 @@ namespace fdtd
 
                 /** Where the OpenMP backend opens its parallel regions; Tasks takes Run only. */
                 OmpRegion omp_region = OmpRegion::Run;
+
+                /** Affinity policy; enable affinity with OMP_PROC_BIND=true and set
+                 * OMP_PLACES=threads before starting the process. A runtime with affinity
+                 * disabled ignores explicit policies, as required by OpenMP. */
+                OmpBind omp_bind = OmpBind::Default;
 
                 /** Whether the OpenMP backend's core cells, the interior less its last column
                  * and row, read the one tuple of coefficients they share (see
@@ -455,14 +468,14 @@ namespace fdtd
             /** Time step in seconds. */
             double m_dt;
 
+            /** Backend that owns the working fields and steps them. */
+            std::unique_ptr<Backend> m_backend;
+
             /** Per-cell material, holding the PML profiles. */
             Material m_material;
 
             /** Host copy of the fields. */
             Fields m_fields;
-
-            /** Backend that owns the working fields and steps them. */
-            std::unique_ptr<Backend> m_backend;
 
             /** Time steps run so far. */
             std::size_t m_step_count = 0;

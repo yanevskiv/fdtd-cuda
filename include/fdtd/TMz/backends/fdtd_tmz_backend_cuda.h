@@ -59,8 +59,8 @@ namespace fdtd
              * Rows on the device are padded to 128 bytes; the host grid keeps its pitch, and
              * the copies and the cells of sources and probes go from one to the other. A step
              * is H, the Hx and Hy sources, E, the Ez sources and the probes, in that order on
-             * one stream. E is one kernel or three, as cuda_kernel says. Each advance ends with
-             * a wait for the stream, so the work is done when step() returns.
+             * one stream; with the Tiled kernel H, its sources and E are one kernel. Each
+             * advance ends with a wait for the stream, so the work is done when step() returns.
              */
             class CudaBackend final : public Backend
             {
@@ -73,7 +73,9 @@ namespace fdtd
                  * @throws std::runtime_error When no CUDA device is present.
                  * @throws std::invalid_argument When a block side is zero, the block holds more
                  *         threads than the device allows, the blocks along y pass the device's
-                 *         limit of 65535, or the padded grid reaches 2^31 elements.
+                 *         limit of 65535, the padded grid reaches 2^31 elements, or its arrays
+                 *         need more device memory than is free; all before anything is
+                 *         allocated.
                  * @throws CudaError When the device memory cannot be had.
                  */
                 CudaBackend(const Grid &grid, const Simulation::Options &options);
@@ -257,16 +259,6 @@ namespace fdtd
                  * @return The tuple, or none when the interior's cells differ.
                  */
                 const std::optional<CoeffTuple> &uniform_tuple() const noexcept;
-
-                /**
-                 * Queue the E update of the Split layout: the interior, the PML slabs, then the
-                 * edge.
-                 *
-                 * @param fields View of the device fields.
-                 * @param coeffs View of the device coefficients.
-                 */
-                void launch_split_e(const gpu::DeviceFields &fields,
-                                    const gpu::DeviceCoeffs &coeffs);
 
                 /** A snapshot on its way out: its device copy, its host copy, and the events
                  * that mark the two copies done. */

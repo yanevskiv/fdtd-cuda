@@ -405,3 +405,22 @@ TEST_CASE("OpenMP models the traffic of the table and fusion", "[unit][backend][
         CHECK(fused.step_traffic().flops == expected.flops);
     }
 }
+
+// Verify that binding preserves fields and probes for every execution strategy.
+TEST_CASE("OpenMP binding preserves results bit for bit", "[backend][openmp]")
+{
+    require_openmp();
+    const auto boundary = GENERATE(Boundary::Pec, Boundary::Pmc, Boundary::Pml);
+    for (const std::size_t threads : thread_counts()) {
+        for (Simulation::Options options : combinations(threads)) {
+            const Run unbound = run(BackendType::OpenMP, options, {67, 45}, boundary);
+            for (const auto bind : {fdtd::TMz::OmpBind::Close, fdtd::TMz::OmpBind::Spread}) {
+                options.omp_bind = bind;
+                INFO(describe(options));
+                const Run bound = run(BackendType::OpenMP, options, {67, 45}, boundary);
+                CHECK(bound.fields == unbound.fields);
+                CHECK(bound.probes == unbound.probes);
+            }
+        }
+    }
+}

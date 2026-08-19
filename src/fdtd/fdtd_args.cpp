@@ -83,8 +83,6 @@ namespace fdtd
             switch (kernel) {
                 case TMz::CudaKernel::Fused:
                     return "fused";
-                case TMz::CudaKernel::Split:
-                    return "split";
                 case TMz::CudaKernel::Tiled:
                     break;
             }
@@ -275,6 +273,7 @@ namespace fdtd
         parsed.omp_region = defaults.omp_region;
         parsed.omp_table = defaults.omp_table;
         parsed.omp_fuse = defaults.omp_fuse;
+        parsed.omp_bind = defaults.omp_bind;
         if (text == "default") {
             options = parsed;
             return;
@@ -285,6 +284,7 @@ namespace fdtd
         bool table = false;
         bool fuse = false;
         bool phase = false;
+        TMz::OmpBind bind = TMz::OmpBind::Default;
         while (!suffixes.empty()) {
             suffixes.remove_prefix(1);
             const std::string_view suffix = suffixes.substr(0, suffixes.find('+'));
@@ -297,10 +297,17 @@ namespace fdtd
                 fuse = true;
             } else if (suffix == "phase" && !phase) {
                 phase = true;
+            } else if (suffix == "close" && bind == TMz::OmpBind::Default) {
+                bind = TMz::OmpBind::Close;
+            } else if (suffix == "spread" && bind == TMz::OmpBind::Default) {
+                bind = TMz::OmpBind::Spread;
             } else {
-                malformed_variant(name, text, "expected +simd, +table, +fuse or +phase, each once");
+                malformed_variant(
+                    name, text,
+                    "expected +simd, +table, +fuse, +phase and one of +close or +spread");
             }
         }
+        parsed.omp_bind = bind;
         parsed.omp_simd = simd;
         parsed.omp_table = table;
         parsed.omp_fuse = fuse;
@@ -355,6 +362,11 @@ namespace fdtd
         if (options.omp_region == TMz::OmpRegion::Phase) {
             name << "+phase";
         }
+        if (options.omp_bind == TMz::OmpBind::Close) {
+            name << "+close";
+        } else if (options.omp_bind == TMz::OmpBind::Spread) {
+            name << "+spread";
+        }
         return name.str();
     }
 
@@ -401,12 +413,10 @@ namespace fdtd
         const std::string_view kernel = head.substr(0, colon);
         if (kernel == "fused") {
             parsed.cuda_kernel = TMz::CudaKernel::Fused;
-        } else if (kernel == "split") {
-            parsed.cuda_kernel = TMz::CudaKernel::Split;
         } else if (kernel == "tiled") {
             parsed.cuda_kernel = TMz::CudaKernel::Tiled;
         } else {
-            malformed_variant(name, text, "expected fused, split or tiled");
+            malformed_variant(name, text, "expected fused or tiled");
         }
         if (colon != std::string_view::npos) {
             const auto [x, y] = parse_sides(name, text, head.substr(colon + 1), "block");

@@ -159,7 +159,7 @@ TEST_CASE("OpenMP variant names round-trip", "[unit][args]")
     for (const std::string name :
          {"rows", "rows+simd", "collapse2+phase", "tiles:128x32", "tasks:8x4+simd",
           "collapse2+simd+phase", "rows+table", "rows+simd+table+fuse", "tiles:64x16+table+phase",
-          "rows+fuse+phase"}) {
+          "rows+fuse+phase", "rows+simd+table+fuse+close", "tasks:128x32+spread"}) {
         CAPTURE(name);
         CHECK(fdtd::omp_variant_name(variant(name)) == name);
     }
@@ -195,7 +195,8 @@ TEST_CASE("OpenMP variant names reject malformed text", "[unit][args]")
         CHECK(options.omp_schedule == OmpSchedule::Tasks);
     }
 
-    for (const char *name : {"rows+table+table", "rows+simd+fuse+fuse", "+table"}) {
+    for (const char *name : {"rows+table+table", "rows+simd+fuse+fuse", "+table",
+                             "rows+close+spread", "rows+close+close", "rows+spread+spread"}) {
         CAPTURE(name);
         Simulation::Options options;
         CHECK_THROWS_AS(fdtd::parse_omp_variant_arg("--variant", name, options),
@@ -212,29 +213,29 @@ TEST_CASE("CUDA variant names round-trip", "[unit][args]")
     CHECK(fused.cuda_block_y == 8);
     CHECK(fdtd::cuda_variant_name(fused) == "fused:32x8");
 
-    const Simulation::Options split = cuda_variant("split:16x4");
-    CHECK(split.cuda_kernel == CudaKernel::Split);
-    CHECK(split.cuda_block_x == 16);
-    CHECK(split.cuda_block_y == 4);
-    CHECK(fdtd::cuda_variant_name(split) == "split:16x4");
+    const Simulation::Options tiled = cuda_variant("tiled:16x4");
+    CHECK(tiled.cuda_kernel == CudaKernel::Tiled);
+    CHECK(tiled.cuda_block_x == 16);
+    CHECK(tiled.cuda_block_y == 4);
+    CHECK(fdtd::cuda_variant_name(tiled) == "tiled:16x4");
 
-    CHECK(fdtd::cuda_variant_name(cuda_variant("split")) == "split:32x8");
+    CHECK(fdtd::cuda_variant_name(cuda_variant("tiled")) == "tiled:32x8");
     CHECK_FALSE(fused.cuda_graph);
     const Simulation::Options graph = cuda_variant("fused+graph");
     CHECK(graph.cuda_graph);
     CHECK(fdtd::cuda_variant_name(graph) == "fused:32x8+graph");
     CHECK(graph.cuda_coeffs == fdtd::TMz::CudaCoeffs::Arrays);
-    const Simulation::Options both = cuda_variant("split+graph+table");
+    const Simulation::Options both = cuda_variant("tiled+graph+table");
     CHECK(both.cuda_coeffs == fdtd::TMz::CudaCoeffs::Table);
     CHECK(both.cuda_graph);
-    CHECK(fdtd::cuda_variant_name(both) == "split:32x8+table+graph");
+    CHECK(fdtd::cuda_variant_name(both) == "tiled:32x8+table+graph");
     CHECK(cuda_variant("tiled").cuda_kernel == CudaKernel::Tiled);
     CHECK(cuda_variant("fused+async").cuda_async_snapshots);
     CHECK_FALSE(cuda_variant("fused+graph").cuda_async_snapshots);
     for (const std::string name :
-         {"fused:32x8", "fused:1x1", "split:128x1", "split:7x5", "split:16x16+graph",
+         {"fused:32x8", "fused:1x1", "tiled:128x1", "tiled:7x5", "tiled:16x16+graph",
           "fused:32x8+table", "fused:64x4+table+graph", "tiled:32x8", "tiled:16x16+table+graph",
-          "split:32x8+async", "tiled:32x8+table+graph+async"}) {
+          "fused:32x8+async", "tiled:32x8+table+graph+async"}) {
         CAPTURE(name);
         CHECK(fdtd::cuda_variant_name(cuda_variant(name)) == name);
     }
@@ -248,7 +249,7 @@ TEST_CASE("CUDA variant names reject malformed text", "[unit][args]")
     options.cuda_block_x = 7;
     options.cuda_graph = true;
     options.cuda_coeffs = fdtd::TMz::CudaCoeffs::Table;
-    fdtd::parse_cuda_variant_arg("--variant", "split", options);
+    fdtd::parse_cuda_variant_arg("--variant", "tiled", options);
     CHECK(options.cuda_coeffs == fdtd::TMz::CudaCoeffs::Arrays);
     CHECK(options.omp_schedule == OmpSchedule::Tasks);
     CHECK(options.cuda_block_x == 32);
@@ -265,7 +266,8 @@ TEST_CASE("CUDA variant names reject malformed text", "[unit][args]")
                              "fused:32x8x2",
                              "fused:ax8",
                              "fused+simd",
-                             "split:",
+                             "split",
+                             "split:32x8",
                              "default:32x8",
                              "fused+graph+graph",
                              "fused+",
@@ -277,10 +279,10 @@ TEST_CASE("CUDA variant names reject malformed text", "[unit][args]")
                              "fused+async+async"}) {
         CAPTURE(name);
         Simulation::Options unchanged;
-        unchanged.cuda_kernel = CudaKernel::Split;
+        unchanged.cuda_kernel = CudaKernel::Tiled;
         CHECK_THROWS_AS(fdtd::parse_cuda_variant_arg("--variant", name, unchanged),
                         std::invalid_argument);
-        CHECK(unchanged.cuda_kernel == CudaKernel::Split);
+        CHECK(unchanged.cuda_kernel == CudaKernel::Tiled);
     }
 }
 
@@ -295,16 +297,16 @@ TEST_CASE("Variant names belong to their backend", "[unit][args]")
     CHECK(fdtd::backend_reads_variant(BackendType::OpenMP, "tiles:8x8+simd"));
     CHECK_FALSE(fdtd::backend_reads_variant(BackendType::Cuda, "tiles:8x8+simd"));
     CHECK_FALSE(fdtd::backend_reads_variant(BackendType::Serial, "rows"));
-    CHECK(fdtd::backend_reads_variant(BackendType::Cuda, "split:16x16"));
-    CHECK_FALSE(fdtd::backend_reads_variant(BackendType::OpenMP, "split:16x16"));
+    CHECK(fdtd::backend_reads_variant(BackendType::Cuda, "tiled:16x16"));
+    CHECK_FALSE(fdtd::backend_reads_variant(BackendType::OpenMP, "tiled:16x16"));
     CHECK_FALSE(fdtd::backend_reads_variant(BackendType::Serial, "fused"));
 
     Simulation::Options options;
-    fdtd::parse_variant_arg("--variant", BackendType::Cuda, "split:8x4", options);
-    CHECK(options.cuda_kernel == CudaKernel::Split);
+    fdtd::parse_variant_arg("--variant", BackendType::Cuda, "tiled:8x4", options);
+    CHECK(options.cuda_kernel == CudaKernel::Tiled);
     fdtd::parse_variant_arg("--variant", BackendType::OpenMP, "collapse2", options);
     CHECK(options.omp_schedule == OmpSchedule::Collapse2);
-    CHECK(options.cuda_kernel == CudaKernel::Split);
+    CHECK(options.cuda_kernel == CudaKernel::Tiled);
     CHECK_THROWS_AS(fdtd::parse_variant_arg("--variant", BackendType::Serial, "rows", options),
                     std::invalid_argument);
     CHECK_THROWS_AS(fdtd::parse_variant_arg("--variant", BackendType::OpenMP, "fused", options),
@@ -312,5 +314,5 @@ TEST_CASE("Variant names belong to their backend", "[unit][args]")
 
     CHECK(fdtd::variant_name(BackendType::Serial, options) == "default");
     CHECK(fdtd::variant_name(BackendType::OpenMP, options) == "collapse2");
-    CHECK(fdtd::variant_name(BackendType::Cuda, options) == "split:8x4");
+    CHECK(fdtd::variant_name(BackendType::Cuda, options) == "tiled:8x4");
 }

@@ -50,7 +50,7 @@ namespace fdtd::TMz::backends
     // Helpers private to this file.
     namespace
     {
-        // Threads per block of the kernels over a list of cells: sources, probes, slabs and edge.
+        // Threads per block of the kernels over a list of cells: the sources and the probes.
         constexpr unsigned LINE_BLOCK = 128;
 
         // Most blocks a launch may have along y.
@@ -89,39 +89,6 @@ namespace fdtd::TMz::backends
             const int j = thread_j();
             if (i < fields.nx && j < fields.ny) {
                 gpu::update_e_cell(fields, coeffs, i, j, boundary);
-            }
-        }
-
-        // Advance Ez of the thread's interior cell, the interior starting at lo along both axes.
-        __global__ void update_e_interior_kernel(gpu::DeviceFields fields, gpu::DeviceCoeffs coeffs,
-                                                 int lo)
-        {
-            const int i = lo + thread_i();
-            const int j = lo + thread_j();
-            if (i < fields.nx - lo && j < fields.ny - lo) {
-                gpu::update_e_interior_cell(fields, coeffs, i, j);
-            }
-        }
-
-        // Advance Ezx, Ezy and Ez of the thread's PML cell.
-        __global__ void update_e_slab_kernel(gpu::DeviceFields fields, gpu::DeviceCoeffs coeffs,
-                                             int count)
-        {
-            const int t = thread_i();
-            if (t < count) {
-                const gpu::CellIndex cell = gpu::slab_cell(fields, t);
-                gpu::update_e_split_cell(fields, coeffs, cell.i, cell.j);
-            }
-        }
-
-        // Update Ez of the thread's edge cell.
-        __global__ void update_e_edge_kernel(gpu::DeviceFields fields, gpu::DeviceCoeffs coeffs,
-                                             int count, Boundary boundary)
-        {
-            const int t = thread_i();
-            if (t < count) {
-                const gpu::CellIndex cell = gpu::edge_cell(fields, t);
-                gpu::update_e_edge_cell(fields, coeffs, cell.i, cell.j, boundary);
             }
         }
 
@@ -239,6 +206,30 @@ namespace fdtd::TMz::backends
             return static_cast<unsigned>((count + LINE_BLOCK - 1) / LINE_BLOCK);
         }
 
+        // Bytes of device memory the grid's arrays take: fields, coefficients, and the options'.
+        std::size_t device_bytes(std::size_t cells, const Simulation::Options &options)
+        {
+            std::size_t arrays = 13;
+            if (options.cuda_kernel == CudaKernel::Tiled) {
+                arrays += 3;
+            }
+            if (options.cuda_async_snapshots) {
+                arrays += 10;
+            }
+            const std::size_t index = options.cuda_coeffs == CudaCoeffs::Table ? cells : 0;
+            const std::size_t table = options.cuda_coeffs == CudaCoeffs::Table
+                                          ? CoeffTable::CAPACITY * sizeof(CoeffTuple)
+                                          : 0;
+            return arrays * cells * sizeof(FloatType) + index + table + sizeof(int);
+        }
+
+        // Write a byte count in MiB for a message.
+        void put_mib(std::ostringstream &message, std::size_t bytes)
+        {
+            message << bytes / (std::size_t(1) << 20);
+            message << " MiB";
+        }
+
         // Check the options and the grid before anything is allocated.
         const Simulation::Options &checked(const Grid &grid, const Simulation::Options &options)
         {
@@ -265,6 +256,17 @@ namespace fdtd::TMz::backends
             const auto limit = static_cast<std::size_t>(std::numeric_limits<int>::max());
             if (pitch > limit / grid.ny()) {
                 throw std::invalid_argument("CudaBackend: the grid is too large for int indices");
+            }
+            const std::size_t needed = device_bytes(pitch * grid.ny(), options);
+            const std::size_t free = gpu::free_memory();
+            if (needed > free) {
+                std::ostringstream message;
+                message << "CudaBackend: the grid needs ";
+                put_mib(message, needed);
+                message << " of device memory, and ";
+                put_mib(message, free);
+                message << " are free";
+                throw std::invalid_argument(message.str());
             }
             return options;
         }
@@ -448,7 +450,7 @@ namespace fdtd::TMz::backends
         return m_records;
     }
 
-    // Model the kernels: Fused and Split make an H pass and an E pass, Tiled one pass.
+    // Model the kernels: Fused makes an H pass and an E pass, Tiled one pass.
     StepTraffic CudaBackend::step_traffic() const noexcept
     {
         TrafficModel model;
@@ -736,31 +738,6 @@ namespace fdtd::TMz::backends
         return coeffs;
     }
 
-    // Queue the interior, slab and edge kernels of the Split layout.
-    void CudaBackend::launch_split_e(const gpu::DeviceFields &fields,
-                                     const gpu::DeviceCoeffs &coeffs)
-    {
-        cudaStream_t stream = m_stream.handle();
-        const int lo = gpu::interior_lo(fields);
-        if (fields.nx > 2 * lo && fields.ny > 2 * lo) {
-            const auto bx = static_cast<unsigned>(m_options.cuda_block_x);
-            const auto by = static_cast<unsigned>(m_options.cuda_block_y);
-            const auto width = static_cast<unsigned>(fields.nx - 2 * lo);
-            const auto height = static_cast<unsigned>(fields.ny - 2 * lo);
-            const dim3 block(bx, by);
-            const dim3 cells((width + bx - 1) / bx, (height + by - 1) / by);
-            update_e_interior_kernel<<<cells, block, 0, stream>>>(fields, coeffs, lo);
-        }
-        const int slabs = gpu::slab_cell_count(fields);
-        if (slabs > 0) {
-            update_e_slab_kernel<<<line_blocks(static_cast<std::size_t>(slabs)), LINE_BLOCK, 0,
-                                   stream>>>(fields, coeffs, slabs);
-        }
-        const int edges = gpu::edge_cell_count(fields);
-        update_e_edge_kernel<<<line_blocks(static_cast<std::size_t>(edges)), LINE_BLOCK, 0,
-                               stream>>>(fields, coeffs, edges, m_boundary);
-    }
-
     // Queue the kernels of step n, or of the step on the device, which is then counted.
     void CudaBackend::launch_step(const gpu::DeviceCoeffs &coeffs, std::size_t n,
                                   std::size_t magnetic, std::size_t electric, bool replay)
@@ -796,11 +773,7 @@ namespace fdtd::TMz::backends
                     fields, sources, static_cast<int>(magnetic), values, step,
                     static_cast<int>(npoints));
             }
-            if (m_options.cuda_kernel == CudaKernel::Fused) {
-                update_e_fused_kernel<<<cells, block, 0, stream>>>(fields, coeffs, m_boundary);
-            } else {
-                launch_split_e(fields, coeffs);
-            }
+            update_e_fused_kernel<<<cells, block, 0, stream>>>(fields, coeffs, m_boundary);
         }
         if (electric > 0) {
             add_sources_kernel<<<line_blocks(electric), LINE_BLOCK, 0, stream>>>(

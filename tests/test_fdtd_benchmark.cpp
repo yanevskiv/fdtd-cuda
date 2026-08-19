@@ -283,7 +283,7 @@ TEST_CASE("Benchmark interleaves the configurations", "[unit][benchmark]")
 {
     auto options = small();
     options.repeat = 3;
-    options.variants = {"default", "collapse2", "split"};
+    options.variants = {"default", "collapse2", "tiled"};
     options.threads = {1, 2};
     std::string groupedCsv;
     const auto grouped = run(options, groupedCsv);
@@ -369,10 +369,10 @@ TEST_CASE("Benchmark runs each CUDA variant", "[unit][benchmark][cuda]")
     CHECK(samples[0].threads == 1);
     CHECK(samples[0].checksum != 0);
 
-    options.variants = {"rows", "split:16x16", "fused:7x5"};
+    options.variants = {"rows", "tiled:16x16", "fused:7x5"};
     samples = run(options, csv);
     REQUIRE(samples.size() == 2);
-    CHECK(samples[0].variant == "split:16x16");
+    CHECK(samples[0].variant == "tiled:16x16");
     CHECK(samples[1].variant == "fused:7x5");
     CHECK(samples[0].threads == 1);
 }
@@ -382,7 +382,7 @@ TEST_CASE("Benchmark splits a mixed variant list by backend", "[unit][benchmark]
 {
     auto options = small();
     options.repeat = 1;
-    options.variants = {"collapse2+simd", "split", "rows"};
+    options.variants = {"collapse2+simd", "tiled", "rows"};
     std::string csv;
     const auto samples = run(options, csv);
     std::vector<std::string> openmp;
@@ -400,7 +400,7 @@ TEST_CASE("Benchmark splits a mixed variant list by backend", "[unit][benchmark]
         CHECK(openmp == std::vector<std::string>{"collapse2+simd", "rows"});
     }
     if (fdtd::TMz::is_backend_available(BackendType::Cuda)) {
-        CHECK(cuda == std::vector<std::string>{"split:32x8"});
+        CHECK(cuda == std::vector<std::string>{"tiled:32x8"});
     }
 }
 

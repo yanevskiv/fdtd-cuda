@@ -93,33 +93,59 @@ namespace fdtd::TMz::backends
             return cpu::Partition::tiles(grid, options.omp_tile_x, options.omp_tile_y);
         }
 
+        // Run a shared body on a team with the requested affinity policy.
+        template <typename Body> void run_team(int threads, OmpBind bind, const Body &body)
+        {
+            if (bind == OmpBind::Close) {
+#pragma omp parallel num_threads(threads) proc_bind(close)
+                {
+                    body();
+                }
+            } else if (bind == OmpBind::Spread) {
+#pragma omp parallel num_threads(threads) proc_bind(spread)
+                {
+                    body();
+                }
+            } else {
+#pragma omp parallel num_threads(threads)
+                {
+                    body();
+                }
+            }
+        }
+
         // Run every step as a static omp for over the parts, in one region or one per phase.
         template <bool Simd, bool Table, OmpRegion Region>
         void run_loops(const cpu::Stepper &stepper, std::size_t parts, std::size_t nsteps,
-                       int threads)
+                       int threads, OmpBind bind)
         {
             if constexpr (Region == OmpRegion::Run) {
-#pragma omp parallel num_threads(threads)
-                for (std::size_t n = 0; n < nsteps; ++n) {
+                run_team(threads, bind, [&] {
+                    for (std::size_t n = 0; n < nsteps; ++n) {
 #pragma omp for schedule(static)
-                    for (std::size_t p = 0; p < parts; ++p) {
-                        stepper.h_phase<Simd, Table>(p, n);
-                    }
+                        for (std::size_t p = 0; p < parts; ++p) {
+                            stepper.h_phase<Simd, Table>(p, n);
+                        }
 #pragma omp for schedule(static)
-                    for (std::size_t p = 0; p < parts; ++p) {
-                        stepper.e_phase<Simd, Table>(p, n);
+                        for (std::size_t p = 0; p < parts; ++p) {
+                            stepper.e_phase<Simd, Table>(p, n);
+                        }
                     }
-                }
+                });
             } else {
                 for (std::size_t n = 0; n < nsteps; ++n) {
-#pragma omp parallel for num_threads(threads) schedule(static)
-                    for (std::size_t p = 0; p < parts; ++p) {
-                        stepper.h_phase<Simd, Table>(p, n);
-                    }
-#pragma omp parallel for num_threads(threads) schedule(static)
-                    for (std::size_t p = 0; p < parts; ++p) {
-                        stepper.e_phase<Simd, Table>(p, n);
-                    }
+                    run_team(threads, bind, [&] {
+#pragma omp for schedule(static)
+                        for (std::size_t p = 0; p < parts; ++p) {
+                            stepper.h_phase<Simd, Table>(p, n);
+                        }
+                    });
+                    run_team(threads, bind, [&] {
+#pragma omp for schedule(static)
+                        for (std::size_t p = 0; p < parts; ++p) {
+                            stepper.e_phase<Simd, Table>(p, n);
+                        }
+                    });
                 }
             }
         }
@@ -127,10 +153,9 @@ namespace fdtd::TMz::backends
         // Sweep each thread's band of rows once a step, H then E row by row, after the top row's H.
         template <bool Simd, bool Table>
         void run_fused_rows(const cpu::Stepper &stepper, std::size_t rows, std::size_t nsteps,
-                            int threads)
+                            int threads, OmpBind bind)
         {
-#pragma omp parallel num_threads(threads)
-            {
+            run_team(threads, bind, [&] {
                 const auto team = static_cast<std::size_t>(omp_get_num_threads());
                 const auto t = static_cast<std::size_t>(omp_get_thread_num());
                 const std::size_t base = rows / team;
@@ -150,13 +175,13 @@ namespace fdtd::TMz::backends
                     }
 #pragma omp barrier
                 }
-            }
+            });
         }
 
         // Make one task per tile per phase, each waiting for the phases of the tiles it reads.
         template <bool Simd, bool Table>
         void run_tasks(const cpu::Stepper &stepper, const cpu::Partition &partition,
-                       std::size_t nsteps, int threads)
+                       std::size_t nsteps, int threads, OmpBind bind)
         {
             const std::size_t parts = partition.size();
             const std::size_t columns = partition.tiles_x();
@@ -166,25 +191,26 @@ namespace fdtd::TMz::backends
             std::vector<char> eTokens(parts);
             char *h = hTokens.data();
             char *e = eTokens.data();
-#pragma omp parallel num_threads(threads)
+            run_team(threads, bind, [&] {
 #pragma omp single
-            for (std::size_t n = 0; n < nsteps; ++n) {
-                for (std::size_t p = 0; p < parts; ++p) {
-                    const std::size_t right = p % columns + 1 < columns ? p + 1 : p;
-                    const std::size_t up = p / columns + 1 < rows ? p + columns : p;
+                for (std::size_t n = 0; n < nsteps; ++n) {
+                    for (std::size_t p = 0; p < parts; ++p) {
+                        const std::size_t right = p % columns + 1 < columns ? p + 1 : p;
+                        const std::size_t up = p / columns + 1 < rows ? p + columns : p;
 #pragma omp task depend(in : e[p], e[right], e[up]) depend(out : h[p])
-                    stepper.h_phase<Simd, Table>(p, n);
-                }
-                for (std::size_t p = 0; p < parts; ++p) {
-                    const std::size_t left = p % columns > 0 ? p - 1 : p;
-                    const std::size_t down = p / columns > 0 ? p - columns : p;
+                        stepper.h_phase<Simd, Table>(p, n);
+                    }
+                    for (std::size_t p = 0; p < parts; ++p) {
+                        const std::size_t left = p % columns > 0 ? p - 1 : p;
+                        const std::size_t down = p / columns > 0 ? p - columns : p;
 #pragma omp task depend(in : h[p], h[left], h[down]) depend(out : e[p])
-                    stepper.e_phase<Simd, Table>(p, n);
-                }
-                if ((n + 1) % window == 0) {
+                        stepper.e_phase<Simd, Table>(p, n);
+                    }
+                    if ((n + 1) % window == 0) {
 #pragma omp taskwait
+                    }
                 }
-            }
+            });
         }
 
         // Hand the parts to the threads as the schedule, the fusion and the region say.
@@ -194,13 +220,15 @@ namespace fdtd::TMz::backends
         {
             const std::size_t parts = partition.size();
             if (options.omp_schedule == OmpSchedule::Tasks) {
-                run_tasks<Simd, Table>(stepper, partition, nsteps, threads);
+                run_tasks<Simd, Table>(stepper, partition, nsteps, threads, options.omp_bind);
             } else if (options.omp_fuse) {
-                run_fused_rows<Simd, Table>(stepper, parts, nsteps, threads);
+                run_fused_rows<Simd, Table>(stepper, parts, nsteps, threads, options.omp_bind);
             } else if (options.omp_region == OmpRegion::Run) {
-                run_loops<Simd, Table, OmpRegion::Run>(stepper, parts, nsteps, threads);
+                run_loops<Simd, Table, OmpRegion::Run>(stepper, parts, nsteps, threads,
+                                                       options.omp_bind);
             } else {
-                run_loops<Simd, Table, OmpRegion::Phase>(stepper, parts, nsteps, threads);
+                run_loops<Simd, Table, OmpRegion::Phase>(stepper, parts, nsteps, threads,
+                                                         options.omp_bind);
             }
         }
     }
