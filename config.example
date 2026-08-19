@@ -15,54 +15,52 @@ BENCH_REPEAT=10
 # Backends: serial, openmp, cuda, or all for every compiled one
 BENCH_BACKENDS="all"
 
-# Thread counts, for OpenMP only; 12 was the stable choice on the reference 8-core CPU
+# OpenMP thread counts; 12 was the stable choice on the reference 8-core CPU
 BENCH_THREADS="12"
 
-# Sleep at barriers on shared machines; an explicit environment setting still wins.
+# PASSIVE sleeps at barriers, kind to a shared machine; a value set in the environment wins
 export OMP_WAIT_POLICY="${OMP_WAIT_POLICY:-PASSIVE}"
 
-# Variants, OpenMP and CUDA names mixed: OpenMP SCHEDULE[+simd][+table][+fuse][+phase][+close|+spread]
-# with rows or collapse2; CUDA KERNEL[:BXxBY][+table][+graph][+async] with fused or
-# tiled; or default. Each backend runs the names it reads, or default when it reads none; serial
-# runs default only
+# Variant names or default; each backend runs the ones it reads (see benchmark --help)
 BENCH_VARIANTS="default"
 
-# Weak scaling: per thread count p, OpenMP on nx = BENCH_WEAK_NX and ny = p * BENCH_WEAK_NX, into
-# benchmark_weak_<timestamp>.csv; empty for none
+# Weak scaling: OpenMP on nx = BENCH_WEAK_NX by ny = threads * BENCH_WEAK_NX; empty for none
 BENCH_WEAK_NX=""
 
 # Grid sizes, nx = ny
 BENCH_SIZES="128 256 512 1024 2048"
 
-# Order of the samples: interleaved takes one sample of each configuration per round, so a load
-# spike from another process falls on all of them alike; grouped takes each configuration's
-# samples in a row
+# interleaved (one sample per configuration per round, evens out load spikes) or grouped
 BENCH_ORDER="interleaved"
 
-# Outer boundary of the workload: pml, the default, or pec or pmc with no PML
+# Outer boundary: pml, or pec or pmc with no PML
 BENCH_BOUNDARY="pml"
 
-# Steps between the snapshots each sample copies to the host, timed with it; 0 for none
+# Steps between snapshots copied to the host inside the timed run; 0 for none
 BENCH_SNAPSHOT_EVERY=0
 
-# Label of the run, written into its CSV; the report tells apart by label the runs that share a
-# configuration, such as runs under different OMP_* settings; empty for none
+# Run label written into the CSV, telling apart runs of the same configuration; empty for none
 BENCH_LABEL=""
 
 # --- Profile run ---
 
-# Tools, any of: perf-stat perf-record callgrind cachegrind memcheck nsys ncu; nsys and ncu
-# need PROFILE_BACKEND="cuda"
+# Tools: perf-stat perf-record callgrind cachegrind memcheck nsys ncu (nsys, ncu need cuda)
 PROFILE_TOOLS="perf-stat perf-record callgrind cachegrind memcheck"
 
-# Backend and thread count profiled
+# Backend profiled: serial, openmp or cuda
 PROFILE_BACKEND="serial"
+
+# Thread count profiled, for OpenMP
 PROFILE_THREADS=1
 
-# Grid size, nx = ny, and time steps under perf, nsys and ncu
+# Grid size, nx = ny, under perf, nsys and ncu
 PROFILE_PERF_SIZE=1024
+
+# Time steps under perf, nsys and ncu
 PROFILE_PERF_STEPS=200
 
-# Grid size and time steps under valgrind, which runs far slower than perf
+# Grid size, nx = ny, under valgrind, which runs far slower than perf
 PROFILE_VALGRIND_SIZE=256
+
+# Time steps under valgrind
 PROFILE_VALGRIND_STEPS=200
