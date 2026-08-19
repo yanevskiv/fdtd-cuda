@@ -103,7 +103,7 @@ target_link_libraries(fdtd_benchmark PUBLIC fdtd::fdtd PRIVATE fdtd_args fdtd_wa
 add_executable(benchmark src/benchmark.cpp)
 target_link_libraries(benchmark PRIVATE fdtd_benchmark fdtd_warnings)
 
-# The benchmark sweep of the config file into build/results/, run by hand; timing is never a test.
+# The benchmark sweep of the config file into results/, run by hand; timing is never a test.
 add_custom_target(bench
     COMMAND ${PROJECT_SOURCE_DIR}/tools/bench_sweep.sh -p $<TARGET_FILE:benchmark>
     DEPENDS benchmark
@@ -111,7 +111,7 @@ add_custom_target(bench
     USES_TERMINAL
     VERBATIM)
 
-# The profile run of the config file into build/results/, run by hand with the profile preset.
+# The profile run of the config file into results/, run by hand with the profile preset.
 add_custom_target(profile
     COMMAND ${PROJECT_SOURCE_DIR}/tools/profile_run.sh -p $<TARGET_FILE:benchmark>
     DEPENDS benchmark

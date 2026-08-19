@@ -23,7 +23,7 @@ HERE="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 CONFIG="$(dirname "$HERE")/config"
 NAME="../config"
 PROG=""
-OUT="results/benchmarks"
+OUT="$(dirname "$HERE")/results/benchmarks"
 
 # Print usage instructions
 usage() {

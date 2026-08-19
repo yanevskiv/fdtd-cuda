@@ -2,9 +2,9 @@
 
 PRESET ?= debug
 BENCH_PRESET ?= bench
-BENCH_DIR ?= $(lastword $(sort $(wildcard build/results/benchmarks/*)))
-PROFILE_DIR ?= $(lastword $(sort $(wildcard build/results/profiles/*)))
-REPORT_DIR ?= build/reports/$(shell date +%s%3N)
+BENCH_DIR ?= $(lastword $(sort $(wildcard results/benchmarks/*)))
+PROFILE_DIR ?= $(lastword $(sort $(wildcard results/profiles/*)))
+REPORT_DIR ?= results/reports/$(shell date +%s%3N)
 
 SOURCES = $(shell git ls-files --cached --others --exclude-standard 'include/*.h' 'include/*.cuh' 'src/*.h' 'src/*.cpp' 'src/*.cu' 'src/*.cuh' \
 	'tests/*.cpp' 'tests/*.h' 'samples/*.cpp')

@@ -2,6 +2,7 @@
 /build/
 /dist/
 /out/
+/results/
 
 # Editors and tools
 /.cache/
