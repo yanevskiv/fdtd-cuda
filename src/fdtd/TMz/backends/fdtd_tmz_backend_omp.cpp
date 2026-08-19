@@ -20,8 +20,8 @@
 // Class declaration.
 #include "fdtd/TMz/backends/fdtd_tmz_backend_omp.h"
 
-// The stepper the threads share.
-#include "fdtd/TMz/backends/cpu/fdtd_tmz_backend_cpu_stepper.h"
+// The serial stepper the threads share.
+#include "fdtd/TMz/backends/fdtd_tmz_backend_serial.h"
 
 // OpenMP runtime for the default thread count.
 #include <omp.h>
@@ -68,13 +68,13 @@ namespace fdtd::TMz::backends
         }
 
         // Cut the grid into the parts of the schedule: rows or one range per thread.
-        cpu::Partition partition_for(const Grid &grid, const Simulation::Options &options,
-                                     std::size_t threads)
+        serial::Partition partition_for(const Grid &grid, const Simulation::Options &options,
+                                        std::size_t threads)
         {
             if (options.omp_schedule == OmpSchedule::Collapse2) {
-                return cpu::Partition::ranges(grid, threads);
+                return serial::Partition::ranges(grid, threads);
             }
-            return cpu::Partition::tiles(grid, grid.nx(), 1);
+            return serial::Partition::tiles(grid, grid.nx(), 1);
         }
 
         // Run a shared body on a team with the requested affinity policy.
@@ -100,7 +100,7 @@ namespace fdtd::TMz::backends
 
         // Run every step as a static omp for over the parts, in one region or one per phase.
         template <bool Simd, bool Table, OmpRegion Region>
-        void run_loops(const cpu::Stepper &stepper, std::size_t parts, std::size_t nsteps,
+        void run_loops(const serial::Stepper &stepper, std::size_t parts, std::size_t nsteps,
                        int threads, OmpBind bind)
         {
             if constexpr (Region == OmpRegion::Run) {
@@ -136,7 +136,7 @@ namespace fdtd::TMz::backends
 
         // Sweep each thread's band of rows once a step, H then E row by row, after the top row's H.
         template <bool Simd, bool Table>
-        void run_fused_rows(const cpu::Stepper &stepper, std::size_t rows, std::size_t nsteps,
+        void run_fused_rows(const serial::Stepper &stepper, std::size_t rows, std::size_t nsteps,
                             int threads, OmpBind bind)
         {
             run_team(threads, bind, [&] {
@@ -164,7 +164,7 @@ namespace fdtd::TMz::backends
 
         // Hand the parts to the threads as the schedule, the fusion and the region say.
         template <bool Simd, bool Table>
-        void run_schedule(const cpu::Stepper &stepper, const cpu::Partition &partition,
+        void run_schedule(const serial::Stepper &stepper, const serial::Partition &partition,
                           std::size_t nsteps, int threads, const Simulation::Options &options)
         {
             const std::size_t parts = partition.size();
@@ -182,7 +182,7 @@ namespace fdtd::TMz::backends
 
     // Check the options, fix the thread count and cut the grid for the schedule.
     OmpBackend::OmpBackend(const Grid &grid, const Simulation::Options &options)
-        : cpu::CpuBase(grid)
+        : SerialBackend(grid)
         , m_options(checked(options))
         , m_threads(options.omp_threads > 0 ? options.omp_threads
                                             : static_cast<std::size_t>(omp_get_max_threads()))
@@ -218,7 +218,7 @@ namespace fdtd::TMz::backends
     // Copy the arrays in, then find the core's tuple with the coefficients' PML and with none.
     void OmpBackend::upload(const Coeffs &coeffs)
     {
-        cpu::CpuBase::upload(coeffs);
+        SerialBackend::upload(coeffs);
         m_uniform_pml.reset();
         m_uniform_plain.reset();
         if (m_options.omp_table) {
@@ -245,9 +245,9 @@ namespace fdtd::TMz::backends
     }
 
     // View the arrays, with the core's tuple and the core when there is a tuple.
-    cpu::CoeffsView OmpBackend::stepper_coeffs() const noexcept
+    serial::CoeffsView OmpBackend::stepper_coeffs() const noexcept
     {
-        cpu::CoeffsView view = coeffs();
+        serial::CoeffsView view = coeffs();
         const std::optional<CoeffTuple> &uniform = uniform_tuple();
         if (uniform.has_value()) {
             const std::size_t lo = std::max<std::size_t>(active_pml(), 1);
@@ -268,8 +268,8 @@ namespace fdtd::TMz::backends
     {
         require_coeffs();
         FloatType *records = add_records(nsteps);
-        const cpu::Stepper stepper(fields(), stepper_coeffs(), active_pml(), boundary(),
-                                   m_partition, points, values, probes(), records);
+        const serial::Stepper stepper(fields(), stepper_coeffs(), active_pml(), boundary(),
+                                      m_partition, points, values, probes(), records);
         const int threads = static_cast<int>(m_threads);
         if (m_options.omp_simd && m_options.omp_table) {
             run_schedule<true, true>(stepper, m_partition, nsteps, threads, m_options);

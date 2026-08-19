@@ -20,8 +20,7 @@
 #ifndef FDTD_TMZ_BACKEND_OMP_H
 #define FDTD_TMZ_BACKEND_OMP_H
 
-#include "fdtd/TMz/backends/cpu/fdtd_tmz_backend_cpu_base.h"
-#include "fdtd/TMz/backends/cpu/fdtd_tmz_backend_cpu_partition.h"
+#include "fdtd/TMz/backends/fdtd_tmz_backend_serial.h"
 #include "fdtd/TMz/fdtd_tmz_backend.h"
 #include "fdtd/TMz/fdtd_tmz_coeff_table.h"
 #include "fdtd/TMz/fdtd_tmz_coeffs.h"
@@ -50,7 +49,7 @@ namespace fdtd
              * in as template instances and picked when the run starts. The arithmetic per cell is
              * the serial backend's.
              */
-            class OmpBackend final : public cpu::CpuBase
+            class OmpBackend final : public SerialBackend
             {
             public:
                 /**
@@ -64,7 +63,7 @@ namespace fdtd
                 OmpBackend(const Grid &grid, const Simulation::Options &options);
 
                 /** The upload of fields, which the upload of coefficients would hide. */
-                using cpu::CpuBase::upload;
+                using SerialBackend::upload;
 
                 /**
                  * Copy update coefficients into the backend, and with omp_table find the tuple
@@ -137,7 +136,7 @@ namespace fdtd
                  *
                  * @return The view the stepper reads.
                  */
-                cpu::CoeffsView stepper_coeffs() const noexcept;
+                serial::CoeffsView stepper_coeffs() const noexcept;
 
                 /** Settings of the backend. */
                 Simulation::Options m_options;
@@ -146,7 +145,7 @@ namespace fdtd
                 std::size_t m_threads;
 
                 /** Parts the threads share. */
-                cpu::Partition m_partition;
+                serial::Partition m_partition;
 
                 /** Tuple the core cells share with the PML of the coefficients in force. */
                 std::optional<CoeffTuple> m_uniform_pml;

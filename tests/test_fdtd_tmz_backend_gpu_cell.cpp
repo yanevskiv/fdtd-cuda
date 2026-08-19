@@ -21,8 +21,8 @@
 #include <catch2/catch_test_macros.hpp>
 #include <catch2/generators/catch_generators.hpp>
 
-// Project headers under test, and the CPU kernels they are checked against.
-#include "fdtd/TMz/backends/cpu/fdtd_tmz_backend_cpu_block.h"
+// Project headers under test, and the serial kernels they are checked against.
+#include "fdtd/TMz/backends/fdtd_tmz_backend_serial.h"
 #include "fdtd/TMz/backends/gpu/fdtd_tmz_backend_gpu_cell.h"
 #include "fdtd/TMz/fdtd_tmz_coeffs.h"
 #include "fdtd/TMz/fdtd_tmz_fields.h"
@@ -119,10 +119,10 @@ namespace
     // Run steps with the CPU block kernels over the whole grid.
     void run_blocks(Fields &fields, const Coeffs &coeffs, std::size_t pml, Boundary boundary)
     {
-        const auto whole = fdtd::TMz::backends::cpu::whole_block(fields.grid());
+        const auto whole = fdtd::TMz::backends::serial::whole_block(fields.grid());
         for (int n = 0; n < STEPS; ++n) {
-            fdtd::TMz::backends::cpu::update_h_block(fields, coeffs, whole);
-            fdtd::TMz::backends::cpu::update_e_block(fields, coeffs, whole, pml, boundary);
+            fdtd::TMz::backends::serial::update_h_block(fields, coeffs, whole);
+            fdtd::TMz::backends::serial::update_e_block(fields, coeffs, whole, pml, boundary);
         }
     }
 
@@ -183,7 +183,7 @@ TEST_CASE("Cell classes match the CPU blocks", "[unit][cell]")
     const Grid grid(12, 9);
     Fields fields(grid);
     const DeviceFields f = view(fields, pml);
-    const auto interior = fdtd::TMz::backends::cpu::interior_block(grid, pml);
+    const auto interior = fdtd::TMz::backends::serial::interior_block(grid, pml);
     for (int j = 0; j < f.ny; ++j) {
         for (int i = 0; i < f.nx; ++i) {
             const auto ui = static_cast<std::size_t>(i);

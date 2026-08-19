@@ -39,11 +39,7 @@ add_library(fdtd
     src/fdtd/TMz/fdtd_tmz_output.cpp
     src/fdtd/TMz/fdtd_tmz_simulation.cpp
     src/fdtd/TMz/fdtd_tmz_waveform.cpp
-    src/fdtd/TMz/backends/fdtd_tmz_backend_serial.cpp
-    src/fdtd/TMz/backends/cpu/fdtd_tmz_backend_cpu_base.cpp
-    src/fdtd/TMz/backends/cpu/fdtd_tmz_backend_cpu_block.cpp
-    src/fdtd/TMz/backends/cpu/fdtd_tmz_backend_cpu_partition.cpp
-    src/fdtd/TMz/backends/cpu/fdtd_tmz_backend_cpu_stepper.cpp)
+    src/fdtd/TMz/backends/fdtd_tmz_backend_serial.cpp)
 add_library(fdtd::fdtd ALIAS fdtd)
 target_compile_features(fdtd PUBLIC cxx_std_20)
 target_include_directories(fdtd PUBLIC

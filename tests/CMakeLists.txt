@@ -16,9 +16,6 @@ add_executable(fdtd_tests
     test_fdtd_constants.cpp
     test_fdtd_driver.cpp
     test_fdtd_tmz_backend.cpp
-    test_fdtd_tmz_backend_cpu_block.cpp
-    test_fdtd_tmz_backend_cpu_partition.cpp
-    test_fdtd_tmz_backend_cpu_stepper.cpp
     test_fdtd_tmz_backend_cuda.cpp
     test_fdtd_tmz_backend_gpu_cell.cpp
     test_fdtd_tmz_backend_omp.cpp
