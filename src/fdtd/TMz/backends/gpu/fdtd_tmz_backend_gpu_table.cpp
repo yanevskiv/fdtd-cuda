@@ -1,5 +1,5 @@
 /*
- * C++ file for the table of distinct update coefficients that kernels read in place of arrays.
+ * C++ file for the CUDA backend's table of distinct update coefficients, read in place of arrays.
  *
  * Copyright (C) 2026 Ivan Janevski
  *
@@ -18,7 +18,7 @@
  */
 
 // Class declaration.
-#include "fdtd/TMz/fdtd_tmz_coeff_table.h"
+#include "fdtd/TMz/backends/gpu/fdtd_tmz_backend_gpu_table.h"
 
 // Standard library for bit patterns, ordered maps, sizes, arrays and type choices.
 #include <array>
@@ -28,8 +28,8 @@
 #include <map>
 #include <type_traits>
 
-// Namespace for the 2D TMz module.
-namespace fdtd::TMz
+// Namespace for what the 2D TMz CUDA backend's files share.
+namespace fdtd::TMz::backends::gpu
 {
     // Helpers private to this file.
     namespace

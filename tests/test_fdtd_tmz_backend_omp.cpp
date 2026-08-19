@@ -22,7 +22,11 @@
 #include <catch2/generators/catch_generators.hpp>
 
 // Project headers under test.
+#include "fdtd/TMz/backends/fdtd_tmz_backend_omp.h"
 #include "fdtd/TMz/fdtd_tmz_backend.h"
+#include "fdtd/TMz/fdtd_tmz_coeffs.h"
+#include "fdtd/TMz/fdtd_tmz_grid.h"
+#include "fdtd/TMz/fdtd_tmz_material.h"
 #include "fdtd/TMz/fdtd_tmz_simulation.h"
 #include "fdtd/TMz/fdtd_tmz_waveform.h"
 
@@ -42,7 +46,11 @@
 using fdtd::FloatType;
 using fdtd::TMz::BackendType;
 using fdtd::TMz::Boundary;
+using fdtd::TMz::Coeffs;
 using fdtd::TMz::Component;
+using fdtd::TMz::courant_dt;
+using fdtd::TMz::Grid;
+using fdtd::TMz::Material;
 using fdtd::TMz::OmpRegion;
 using fdtd::TMz::OmpSchedule;
 using fdtd::TMz::Simulation;
@@ -392,3 +400,59 @@ TEST_CASE("OpenMP binding preserves results bit for bit", "[backend][openmp]")
         }
     }
 }
+
+#if FDTD_WITH_OPENMP
+
+// Check that a tuple holds a cell's values exactly.
+static void check_tuple(const fdtd::TMz::backends::serial::CoeffTuple &tuple, const Coeffs &coeffs,
+                        std::size_t k)
+{
+    CHECK(tuple.ez_1 == coeffs.coeff_ez_x1()[k]);
+    CHECK(tuple.ez_2 == coeffs.coeff_ez_x2()[k]);
+    CHECK(tuple.ez_1 == coeffs.coeff_ez_y1()[k]);
+    CHECK(tuple.ez_2 == coeffs.coeff_ez_y2()[k]);
+    CHECK(tuple.hx_1 == coeffs.coeff_hx_1()[k]);
+    CHECK(tuple.hx_2 == coeffs.coeff_hx_2()[k]);
+    CHECK(tuple.hy_1 == coeffs.coeff_hy_1()[k]);
+    CHECK(tuple.hy_2 == coeffs.coeff_hy_2()[k]);
+}
+
+// Verify that the core of vacuum shares one tuple until it is empty.
+TEST_CASE("Core tuple of vacuum", "[unit][openmp][coeffs]")
+{
+    const Grid grid(9, 7, 1e-3F, 2e-3F);
+    const Material material(grid);
+    const Coeffs coeffs(material, courant_dt(grid, 0.9));
+    const auto tuple = fdtd::TMz::backends::omp::core_tuple(coeffs, 1);
+    REQUIRE(tuple.has_value());
+    check_tuple(*tuple, coeffs, grid.index(4, 3));
+    CHECK(fdtd::TMz::backends::omp::core_tuple(coeffs, 2).has_value());
+    CHECK_FALSE(fdtd::TMz::backends::omp::core_tuple(coeffs, 3).has_value());
+    CHECK_FALSE(fdtd::TMz::backends::omp::core_tuple(coeffs, 4).has_value());
+}
+
+// Verify that the core inside a PML shares one tuple, and a core reaching into the PML does not.
+TEST_CASE("Core tuple of vacuum with a PML", "[unit][openmp][coeffs]")
+{
+    const Grid grid(30, 24);
+    Material material(grid);
+    material.set_pml(4, 3, 1e-6);
+    const Coeffs coeffs(material, courant_dt(grid, 0.9));
+    const auto tuple = fdtd::TMz::backends::omp::core_tuple(coeffs, 4);
+    REQUIRE(tuple.has_value());
+    check_tuple(*tuple, coeffs, grid.index(15, 12));
+    CHECK_FALSE(fdtd::TMz::backends::omp::core_tuple(coeffs, 1).has_value());
+}
+
+// Verify that a core holding two media shares no tuple.
+TEST_CASE("Core tuple of a slab and a lossy circle", "[unit][openmp][coeffs]")
+{
+    const Grid grid(40, 32);
+    Material material(grid);
+    material.fill_rect(10, 0, 16, 32, {.eps_r = 4});
+    material.fill_circle(28, 16, 5, {.eps_r = 2, .sigma_e = FloatType(0.5)});
+    const Coeffs coeffs(material, courant_dt(grid, 0.9));
+    CHECK_FALSE(fdtd::TMz::backends::omp::core_tuple(coeffs, 1).has_value());
+}
+
+#endif

@@ -27,9 +27,6 @@
 // CUDA runtime.
 #include <cuda_runtime.h>
 
-// The table of distinct coefficients.
-#include "fdtd/TMz/fdtd_tmz_coeff_table.h"
-
 // Standard library for partitions, limits, sizes, string building, errors and buffers.
 #include <algorithm>
 #include <cstddef>
@@ -218,7 +215,7 @@ namespace fdtd::TMz::backends
             }
             const std::size_t index = options.cuda_coeffs == CudaCoeffs::Table ? cells : 0;
             const std::size_t table = options.cuda_coeffs == CudaCoeffs::Table
-                                          ? CoeffTable::CAPACITY * sizeof(CoeffTuple)
+                                          ? gpu::CoeffTable::CAPACITY * sizeof(gpu::CoeffTuple)
                                           : 0;
             return arrays * cells * sizeof(FloatType) + index + table + sizeof(int);
         }
@@ -296,7 +293,7 @@ namespace fdtd::TMz::backends
         }
 
         // Copy of a table entry, or none for a null one.
-        std::optional<CoeffTuple> tuple_of(const CoeffTuple *entry)
+        std::optional<gpu::CoeffTuple> tuple_of(const gpu::CoeffTuple *entry)
         {
             if (entry == nullptr) {
                 return std::nullopt;
@@ -405,7 +402,7 @@ namespace fdtd::TMz::backends
         gpu::upload_rows(m_coeff_hy_1, m_pitch, coeffs.coeff_hy_1(), host, nx, ny, m_stream);
         gpu::upload_rows(m_coeff_hy_2, m_pitch, coeffs.coeff_hy_2(), host, nx, ny, m_stream);
         if (m_options.cuda_coeffs == CudaCoeffs::Table) {
-            const CoeffTable table(coeffs);
+            const gpu::CoeffTable table(coeffs);
             reserve(m_table_entries, std::max<std::size_t>(table.entries().size(), 1));
             gpu::upload(m_table_entries, table.entries(), m_stream);
             reserve(m_table_index, m_pitch * ny);
@@ -464,7 +461,7 @@ namespace fdtd::TMz::backends
     }
 
     // Pick the interior's tuple for the boundary in force.
-    const std::optional<CoeffTuple> &CudaBackend::uniform_tuple() const noexcept
+    const std::optional<gpu::CoeffTuple> &CudaBackend::uniform_tuple() const noexcept
     {
         return m_boundary == Boundary::Pml ? m_uniform_pml : m_uniform_plain;
     }
@@ -725,7 +722,7 @@ namespace fdtd::TMz::backends
             .coeff_hy_2 = m_coeff_hy_2.data(),
         };
         if (m_options.cuda_coeffs == CudaCoeffs::Table) {
-            const std::optional<CoeffTuple> &uniform = uniform_tuple();
+            const std::optional<gpu::CoeffTuple> &uniform = uniform_tuple();
             if (uniform.has_value()) {
                 coeffs.source = gpu::CoeffSource::Uniform;
                 coeffs.uniform = *uniform;

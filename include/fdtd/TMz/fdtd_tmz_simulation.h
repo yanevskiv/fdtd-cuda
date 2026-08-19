@@ -87,7 +87,7 @@ namespace fdtd
             /** Eight arrays with a value per cell. */
             Arrays,
 
-            /** A table of the distinct tuples of the cells outside the PML (see CoeffTable), from
+            /** A table of the distinct tuples of the cells outside the PML, read from
              * the cell's position when the interior shares one tuple and from a byte per cell
              * otherwise; the PML cells read the arrays. The default. */
             Table
@@ -161,8 +161,8 @@ namespace fdtd
                 OmpBind omp_bind = OmpBind::Default;
 
                 /** Whether the OpenMP backend's core cells, the interior less its last column
-                 * and row, read the one tuple of coefficients they share (see
-                 * CoeffTable::uniform_entry()) instead of the arrays, when they share one. */
+                 * and row, read the one tuple of coefficients they share
+                 * instead of the arrays, when they share one. */
                 bool omp_table = true;
 
                 /** Whether each thread of the Rows schedule sweeps its band of rows once a step,

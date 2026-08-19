@@ -22,7 +22,6 @@
 
 #include "fdtd/TMz/fdtd_tmz_backend.h"
 #include "fdtd/TMz/fdtd_tmz_boundary.h"
-#include "fdtd/TMz/fdtd_tmz_coeff_table.h"
 #include "fdtd/TMz/fdtd_tmz_coeffs.h"
 #include "fdtd/TMz/fdtd_tmz_fields.h"
 #include "fdtd/TMz/fdtd_tmz_grid.h"
@@ -71,6 +70,31 @@ namespace fdtd
                     {
                         return i0 >= i1 || j0 >= j1;
                     }
+                };
+
+                /**
+                 * The update coefficients of a cell whose Ez takes the same pair along x and y, as
+                 * every cell outside the PML does: the pairs of Ez, Hx and Hy.
+                 */
+                struct CoeffTuple
+                {
+                    /** Ez decay factor, along x and y alike. */
+                    FloatType ez_1;
+
+                    /** Ez curl factor, along x and y alike, before 1/dx or 1/dy. */
+                    FloatType ez_2;
+
+                    /** Hx decay factor. */
+                    FloatType hx_1;
+
+                    /** Hx curl factor, before 1/dy. */
+                    FloatType hx_2;
+
+                    /** Hy decay factor. */
+                    FloatType hy_1;
+
+                    /** Hy curl factor, before 1/dx. */
+                    FloatType hy_2;
                 };
 
                 /**
@@ -135,8 +159,8 @@ namespace fdtd
                      * Table read there instead; null for none. */
                     const CoeffTuple *uniform = nullptr;
 
-                    /** Cells that read uniform: the core of the interior (see
-                     * CoeffTable::uniform_entry()). */
+                    /** Cells that read uniform: the core of the interior, the interior less its
+                     * last column and row, where Hy and Hx sit half a cell into the PML. */
                     Block core = {};
                 };
 

@@ -20,8 +20,8 @@
 #ifndef FDTD_TMZ_BACKEND_GPU_CELL_H
 #define FDTD_TMZ_BACKEND_GPU_CELL_H
 
+#include "fdtd/TMz/backends/gpu/fdtd_tmz_backend_gpu_table.h"
 #include "fdtd/TMz/fdtd_tmz_boundary.h"
-#include "fdtd/TMz/fdtd_tmz_coeff_table.h"
 #include "fdtd/TMz/fdtd_tmz_component.h"
 #include "fdtd/fdtd_float.h"
 

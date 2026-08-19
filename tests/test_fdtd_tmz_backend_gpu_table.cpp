@@ -1,5 +1,5 @@
 /*
- * C++ file for the coefficient table tests.
+ * C++ file for the tests of the CUDA backend's coefficient table.
  *
  * Copyright (C) 2026 Ivan Janevski
  *
@@ -21,7 +21,7 @@
 #include <catch2/catch_test_macros.hpp>
 
 // Project headers under test.
-#include "fdtd/TMz/fdtd_tmz_coeff_table.h"
+#include "fdtd/TMz/backends/gpu/fdtd_tmz_backend_gpu_table.h"
 #include "fdtd/TMz/fdtd_tmz_coeffs.h"
 #include "fdtd/TMz/fdtd_tmz_grid.h"
 #include "fdtd/TMz/fdtd_tmz_material.h"
@@ -34,11 +34,11 @@
 // Shorthand for the types under test.
 using fdtd::FloatType;
 using fdtd::TMz::Coeffs;
-using fdtd::TMz::CoeffTable;
-using fdtd::TMz::CoeffTuple;
 using fdtd::TMz::courant_dt;
 using fdtd::TMz::Grid;
 using fdtd::TMz::Material;
+using fdtd::TMz::backends::gpu::CoeffTable;
+using fdtd::TMz::backends::gpu::CoeffTuple;
 
 // Helpers private to this file.
 namespace
@@ -78,7 +78,7 @@ namespace
 }
 
 // Verify that vacuum without a PML is one entry that every cell takes.
-TEST_CASE("Coefficient table of vacuum", "[unit][coeffs]")
+TEST_CASE("Coefficient table of vacuum", "[unit][cuda][coeffs]")
 {
     const Grid grid(9, 7, 1e-3F, 2e-3F);
     const Material material(grid);
@@ -99,7 +99,7 @@ TEST_CASE("Coefficient table of vacuum", "[unit][coeffs]")
 
 // Verify that the PML cells read the arrays and the core inside the PML shares one entry, while
 // the interior's last column holds Hy half a cell into the PML.
-TEST_CASE("Coefficient table of vacuum with a PML", "[unit][coeffs]")
+TEST_CASE("Coefficient table of vacuum with a PML", "[unit][cuda][coeffs]")
 {
     const Grid grid(30, 24);
     Material material(grid);
@@ -117,7 +117,7 @@ TEST_CASE("Coefficient table of vacuum with a PML", "[unit][coeffs]")
 }
 
 // Verify that media give an entry each and no rectangle that spans two of them is uniform.
-TEST_CASE("Coefficient table of a slab and a lossy circle", "[unit][coeffs]")
+TEST_CASE("Coefficient table of a slab and a lossy circle", "[unit][cuda][coeffs]")
 {
     const Grid grid(40, 32);
     Material material(grid);
@@ -136,7 +136,7 @@ TEST_CASE("Coefficient table of a slab and a lossy circle", "[unit][coeffs]")
 // Verify that a grid with more distinct tuples than the table holds fills the table, and the
 // cells past it read the arrays: cells 0 to 299 in row-major order take a medium each, cell 0's
 // being vacuum, so cells 255 to 299 find no room and the vacuum after them takes entry 0.
-TEST_CASE("Coefficient table past its capacity", "[unit][coeffs]")
+TEST_CASE("Coefficient table past its capacity", "[unit][cuda][coeffs]")
 {
     const Grid grid(20, 20);
     Material material(grid);

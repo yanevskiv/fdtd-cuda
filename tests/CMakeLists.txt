@@ -20,7 +20,6 @@ add_executable(fdtd_tests
     test_fdtd_tmz_backend_gpu_cell.cpp
     test_fdtd_tmz_backend_omp.cpp
     test_fdtd_tmz_backend_serial.cpp
-    test_fdtd_tmz_coeff_table.cpp
     test_fdtd_tmz_coeffs.cpp
     test_fdtd_tmz_fields.cpp
     test_fdtd_tmz_grid.cpp
@@ -35,7 +34,8 @@ if(FDTD_WITH_CUDA)
         test_fdtd_tmz_backend_gpu_buffer.cpp
         test_fdtd_tmz_backend_gpu_device.cpp
         test_fdtd_tmz_backend_gpu_error.cpp
-        test_fdtd_tmz_backend_gpu_stream.cpp)
+        test_fdtd_tmz_backend_gpu_stream.cpp
+        test_fdtd_tmz_backend_gpu_table.cpp)
 endif()
 target_link_libraries(fdtd_tests PRIVATE fdtd::fdtd fdtd_args fdtd_benchmark fdtd_driver fdtd_warnings Catch2::Catch2WithMain)
 # The bound of the backend comparisons, in machine epsilons per step.

@@ -31,7 +31,6 @@ option(FDTD_NATIVE "Build the library's C++ for the CPU of the build machine (-m
 # The library.
 add_library(fdtd
     src/fdtd/TMz/fdtd_tmz_backend.cpp
-    src/fdtd/TMz/fdtd_tmz_coeff_table.cpp
     src/fdtd/TMz/fdtd_tmz_coeffs.cpp
     src/fdtd/TMz/fdtd_tmz_fields.cpp
     src/fdtd/TMz/fdtd_tmz_grid.cpp
@@ -61,6 +60,7 @@ if(FDTD_WITH_CUDA)
         src/fdtd/TMz/backends/gpu/fdtd_tmz_backend_gpu_buffer.cu
         src/fdtd/TMz/backends/gpu/fdtd_tmz_backend_gpu_device.cu
         src/fdtd/TMz/backends/gpu/fdtd_tmz_backend_gpu_error.cpp
+        src/fdtd/TMz/backends/gpu/fdtd_tmz_backend_gpu_table.cpp
         src/fdtd/TMz/backends/gpu/fdtd_tmz_backend_gpu_event.cu
         src/fdtd/TMz/backends/gpu/fdtd_tmz_backend_gpu_graph.cu
         src/fdtd/TMz/backends/gpu/fdtd_tmz_backend_gpu_pinned.cu
@@ -186,7 +186,6 @@ install(DIRECTORY include/ DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}
     PATTERN backends EXCLUDE
     PATTERN fdtd_args.h EXCLUDE
     PATTERN fdtd_benchmark.h EXCLUDE
-    PATTERN fdtd_tmz_coeff_table.h EXCLUDE
     PATTERN fdtd_driver.h EXCLUDE)
 install(TARGETS fdtd EXPORT fdtdTargets)
 install(TARGETS fdtd_cli benchmark RUNTIME DESTINATION ${CMAKE_INSTALL_BINDIR})

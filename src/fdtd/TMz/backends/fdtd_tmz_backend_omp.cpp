@@ -26,18 +26,18 @@
 // OpenMP runtime for the default thread count.
 #include <omp.h>
 
-// The table of distinct coefficients.
-#include "fdtd/TMz/fdtd_tmz_coeff_table.h"
-
-// Standard library for bounds, timing, sizes, views, errors and buffers.
+// Standard library for bounds, bit patterns, timing, sizes, views, errors and buffers.
 #include <algorithm>
+#include <bit>
 #include <chrono>
 #include <cstddef>
+#include <cstdint>
 #include <memory>
 #include <optional>
 #include <span>
 #include <stdexcept>
 #include <string_view>
+#include <type_traits>
 #include <vector>
 
 // Namespace for the 2D TMz backends.
@@ -58,13 +58,13 @@ namespace fdtd::TMz::backends
             return options;
         }
 
-        // Copy of a table entry, or none for a null one.
-        std::optional<CoeffTuple> tuple_of(const CoeffTuple *entry)
+        // Unsigned integer as wide as FloatType, for comparing values bit by bit.
+        using Bits = std::conditional_t<sizeof(FloatType) == 8, std::uint64_t, std::uint32_t>;
+
+        // Whether two values hold the same bits.
+        bool same_bits(FloatType a, FloatType b) noexcept
         {
-            if (entry == nullptr) {
-                return std::nullopt;
-            }
-            return *entry;
+            return std::bit_cast<Bits>(a) == std::bit_cast<Bits>(b);
         }
 
         // Cut the grid into the parts of the schedule: rows or one range per thread.
@@ -180,6 +180,44 @@ namespace fdtd::TMz::backends
         }
     }
 
+    // Take the core's first cell, then check that every cell of the core holds its bits.
+    std::optional<serial::CoeffTuple> omp::core_tuple(const Coeffs &coeffs, std::size_t lo)
+    {
+        const Grid &grid = coeffs.grid();
+        if (grid.nx() <= 2 * lo + 1 || grid.ny() <= 2 * lo + 1) {
+            return std::nullopt;
+        }
+        const auto ezX1 = coeffs.coeff_ez_x1();
+        const auto ezX2 = coeffs.coeff_ez_x2();
+        const auto ezY1 = coeffs.coeff_ez_y1();
+        const auto ezY2 = coeffs.coeff_ez_y2();
+        const auto hx1 = coeffs.coeff_hx_1();
+        const auto hx2 = coeffs.coeff_hx_2();
+        const auto hy1 = coeffs.coeff_hy_1();
+        const auto hy2 = coeffs.coeff_hy_2();
+        const std::size_t first = grid.index(lo, lo);
+        const serial::CoeffTuple tuple{
+            .ez_1 = ezX1[first],
+            .ez_2 = ezX2[first],
+            .hx_1 = hx1[first],
+            .hx_2 = hx2[first],
+            .hy_1 = hy1[first],
+            .hy_2 = hy2[first],
+        };
+        for (std::size_t j = lo; j < grid.ny() - lo - 1; ++j) {
+            for (std::size_t i = lo; i < grid.nx() - lo - 1; ++i) {
+                const std::size_t k = grid.index(i, j);
+                if (!same_bits(ezX1[k], tuple.ez_1) || !same_bits(ezY1[k], tuple.ez_1) ||
+                    !same_bits(ezX2[k], tuple.ez_2) || !same_bits(ezY2[k], tuple.ez_2) ||
+                    !same_bits(hx1[k], tuple.hx_1) || !same_bits(hx2[k], tuple.hx_2) ||
+                    !same_bits(hy1[k], tuple.hy_1) || !same_bits(hy2[k], tuple.hy_2)) {
+                    return std::nullopt;
+                }
+            }
+        }
+        return tuple;
+    }
+
     // Check the options, fix the thread count and cut the grid for the schedule.
     OmpBackend::OmpBackend(const Grid &grid, const Simulation::Options &options)
         : SerialBackend(grid)
@@ -222,10 +260,9 @@ namespace fdtd::TMz::backends
         m_uniform_pml.reset();
         m_uniform_plain.reset();
         if (m_options.omp_table) {
-            const CoeffTable table(coeffs);
             m_uniform_pml =
-                tuple_of(table.uniform_entry(std::max<std::size_t>(coeffs.pml_thickness(), 1)));
-            m_uniform_plain = tuple_of(table.uniform_entry(1));
+                omp::core_tuple(coeffs, std::max<std::size_t>(coeffs.pml_thickness(), 1));
+            m_uniform_plain = omp::core_tuple(coeffs, 1);
         }
     }
 
@@ -239,7 +276,7 @@ namespace fdtd::TMz::backends
     }
 
     // Pick the core's tuple for the boundary in force.
-    const std::optional<CoeffTuple> &OmpBackend::uniform_tuple() const noexcept
+    const std::optional<serial::CoeffTuple> &OmpBackend::uniform_tuple() const noexcept
     {
         return boundary() == Boundary::Pml ? m_uniform_pml : m_uniform_plain;
     }
@@ -248,7 +285,7 @@ namespace fdtd::TMz::backends
     serial::CoeffsView OmpBackend::stepper_coeffs() const noexcept
     {
         serial::CoeffsView view = coeffs();
-        const std::optional<CoeffTuple> &uniform = uniform_tuple();
+        const std::optional<serial::CoeffTuple> &uniform = uniform_tuple();
         if (uniform.has_value()) {
             const std::size_t lo = std::max<std::size_t>(active_pml(), 1);
             view.uniform = &*uniform;

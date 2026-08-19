@@ -22,7 +22,6 @@
 
 #include "fdtd/TMz/backends/fdtd_tmz_backend_serial.h"
 #include "fdtd/TMz/fdtd_tmz_backend.h"
-#include "fdtd/TMz/fdtd_tmz_coeff_table.h"
 #include "fdtd/TMz/fdtd_tmz_coeffs.h"
 #include "fdtd/TMz/fdtd_tmz_simulation.h"
 
@@ -40,6 +39,24 @@ namespace fdtd
         /** Namespace for the 2D TMz backends. */
         namespace backends
         {
+            /** Namespace for what the 2D TMz OpenMP backend keeps on its own. */
+            namespace omp
+            {
+                /**
+                 * The one tuple every cell of the core of an interior holds, compared bit by bit.
+                 *
+                 * The core is the interior less its last column and row, where Hy and Hx sit half a
+                 * cell into the PML and take its grading.
+                 *
+                 * @param coeffs Coefficients to read.
+                 * @param lo Lower bound of the interior along both axes: the core holds the cells
+                 *        with lo <= i < nx - lo - 1 and lo <= j < ny - lo - 1.
+                 * @return The tuple, or none when the core is empty, or two of its cells differ, or
+                 *         a cell's Ez pairs along x and y differ.
+                 */
+                std::optional<serial::CoeffTuple> core_tuple(const Coeffs &coeffs, std::size_t lo);
+            }
+
             /**
              * Multi-threaded CPU backend: the serial stencil, its parts shared among threads.
              *
@@ -128,7 +145,7 @@ namespace fdtd
                  * @return The tuple, or empty when the core does not share one or the option is
                  *         off.
                  */
-                const std::optional<CoeffTuple> &uniform_tuple() const noexcept;
+                const std::optional<serial::CoeffTuple> &uniform_tuple() const noexcept;
 
                 /**
                  * View of the coefficient arrays, with the uniform tuple and its core when there
@@ -148,10 +165,10 @@ namespace fdtd
                 serial::Partition m_partition;
 
                 /** Tuple the core cells share with the PML of the coefficients in force. */
-                std::optional<CoeffTuple> m_uniform_pml;
+                std::optional<serial::CoeffTuple> m_uniform_pml;
 
                 /** Tuple the core cells share with no PML in force. */
-                std::optional<CoeffTuple> m_uniform_plain;
+                std::optional<serial::CoeffTuple> m_uniform_plain;
             };
 
             /** Result of the STREAM triad. */

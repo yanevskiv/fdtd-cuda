@@ -26,9 +26,9 @@
 #include "fdtd/TMz/backends/gpu/fdtd_tmz_backend_gpu_graph.h"
 #include "fdtd/TMz/backends/gpu/fdtd_tmz_backend_gpu_pinned.h"
 #include "fdtd/TMz/backends/gpu/fdtd_tmz_backend_gpu_stream.h"
+#include "fdtd/TMz/backends/gpu/fdtd_tmz_backend_gpu_table.h"
 #include "fdtd/TMz/fdtd_tmz_backend.h"
 #include "fdtd/TMz/fdtd_tmz_boundary.h"
-#include "fdtd/TMz/fdtd_tmz_coeff_table.h"
 #include "fdtd/TMz/fdtd_tmz_coeffs.h"
 #include "fdtd/TMz/fdtd_tmz_fields.h"
 #include "fdtd/TMz/fdtd_tmz_grid.h"
@@ -258,7 +258,7 @@ namespace fdtd
                  *
                  * @return The tuple, or none when the interior's cells differ.
                  */
-                const std::optional<CoeffTuple> &uniform_tuple() const noexcept;
+                const std::optional<gpu::CoeffTuple> &uniform_tuple() const noexcept;
 
                 /** A snapshot on its way out: its device copy, its host copy, and the events
                  * that mark the two copies done. */
@@ -525,17 +525,17 @@ namespace fdtd
                 gpu::DeviceBuffer<FloatType> m_device_records;
 
                 /** Table entries on the device, under CudaCoeffs::Table. */
-                gpu::DeviceBuffer<CoeffTuple> m_table_entries;
+                gpu::DeviceBuffer<gpu::CoeffTuple> m_table_entries;
 
                 /** Entry of each cell on the device, laid out as the fields, under
                  * CudaCoeffs::Table. */
                 gpu::DeviceBuffer<std::uint8_t> m_table_index;
 
                 /** Tuple every interior cell shares with the PML in force, if one is shared. */
-                std::optional<CoeffTuple> m_uniform_pml;
+                std::optional<gpu::CoeffTuple> m_uniform_pml;
 
                 /** Tuple every interior cell shares with no PML in force, if one is shared. */
-                std::optional<CoeffTuple> m_uniform_plain;
+                std::optional<gpu::CoeffTuple> m_uniform_plain;
 
                 /** Graph of GRAPH_STEPS steps, captured by the first advance that needs it. */
                 gpu::Graph m_graph;
