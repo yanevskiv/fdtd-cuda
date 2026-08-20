@@ -17,8 +17,10 @@ add_executable(fdtd_tests
     test_fdtd_driver.cpp
     test_fdtd_tmz_backend.cpp
     test_fdtd_tmz_backend_cuda.cpp
+    test_fdtd_tmz_backend_cuda_options.cpp
     test_fdtd_tmz_backend_gpu_cell.cpp
     test_fdtd_tmz_backend_omp.cpp
+    test_fdtd_tmz_backend_omp_options.cpp
     test_fdtd_tmz_backend_serial.cpp
     test_fdtd_tmz_coeffs.cpp
     test_fdtd_tmz_fields.cpp

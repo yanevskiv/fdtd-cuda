@@ -20,10 +20,10 @@
 #ifndef FDTD_TMZ_BACKEND_OMP_H
 #define FDTD_TMZ_BACKEND_OMP_H
 
+#include "fdtd/TMz/backends/fdtd_tmz_backend_omp_options.h"
 #include "fdtd/TMz/backends/fdtd_tmz_backend_serial.h"
 #include "fdtd/TMz/fdtd_tmz_backend.h"
 #include "fdtd/TMz/fdtd_tmz_coeffs.h"
-#include "fdtd/TMz/fdtd_tmz_simulation.h"
 
 #include <cstddef>
 #include <optional>
@@ -61,7 +61,7 @@ namespace fdtd
              * Multi-threaded CPU backend: the serial stencil, its parts shared among threads.
              *
              * The schedule of the options picks the partition and how its parts reach the
-             * threads: static loops over rows or ranges, or, with omp_fuse, one sweep of
+             * threads: static loops over rows or ranges, or, with fuse, one sweep of
              * each thread's band of rows per step. The region, SIMD and table settings are compiled
              * in as template instances and picked when the run starts. The arithmetic per cell is
              * the serial backend's.
@@ -73,17 +73,17 @@ namespace fdtd
                  * Create the backend with zeroed fields.
                  *
                  * @param grid Grid the backend works on.
-                 * @param options Settings of a simulation; the backend reads the omp_ fields.
-                 * @throws std::invalid_argument When omp_fuse is set with a
+                 * @param options Settings of the backend.
+                 * @throws std::invalid_argument When fuse is set with a
                  * schedule other than Rows or a region per phase.
                  */
-                OmpBackend(const Grid &grid, const Simulation::Options &options);
+                OmpBackend(const Grid &grid, const OmpOptions &options);
 
                 /** The upload of fields, which the upload of coefficients would hide. */
                 using SerialBackend::upload;
 
                 /**
-                 * Copy update coefficients into the backend, and with omp_table find the tuple
+                 * Copy update coefficients into the backend, and with table find the tuple
                  * the core cells share, with the PML of the coefficients in force and with none.
                  *
                  * @param coeffs Coefficients on the backend's grid.
@@ -109,7 +109,7 @@ namespace fdtd
                  *
                  * @return The options it was made with.
                  */
-                const Simulation::Options &options() const noexcept;
+                const OmpOptions &options() const noexcept;
 
                 /**
                  * Thread count the runs ask for: the option, or the OpenMP default for 0.
@@ -119,8 +119,8 @@ namespace fdtd
                 std::size_t threads() const noexcept;
 
                 /**
-                 * Modelled traffic of one step: one pass with omp_fuse, two otherwise, and the
-                 * core reading no arrays when omp_table finds a tuple it shares.
+                 * Modelled traffic of one step: one pass with fuse, two otherwise, and the
+                 * core reading no arrays when table finds a tuple it shares.
                  *
                  * @return two_pass_traffic() of the grid, the active PML, the boundary and the
                  *         model of the options.
@@ -140,7 +140,7 @@ namespace fdtd
 
             private:
                 /**
-                 * Tuple the core cells share under the boundary in force, with omp_table.
+                 * Tuple the core cells share under the boundary in force, with table.
                  *
                  * @return The tuple, or empty when the core does not share one or the option is
                  *         off.
@@ -156,7 +156,7 @@ namespace fdtd
                 serial::CoeffsView stepper_coeffs() const noexcept;
 
                 /** Settings of the backend. */
-                Simulation::Options m_options;
+                OmpOptions m_options;
 
                 /** Thread count of the runs. */
                 std::size_t m_threads;

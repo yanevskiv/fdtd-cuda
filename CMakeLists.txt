@@ -38,6 +38,8 @@ add_library(fdtd
     src/fdtd/TMz/fdtd_tmz_output.cpp
     src/fdtd/TMz/fdtd_tmz_simulation.cpp
     src/fdtd/TMz/fdtd_tmz_waveform.cpp
+    src/fdtd/TMz/backends/fdtd_tmz_backend_cuda_options.cpp
+    src/fdtd/TMz/backends/fdtd_tmz_backend_omp_options.cpp
     src/fdtd/TMz/backends/fdtd_tmz_backend_serial.cpp)
 add_library(fdtd::fdtd ALIAS fdtd)
 target_compile_features(fdtd PUBLIC cxx_std_20)

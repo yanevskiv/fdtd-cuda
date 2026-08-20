@@ -40,8 +40,6 @@ using fdtd::TMz::Component;
 using fdtd::TMz::courant_dt;
 using fdtd::TMz::Grid;
 using fdtd::TMz::Material;
-using fdtd::TMz::OmpRegion;
-using fdtd::TMz::OmpSchedule;
 using fdtd::TMz::Simulation;
 
 // A waveform that returns the time it is sampled at.
@@ -90,29 +88,27 @@ TEST_CASE("Simulation applies its options", "[unit][simulation]")
     CHECK(sim.options().courant == 0.5);
 }
 
-// Verify the OpenMP defaults: rows, runtime threads, SIMD, table, fusion and one region.
-TEST_CASE("Simulation OpenMP defaults", "[unit][simulation]")
+// Verify that the backend's settings default to its default variant and the runtime's threads.
+TEST_CASE("Simulation backend defaults", "[unit][simulation]")
 {
     const Simulation::Options opts;
 
-    CHECK(opts.omp_schedule == OmpSchedule::Rows);
-    CHECK(opts.omp_threads == 0);
-    CHECK(opts.omp_table);
-    CHECK(opts.omp_fuse);
-    CHECK(opts.omp_simd);
-    CHECK(opts.omp_region == OmpRegion::Run);
+    CHECK(opts.variant == "default");
+    CHECK(opts.threads == 0);
 }
 
-// Verify that a simulation carries the OpenMP settings it was given.
-TEST_CASE("Simulation keeps the OpenMP settings", "[unit][simulation]")
+// Verify that a simulation carries the backend settings it was given, and rejects a variant its
+// backend does not read.
+TEST_CASE("Simulation keeps the backend settings", "[unit][simulation]")
 {
     Simulation::Options opts;
-    opts.omp_schedule = OmpSchedule::Collapse2;
-    opts.omp_fuse = false;
+    opts.threads = 2;
     const Simulation sim(8, 8, opts);
+    CHECK(sim.options().variant == "default");
+    CHECK(sim.options().threads == 2);
 
-    CHECK(sim.options().omp_schedule == OmpSchedule::Collapse2);
-    CHECK_FALSE(sim.options().omp_fuse);
+    opts.variant = "collapse2";
+    CHECK_THROWS_AS(Simulation(8, 8, opts), std::invalid_argument);
 }
 
 // Verify that an explicit dt overrides the Courant number.

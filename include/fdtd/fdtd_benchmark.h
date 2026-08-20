@@ -70,8 +70,8 @@ namespace fdtd
         /** Backends to measure in order; none means every compiled backend. */
         std::vector<TMz::BackendType> backends;
 
-        /** Variant names (see parse_variant_arg) to measure, OpenMP and CUDA ones mixed; none means
-         * "default". */
+        /** Variant names (see TMz::variant_name()) to measure, OpenMP and CUDA ones mixed; none
+         * means "default". */
         std::vector<std::string> variants;
 
         /** Thread counts to measure, read by OpenMP only; none means 1. */

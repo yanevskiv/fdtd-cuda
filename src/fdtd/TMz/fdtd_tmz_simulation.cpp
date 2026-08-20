@@ -369,22 +369,28 @@ namespace fdtd::TMz
         return make_backend(type, grid, Simulation::Options{});
     }
 
-    // Create a backend, or report that it is not compiled in.
+    // Read the backend's settings from the variant, or report that it is not compiled in.
     std::unique_ptr<Backend> make_backend(BackendType type, const Grid &grid,
-                                          [[maybe_unused]] const Simulation::Options &options)
+                                          const Simulation::Options &options)
     {
         switch (type) {
             case BackendType::Serial:
+                variant_name(type, options.variant);
                 return std::make_unique<backends::SerialBackend>(grid);
             case BackendType::OpenMP:
 #if FDTD_WITH_OPENMP
-                return std::make_unique<backends::OmpBackend>(grid, options);
+            {
+                backends::OmpOptions omp = backends::OmpOptions::parse(options.variant);
+                omp.threads = options.threads;
+                return std::make_unique<backends::OmpBackend>(grid, omp);
+            }
 #else
                 break;
 #endif
             case BackendType::Cuda:
 #if FDTD_WITH_CUDA
-                return std::make_unique<backends::CudaBackend>(grid, options);
+                return std::make_unique<backends::CudaBackend>(
+                    grid, backends::CudaOptions::parse(options.variant));
 #else
                 break;
 #endif

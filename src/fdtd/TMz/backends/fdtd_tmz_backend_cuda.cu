@@ -204,17 +204,17 @@ namespace fdtd::TMz::backends
         }
 
         // Bytes of device memory the grid's arrays take: fields, coefficients, and the options'.
-        std::size_t device_bytes(std::size_t cells, const Simulation::Options &options)
+        std::size_t device_bytes(std::size_t cells, const CudaOptions &options)
         {
             std::size_t arrays = 13;
-            if (options.cuda_kernel == CudaKernel::Tiled) {
+            if (options.kernel == CudaKernel::Tiled) {
                 arrays += 3;
             }
-            if (options.cuda_async_snapshots) {
+            if (options.async_snapshots) {
                 arrays += 10;
             }
-            const std::size_t index = options.cuda_coeffs == CudaCoeffs::Table ? cells : 0;
-            const std::size_t table = options.cuda_coeffs == CudaCoeffs::Table
+            const std::size_t index = options.coeffs == CudaCoeffs::Table ? cells : 0;
+            const std::size_t table = options.coeffs == CudaCoeffs::Table
                                           ? gpu::CoeffTable::CAPACITY * sizeof(gpu::CoeffTuple)
                                           : 0;
             return arrays * cells * sizeof(FloatType) + index + table + sizeof(int);
@@ -228,13 +228,13 @@ namespace fdtd::TMz::backends
         }
 
         // Check the options and the grid before anything is allocated.
-        const Simulation::Options &checked(const Grid &grid, const Simulation::Options &options)
+        const CudaOptions &checked(const Grid &grid, const CudaOptions &options)
         {
             if (gpu::device_count() == 0) {
                 throw std::runtime_error("CudaBackend: no CUDA device");
             }
-            const std::size_t bx = options.cuda_block_x;
-            const std::size_t by = options.cuda_block_y;
+            const std::size_t bx = options.block_x;
+            const std::size_t by = options.block_y;
             if (bx == 0 || by == 0) {
                 throw std::invalid_argument("CudaBackend: block sides must be positive");
             }
@@ -303,7 +303,7 @@ namespace fdtd::TMz::backends
     }
 
     // Check the options, allocate the padded arrays and zero them, and make the snapshot slots.
-    CudaBackend::CudaBackend(const Grid &grid, const Simulation::Options &options)
+    CudaBackend::CudaBackend(const Grid &grid, const CudaOptions &options)
         : m_options(checked(grid, options))
         , m_grid(grid)
         , m_pitch(gpu::device_pitch(grid.nx(), sizeof(FloatType)))
@@ -327,13 +327,13 @@ namespace fdtd::TMz::backends
               &m_coeff_ez_y2, &m_coeff_hx_1, &m_coeff_hx_2, &m_coeff_hy_1, &m_coeff_hy_2}) {
             buffer->zero(m_stream);
         }
-        if (m_options.cuda_kernel == CudaKernel::Tiled) {
+        if (m_options.kernel == CudaKernel::Tiled) {
             for (gpu::DeviceBuffer<FloatType> *buffer : {&m_ez_next, &m_hx_next, &m_hy_next}) {
                 *buffer = gpu::DeviceBuffer<FloatType>(m_pitch * grid.ny());
                 buffer->zero(m_stream);
             }
         }
-        if (m_options.cuda_async_snapshots) {
+        if (m_options.async_snapshots) {
             m_async = std::make_unique<AsyncSnapshots>(m_grid, m_pitch);
         }
         m_stream.synchronize();
@@ -401,7 +401,7 @@ namespace fdtd::TMz::backends
         gpu::upload_rows(m_coeff_hx_2, m_pitch, coeffs.coeff_hx_2(), host, nx, ny, m_stream);
         gpu::upload_rows(m_coeff_hy_1, m_pitch, coeffs.coeff_hy_1(), host, nx, ny, m_stream);
         gpu::upload_rows(m_coeff_hy_2, m_pitch, coeffs.coeff_hy_2(), host, nx, ny, m_stream);
-        if (m_options.cuda_coeffs == CudaCoeffs::Table) {
+        if (m_options.coeffs == CudaCoeffs::Table) {
             const gpu::CoeffTable table(coeffs);
             reserve(m_table_entries, std::max<std::size_t>(table.entries().size(), 1));
             gpu::upload(m_table_entries, table.entries(), m_stream);
@@ -451,8 +451,8 @@ namespace fdtd::TMz::backends
     StepTraffic CudaBackend::step_traffic() const noexcept
     {
         TrafficModel model;
-        model.one_pass = m_options.cuda_kernel == CudaKernel::Tiled;
-        if (m_options.cuda_coeffs == CudaCoeffs::Table) {
+        model.one_pass = m_options.kernel == CudaKernel::Tiled;
+        if (m_options.coeffs == CudaCoeffs::Table) {
             model.table = true;
             model.index = !uniform_tuple().has_value();
         }
@@ -467,7 +467,7 @@ namespace fdtd::TMz::backends
     }
 
     // Return the options.
-    const Simulation::Options &CudaBackend::options() const noexcept
+    const CudaOptions &CudaBackend::options() const noexcept
     {
         return m_options;
     }
@@ -514,7 +514,7 @@ namespace fdtd::TMz::backends
                                         std::span<const std::size_t> snapshots,
                                         const SnapshotHandler &handler)
     {
-        if (!m_options.cuda_async_snapshots || snapshots.empty()) {
+        if (!m_options.async_snapshots || snapshots.empty()) {
             Backend::advance_snapshots(nsteps, points, values, snapshots, handler);
             return;
         }
@@ -566,7 +566,7 @@ namespace fdtd::TMz::backends
                                   std::size_t magnetic, std::size_t electric)
     {
         std::size_t n = from;
-        if (m_options.cuda_graph && to - from >= GRAPH_STEPS) {
+        if (m_options.graph && to - from >= GRAPH_STEPS) {
             const GraphKey key{
                 .magnetic = magnetic,
                 .electric = electric,
@@ -721,7 +721,7 @@ namespace fdtd::TMz::backends
             .coeff_hy_1 = m_coeff_hy_1.data(),
             .coeff_hy_2 = m_coeff_hy_2.data(),
         };
-        if (m_options.cuda_coeffs == CudaCoeffs::Table) {
+        if (m_options.coeffs == CudaCoeffs::Table) {
             const std::optional<gpu::CoeffTuple> &uniform = uniform_tuple();
             if (uniform.has_value()) {
                 coeffs.source = gpu::CoeffSource::Uniform;
@@ -741,8 +741,8 @@ namespace fdtd::TMz::backends
     {
         const gpu::DeviceFields fields = device_fields();
         cudaStream_t stream = m_stream.handle();
-        const auto bx = static_cast<unsigned>(m_options.cuda_block_x);
-        const auto by = static_cast<unsigned>(m_options.cuda_block_y);
+        const auto bx = static_cast<unsigned>(m_options.block_x);
+        const auto by = static_cast<unsigned>(m_options.block_y);
         const dim3 block(bx, by);
         const dim3 cells(static_cast<unsigned>((m_grid.nx() + bx - 1) / bx),
                          static_cast<unsigned>((m_grid.ny() + by - 1) / by));
@@ -754,7 +754,7 @@ namespace fdtd::TMz::backends
         const gpu::DevicePoint *sources = m_device_sources.data();
 
         gpu::DeviceFields after = fields;
-        if (m_options.cuda_kernel == CudaKernel::Tiled) {
+        if (m_options.kernel == CudaKernel::Tiled) {
             const std::size_t shared = 2 * (bx + 1) * (by + 1) * sizeof(FloatType);
             update_tiled_kernel<<<cells, block, shared, stream>>>(
                 fields, coeffs, m_boundary, sources, static_cast<int>(magnetic), values, step,

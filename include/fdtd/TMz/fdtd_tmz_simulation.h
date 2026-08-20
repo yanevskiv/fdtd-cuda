@@ -32,6 +32,7 @@
 #include <cstddef>
 #include <functional>
 #include <memory>
+#include <string>
 #include <vector>
 
 /** Namespace for the fdtd library. */
@@ -40,59 +41,6 @@ namespace fdtd
     /** Namespace for the 2D TMz module. */
     namespace TMz
     {
-        /** How the OpenMP backend shares the cells of a phase among its threads. */
-        enum class OmpSchedule {
-            /** A static `omp for` over the rows, the baseline. The default. */
-            Rows,
-
-            /** One contiguous range of cells in row-major order per thread. */
-            Collapse2
-        };
-
-        /** Where the OpenMP backend opens its parallel regions. */
-        enum class OmpRegion {
-            /** One region around the whole run, with the phases as work-sharing loops. */
-            Run,
-
-            /** One region per phase of every step. */
-            Phase
-        };
-
-        /** Affinity policy of the OpenMP backend's parallel regions. */
-        enum class OmpBind {
-            /** Use the runtime's policy. */
-            Default,
-
-            /** Keep the team's threads on nearby places. */
-            Close,
-
-            /** Spread the team's threads across the available places. */
-            Spread
-        };
-
-        /** How the CUDA backend lays the update of a step out in kernels. */
-        enum class CudaKernel {
-            /** One E kernel for every cell, each thread taking its cell's edge, PML or interior
-             * branch. */
-            Fused,
-
-            /** One kernel per step: each block updates H on its tile and the tile's lower and
-             * left halo, keeps it in shared memory, and updates E from it, reading Ez, Hx and Hy
-             * once and writing them to a second set of arrays. The default. */
-            Tiled
-        };
-
-        /** Where the CUDA kernels read the update coefficients of a cell. */
-        enum class CudaCoeffs {
-            /** Eight arrays with a value per cell. */
-            Arrays,
-
-            /** A table of the distinct tuples of the cells outside the PML, read from
-             * the cell's position when the interior shares one tuple and from a byte per cell
-             * otherwise; the PML cells read the arrays. The default. */
-            Table
-        };
-
         /**
          * A 2D TMz simulation: grid, material, fields and the backend that steps them.
          *
@@ -142,53 +90,13 @@ namespace fdtd
                 /** Backend to run on. */
                 BackendType backend = BackendType::Serial;
 
-                /** How the OpenMP backend shares the cells among its threads. */
-                OmpSchedule omp_schedule = OmpSchedule::Rows;
+                /** Variant of the backend, in its own grammar (see variant_name()); `default`
+                 * names the backend's default settings. */
+                std::string variant = "default";
 
-                /** Thread count of the OpenMP backend, 0 for the OpenMP default. */
-                std::size_t omp_threads = 0;
-
-                /** Whether the OpenMP backend's inner loops carry `omp simd`; on by default,
-                 * the fastest on the M5 sweep. */
-                bool omp_simd = true;
-
-                /** Where the OpenMP backend opens its parallel regions. */
-                OmpRegion omp_region = OmpRegion::Run;
-
-                /** Affinity policy; enable affinity with OMP_PROC_BIND=true and set
-                 * OMP_PLACES=threads before starting the process. A runtime with affinity
-                 * disabled ignores explicit policies, as required by OpenMP. */
-                OmpBind omp_bind = OmpBind::Default;
-
-                /** Whether the OpenMP backend's core cells, the interior less its last column
-                 * and row, read the one tuple of coefficients they share
-                 * instead of the arrays, when they share one. */
-                bool omp_table = true;
-
-                /** Whether each thread of the Rows schedule sweeps its band of rows once a step,
-                 * H then E row by row, instead of an H pass and an E pass; Rows and Run only. */
-                bool omp_fuse = true;
-
-                /** How the CUDA backend lays a step out in kernels. */
-                CudaKernel cuda_kernel = CudaKernel::Tiled;
-
-                /** Threads along x of a CUDA thread block, positive. */
-                std::size_t cuda_block_x = 32;
-
-                /** Threads along y of a CUDA thread block, positive, with cuda_block_x *
-                 * cuda_block_y within the device's threads per block. */
-                std::size_t cuda_block_y = 8;
-
-                /** Where the CUDA kernels read the coefficients. */
-                CudaCoeffs cuda_coeffs = CudaCoeffs::Table;
-
-                /** Whether the CUDA backend replays a graph of 16 captured steps instead of
-                 * launching each kernel of each step. */
-                bool cuda_graph = true;
-
-                /** Whether the CUDA backend copies the snapshots of a run out while it goes on
-                 * stepping (see run() with a handler), instead of stopping for each. */
-                bool cuda_async_snapshots = false;
+                /** Thread count of the OpenMP backend, 0 for the OpenMP default; the other
+                 * backends ignore it. */
+                std::size_t threads = 0;
 
                 /** Whether an explicit dt above the Courant limit is rejected. */
                 bool check_stability = true;
@@ -496,7 +404,7 @@ namespace fdtd
          *
          * @param type Backend type.
          * @param grid Grid the backend works on.
-         * @param options Settings; a backend reads only its own, as the omp_ or cuda_ fields.
+         * @param options Settings; a backend reads only its own, from the variant and threads.
          * @return The new backend.
          * @throws std::runtime_error When the backend is not compiled in, or is CUDA and no
          *         device is present.

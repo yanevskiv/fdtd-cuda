@@ -20,6 +20,7 @@
 #ifndef FDTD_TMZ_BACKEND_CUDA_H
 #define FDTD_TMZ_BACKEND_CUDA_H
 
+#include "fdtd/TMz/backends/fdtd_tmz_backend_cuda_options.h"
 #include "fdtd/TMz/backends/gpu/fdtd_tmz_backend_gpu_buffer.h"
 #include "fdtd/TMz/backends/gpu/fdtd_tmz_backend_gpu_cell.h"
 #include "fdtd/TMz/backends/gpu/fdtd_tmz_backend_gpu_event.h"
@@ -32,7 +33,6 @@
 #include "fdtd/TMz/fdtd_tmz_coeffs.h"
 #include "fdtd/TMz/fdtd_tmz_fields.h"
 #include "fdtd/TMz/fdtd_tmz_grid.h"
-#include "fdtd/TMz/fdtd_tmz_simulation.h"
 #include "fdtd/fdtd_float.h"
 
 #include <cstddef>
@@ -69,7 +69,7 @@ namespace fdtd
                  * Create the backend with zeroed fields.
                  *
                  * @param grid Grid the backend works on.
-                 * @param options Settings of a simulation; the backend reads the cuda_ fields.
+                 * @param options Settings of the backend.
                  * @throws std::runtime_error When no CUDA device is present.
                  * @throws std::invalid_argument When a block side is zero, the block holds more
                  *         threads than the device allows, the blocks along y pass the device's
@@ -78,7 +78,7 @@ namespace fdtd
                  *         allocated.
                  * @throws gpu::CudaError When the device memory cannot be had.
                  */
-                CudaBackend(const Grid &grid, const Simulation::Options &options);
+                CudaBackend(const Grid &grid, const CudaOptions &options);
 
                 /**
                  * Short lowercase name of the backend.
@@ -171,7 +171,7 @@ namespace fdtd
                  *
                  * @return The options it was made with.
                  */
-                const Simulation::Options &options() const noexcept;
+                const CudaOptions &options() const noexcept;
 
                 /**
                  * Row pitch of the device arrays.
@@ -203,7 +203,7 @@ namespace fdtd
                 /**
                  * Advance the fields on the device, add the sources and hand over the snapshots.
                  *
-                 * With cuda_async_snapshots, a snapshot is copied to device arrays of its own on
+                 * With async_snapshots, a snapshot is copied to device arrays of its own on
                  * the stream, then to page-locked host fields on a second stream, and handed
                  * over once the steps up to the next snapshot are queued, so the copy to the host
                  * and the handler run while the device steps. Two slots take turns. Without it,
@@ -303,7 +303,7 @@ namespace fdtd
                     std::size_t steps = 0;
                 };
 
-                /** What cuda_async_snapshots needs, made with the backend so that no run pays
+                /** What async_snapshots needs, made with the backend so that no run pays
                  * for it. */
                 struct AsyncSnapshots
                 {
@@ -337,7 +337,7 @@ namespace fdtd
                 /**
                  * Queue the steps from one step of the advance to another.
                  *
-                 * With cuda_graph, whole runs of GRAPH_STEPS steps replay one captured graph,
+                 * With graph, whole runs of GRAPH_STEPS steps replay one captured graph,
                  * captured again when its key changes; the steps left over are launched one by
                  * one.
                  *
@@ -435,7 +435,7 @@ namespace fdtd
                 };
 
                 /** Settings of the backend. */
-                Simulation::Options m_options;
+                CudaOptions m_options;
 
                 /** Grid of the backend, with the host pitch. */
                 Grid m_grid;
@@ -543,7 +543,7 @@ namespace fdtd
                 /** What m_graph was captured with, captured again when this changes. */
                 GraphKey m_graph_key;
 
-                /** Copy stream and slots of cuda_async_snapshots, or null without it. */
+                /** Copy stream and slots of async_snapshots, or null without it. */
                 std::unique_ptr<AsyncSnapshots> m_async;
             };
         }

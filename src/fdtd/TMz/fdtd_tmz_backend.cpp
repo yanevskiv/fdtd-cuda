@@ -20,15 +20,21 @@
 // Interface declaration.
 #include "fdtd/TMz/fdtd_tmz_backend.h"
 
+// The backends' variant grammars, for the registry.
+#include "fdtd/TMz/backends/fdtd_tmz_backend_cuda_options.h"
+#include "fdtd/TMz/backends/fdtd_tmz_backend_omp_options.h"
+
 // The CUDA device count, for the registry.
 #if FDTD_WITH_CUDA
 #include "fdtd/TMz/backends/gpu/fdtd_tmz_backend_gpu_device.h"
 #endif
 
-// Standard library for algorithms, limits, errors and pairs.
+// Standard library for algorithms, limits, text, errors and pairs.
 #include <algorithm>
 #include <limits>
+#include <sstream>
 #include <stdexcept>
+#include <string>
 #include <utility>
 
 // Namespace for the 2D TMz module.
@@ -194,5 +200,36 @@ namespace fdtd::TMz
     {
         const auto types = available_backends();
         return std::find(types.begin(), types.end(), type) != types.end();
+    }
+
+    // Hand the name to the backend's grammar; serial reads default only.
+    std::string variant_name(BackendType type, std::string_view variant)
+    {
+        switch (type) {
+            case BackendType::Serial:
+                if (variant != "default") {
+                    std::ostringstream message;
+                    message << "the serial backend has no variants: ";
+                    message << variant;
+                    throw std::invalid_argument(message.str());
+                }
+                return "default";
+            case BackendType::OpenMP:
+                return backends::OmpOptions::parse(variant).name();
+            case BackendType::Cuda:
+                break;
+        }
+        return backends::CudaOptions::parse(variant).name();
+    }
+
+    // Try the backend's grammar on the name.
+    bool reads_variant(BackendType type, std::string_view variant)
+    {
+        try {
+            variant_name(type, variant);
+        } catch (const std::invalid_argument &) {
+            return false;
+        }
+        return true;
     }
 }

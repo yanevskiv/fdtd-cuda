@@ -97,14 +97,16 @@ TEST_CASE("Registry reports what was compiled in", "[unit][backend]")
     }
 }
 
-// Verify that the serial backend ignores the settings of the OpenMP backend, even invalid ones.
-TEST_CASE("Serial backend ignores the OpenMP options", "[unit][backend][serial]")
+// Verify that the serial backend ignores the thread count and reads no variant but the default.
+TEST_CASE("Serial backend ignores the thread count", "[unit][backend][serial]")
 {
     const Grid grid(9, 7);
     fdtd::TMz::Simulation::Options options;
-    options.omp_region = fdtd::TMz::OmpRegion::Phase;
-    options.omp_fuse = true;
-    options.omp_threads = 3;
+    options.threads = 3;
+    fdtd::TMz::Simulation::Options rows = options;
+    rows.variant = "rows";
+    CHECK_THROWS_AS(fdtd::TMz::make_backend(fdtd::TMz::BackendType::Serial, grid, rows),
+                    std::invalid_argument);
     auto plain = make_impulse(grid, 0.9, 4, 3, Boundary::Pmc);
     auto backend = fdtd::TMz::make_backend(fdtd::TMz::BackendType::Serial, grid, options);
     backend->upload(Coeffs(Material(grid), fdtd::TMz::courant_dt(grid, 0.9)));
@@ -144,11 +146,11 @@ TEST_CASE("Backends model the traffic of a step", "[unit][backend]")
             INFO(fdtd::TMz::backend_name(type) << ", boundary " << static_cast<int>(c.boundary));
             fdtd::TMz::Simulation::Options options;
             options.backend = type;
-            options.cuda_kernel = fdtd::TMz::CudaKernel::Fused;
-            options.cuda_coeffs = fdtd::TMz::CudaCoeffs::Arrays;
-            options.cuda_graph = false;
-            options.omp_table = false;
-            options.omp_fuse = false;
+            if (type == fdtd::TMz::BackendType::OpenMP) {
+                options.variant = "rows+simd";
+            } else if (type == fdtd::TMz::BackendType::Cuda) {
+                options.variant = "fused";
+            }
             options.boundary = c.boundary;
             options.pml_thickness = 2;
             const fdtd::TMz::Simulation sim(8, 6, options);
@@ -488,4 +490,30 @@ TEST_CASE("Serial backend splits Ez in the PML only under Boundary::Pml",
         }
     }
     CHECK(anyPart == split);
+}
+
+// Verify which backend reads which name, whether compiled in or not, and the name each writes.
+TEST_CASE("Variant names belong to their backend", "[unit][backend]")
+{
+    using fdtd::TMz::BackendType;
+    using fdtd::TMz::reads_variant;
+    using fdtd::TMz::variant_name;
+    for (const BackendType backend :
+         {BackendType::Serial, BackendType::OpenMP, BackendType::Cuda}) {
+        CHECK(reads_variant(backend, "default"));
+        CHECK_FALSE(reads_variant(backend, "fast"));
+    }
+    CHECK(reads_variant(BackendType::OpenMP, "collapse2+simd"));
+    CHECK_FALSE(reads_variant(BackendType::Cuda, "collapse2+simd"));
+    CHECK_FALSE(reads_variant(BackendType::Serial, "rows"));
+    CHECK(reads_variant(BackendType::Cuda, "tiled:16x16"));
+    CHECK_FALSE(reads_variant(BackendType::OpenMP, "tiled:16x16"));
+    CHECK_FALSE(reads_variant(BackendType::Serial, "fused"));
+
+    CHECK(variant_name(BackendType::Serial, "default") == "default");
+    CHECK(variant_name(BackendType::OpenMP, "collapse2") == "collapse2");
+    CHECK(variant_name(BackendType::OpenMP, "default") == "rows+simd+table+fuse");
+    CHECK(variant_name(BackendType::Cuda, "tiled:8x4") == "tiled:8x4");
+    CHECK_THROWS_AS(variant_name(BackendType::Serial, "rows"), std::invalid_argument);
+    CHECK_THROWS_AS(variant_name(BackendType::OpenMP, "fused"), std::invalid_argument);
 }

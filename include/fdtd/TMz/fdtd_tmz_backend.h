@@ -30,6 +30,7 @@
 #include <cstddef>
 #include <functional>
 #include <span>
+#include <string>
 #include <string_view>
 #include <vector>
 
@@ -393,6 +394,30 @@ namespace fdtd
          * @return True when make_backend() can create it.
          */
         bool is_backend_available(BackendType type);
+
+        /**
+         * Canonical name of a variant of a backend, which the backend reads back.
+         *
+         * Each backend reads its own grammar, whether it is compiled in or not: serial reads only
+         * `default`, and OpenMP and CUDA read the names their settings describe. `default` names
+         * a backend's default settings.
+         *
+         * @param type Backend type.
+         * @param variant Variant name, as `rows+simd` for OpenMP.
+         * @return The canonical name: `default` for serial, every setting written for the others.
+         * @throws std::invalid_argument When the backend does not read the name, with the reason
+         *         and the name in the message.
+         */
+        std::string variant_name(BackendType type, std::string_view variant);
+
+        /**
+         * Whether a backend reads a variant name.
+         *
+         * @param type Backend type.
+         * @param variant Variant name.
+         * @return True when variant_name() takes the name for the backend.
+         */
+        bool reads_variant(BackendType type, std::string_view variant);
     }
 }
 

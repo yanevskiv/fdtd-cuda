@@ -178,8 +178,14 @@ namespace fdtd
                 apply(options, arg.name, arg.value);
             }
         }
-        TMz::Simulation::Options check;
-        parse_variant_arg("--variant", options.backend, options.variant, check);
+        try {
+            TMz::variant_name(options.backend, options.variant);
+        } catch (const std::invalid_argument &error) {
+            std::ostringstream message;
+            message << "--variant: ";
+            message << error.what();
+            throw std::invalid_argument(message.str());
+        }
         return options;
     }
 
@@ -242,8 +248,8 @@ namespace fdtd
         simOptions.pml_order = options.pml_order;
         simOptions.pml_reflection = options.pml_reflection;
         simOptions.backend = options.backend;
-        parse_variant_arg("--variant", options.backend, options.variant, simOptions);
-        simOptions.omp_threads = options.threads;
+        simOptions.variant = options.variant;
+        simOptions.threads = options.threads;
         const std::size_t ny = options.ny > 0 ? options.ny : options.nx;
         TMz::Simulation sim(options.nx, ny, simOptions);
 
@@ -272,7 +278,7 @@ namespace fdtd
         log << TMz::backend_name(options.backend);
         if (options.backend != TMz::BackendType::Serial) {
             log << " (";
-            log << variant_name(options.backend, simOptions);
+            log << TMz::variant_name(options.backend, options.variant);
             if (options.backend == TMz::BackendType::OpenMP && options.threads > 0) {
                 log << ", ";
                 log << options.threads;

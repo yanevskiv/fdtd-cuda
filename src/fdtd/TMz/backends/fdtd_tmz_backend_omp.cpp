@@ -47,12 +47,12 @@ namespace fdtd::TMz::backends
     namespace
     {
         // Check the options before anything is built from them.
-        const Simulation::Options &checked(const Simulation::Options &options)
+        const OmpOptions &checked(const OmpOptions &options)
         {
-            if (options.omp_fuse && options.omp_schedule != OmpSchedule::Rows) {
+            if (options.fuse && options.schedule != OmpSchedule::Rows) {
                 throw std::invalid_argument("OmpBackend: fuse is for the Rows schedule only");
             }
-            if (options.omp_fuse && options.omp_region == OmpRegion::Phase) {
+            if (options.fuse && options.region == OmpRegion::Phase) {
                 throw std::invalid_argument("OmpBackend: fuse runs in one region per run");
             }
             return options;
@@ -68,10 +68,10 @@ namespace fdtd::TMz::backends
         }
 
         // Cut the grid into the parts of the schedule: rows or one range per thread.
-        serial::Partition partition_for(const Grid &grid, const Simulation::Options &options,
+        serial::Partition partition_for(const Grid &grid, const OmpOptions &options,
                                         std::size_t threads)
         {
-            if (options.omp_schedule == OmpSchedule::Collapse2) {
+            if (options.schedule == OmpSchedule::Collapse2) {
                 return serial::Partition::ranges(grid, threads);
             }
             return serial::Partition::tiles(grid, grid.nx(), 1);
@@ -165,17 +165,17 @@ namespace fdtd::TMz::backends
         // Hand the parts to the threads as the schedule, the fusion and the region say.
         template <bool Simd, bool Table>
         void run_schedule(const serial::Stepper &stepper, const serial::Partition &partition,
-                          std::size_t nsteps, int threads, const Simulation::Options &options)
+                          std::size_t nsteps, int threads, const OmpOptions &options)
         {
             const std::size_t parts = partition.size();
-            if (options.omp_fuse) {
-                run_fused_rows<Simd, Table>(stepper, parts, nsteps, threads, options.omp_bind);
-            } else if (options.omp_region == OmpRegion::Run) {
+            if (options.fuse) {
+                run_fused_rows<Simd, Table>(stepper, parts, nsteps, threads, options.bind);
+            } else if (options.region == OmpRegion::Run) {
                 run_loops<Simd, Table, OmpRegion::Run>(stepper, parts, nsteps, threads,
-                                                       options.omp_bind);
+                                                       options.bind);
             } else {
                 run_loops<Simd, Table, OmpRegion::Phase>(stepper, parts, nsteps, threads,
-                                                         options.omp_bind);
+                                                         options.bind);
             }
         }
     }
@@ -219,11 +219,11 @@ namespace fdtd::TMz::backends
     }
 
     // Check the options, fix the thread count and cut the grid for the schedule.
-    OmpBackend::OmpBackend(const Grid &grid, const Simulation::Options &options)
+    OmpBackend::OmpBackend(const Grid &grid, const OmpOptions &options)
         : SerialBackend(grid)
         , m_options(checked(options))
-        , m_threads(options.omp_threads > 0 ? options.omp_threads
-                                            : static_cast<std::size_t>(omp_get_max_threads()))
+        , m_threads(options.threads > 0 ? options.threads
+                                        : static_cast<std::size_t>(omp_get_max_threads()))
         , m_partition(partition_for(grid, options, m_threads))
     {
         // Empty.
@@ -242,7 +242,7 @@ namespace fdtd::TMz::backends
     }
 
     // Return the options.
-    const Simulation::Options &OmpBackend::options() const noexcept
+    const OmpOptions &OmpBackend::options() const noexcept
     {
         return m_options;
     }
@@ -259,7 +259,7 @@ namespace fdtd::TMz::backends
         SerialBackend::upload(coeffs);
         m_uniform_pml.reset();
         m_uniform_plain.reset();
-        if (m_options.omp_table) {
+        if (m_options.table) {
             m_uniform_pml =
                 omp::core_tuple(coeffs, std::max<std::size_t>(coeffs.pml_thickness(), 1));
             m_uniform_plain = omp::core_tuple(coeffs, 1);
@@ -270,7 +270,7 @@ namespace fdtd::TMz::backends
     StepTraffic OmpBackend::step_traffic() const noexcept
     {
         TrafficModel model;
-        model.one_pass = m_options.omp_fuse;
+        model.one_pass = m_options.fuse;
         model.table = uniform_tuple().has_value();
         return two_pass_traffic(grid(), active_pml(), boundary(), model);
     }
@@ -308,11 +308,11 @@ namespace fdtd::TMz::backends
         const serial::Stepper stepper(fields(), stepper_coeffs(), active_pml(), boundary(),
                                       m_partition, points, values, probes(), records);
         const int threads = static_cast<int>(m_threads);
-        if (m_options.omp_simd && m_options.omp_table) {
+        if (m_options.simd && m_options.table) {
             run_schedule<true, true>(stepper, m_partition, nsteps, threads, m_options);
-        } else if (m_options.omp_simd) {
+        } else if (m_options.simd) {
             run_schedule<true, false>(stepper, m_partition, nsteps, threads, m_options);
-        } else if (m_options.omp_table) {
+        } else if (m_options.table) {
             run_schedule<false, true>(stepper, m_partition, nsteps, threads, m_options);
         } else {
             run_schedule<false, false>(stepper, m_partition, nsteps, threads, m_options);

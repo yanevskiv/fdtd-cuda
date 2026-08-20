@@ -22,6 +22,7 @@
 #include <catch2/generators/catch_generators.hpp>
 
 // Project headers under test.
+#include "fdtd/TMz/backends/fdtd_tmz_backend_cuda_options.h"
 #include "fdtd/TMz/fdtd_tmz_backend.h"
 #include "fdtd/TMz/fdtd_tmz_coeffs.h"
 #include "fdtd/TMz/fdtd_tmz_fields.h"
@@ -46,13 +47,15 @@ using fdtd::TMz::BackendType;
 using fdtd::TMz::Boundary;
 using fdtd::TMz::Coeffs;
 using fdtd::TMz::Component;
-using fdtd::TMz::CudaKernel;
 using fdtd::TMz::Fields;
 using fdtd::TMz::Grid;
 using fdtd::TMz::Material;
 using fdtd::TMz::PointInjection;
 using fdtd::TMz::PointProbe;
 using fdtd::TMz::Simulation;
+using fdtd::TMz::backends::CudaCoeffs;
+using fdtd::TMz::backends::CudaKernel;
+using fdtd::TMz::backends::CudaOptions;
 
 // Helpers private to this file.
 namespace
@@ -125,15 +128,23 @@ namespace
         }
     }
 
-    // Options of a CUDA run with a kernel and a block.
-    Simulation::Options cuda_options(CudaKernel kernel, Block block)
+    // Settings of a CUDA run with a kernel and a block, reading the arrays and launching plainly.
+    CudaOptions cuda_options(CudaKernel kernel, Block block)
+    {
+        CudaOptions options;
+        options.kernel = kernel;
+        options.coeffs = CudaCoeffs::Arrays;
+        options.graph = false;
+        options.block_x = block.x;
+        options.block_y = block.y;
+        return options;
+    }
+
+    // Simulation settings that give the CUDA backend its settings by their variant name.
+    Simulation::Options settings(const CudaOptions &cuda)
     {
         Simulation::Options options;
-        options.cuda_kernel = kernel;
-        options.cuda_coeffs = fdtd::TMz::CudaCoeffs::Arrays;
-        options.cuda_graph = false;
-        options.cuda_block_x = block.x;
-        options.cuda_block_y = block.y;
+        options.variant = cuda.name();
         return options;
     }
 
@@ -306,7 +317,8 @@ TEST_CASE("CUDA matches serial", "[backend][cuda]")
         for (const Block block : {Block{32, 8}, Block{16, 16}, Block{128, 1}, Block{7, 5}}) {
             INFO("size " << size.nx << "x" << size.ny << ", boundary " << int(boundary)
                          << ", kernel " << int(kernel) << ", block " << block.x << "x" << block.y);
-            const Run cuda = run(BackendType::Cuda, cuda_options(kernel, block), size, boundary);
+            const Run cuda =
+                run(BackendType::Cuda, settings(cuda_options(kernel, block)), size, boundary);
             CHECK(relative_difference(serial.fields, cuda.fields) <= bound());
             CHECK(relative_difference(serial.probes, cuda.probes) <= bound());
         }
@@ -327,8 +339,8 @@ TEST_CASE("CUDA matches serial on small grids", "[backend][cuda]")
         for (const Block block : {Block{32, 8}, Block{7, 5}, Block{1, 1}}) {
             INFO("size " << size.nx << "x" << size.ny << ", boundary " << int(boundary)
                          << ", kernel " << int(kernel) << ", block " << block.x << "x" << block.y);
-            const Run cuda =
-                run_backend(BackendType::Cuda, cuda_options(kernel, block), grid, boundary, pml);
+            const Run cuda = run_backend(BackendType::Cuda, settings(cuda_options(kernel, block)),
+                                         grid, boundary, pml);
             CHECK(relative_difference(serial.fields, cuda.fields) <= bound());
             CHECK(relative_difference(serial.probes, cuda.probes) <= bound());
         }
@@ -350,7 +362,7 @@ TEST_CASE("CUDA matches serial bit for bit", "[backend][cuda][exact]")
     for (const CudaKernel kernel : KERNELS) {
         for (const Block block : {Block{32, 8}, Block{7, 5}}) {
             INFO("kernel " << int(kernel) << ", block " << block.x << "x" << block.y);
-            const Simulation::Options options = cuda_options(kernel, block);
+            const Simulation::Options options = settings(cuda_options(kernel, block));
             const Run cuda = run(BackendType::Cuda, options, size, boundary);
             CHECK(serial.fields == cuda.fields);
             CHECK(serial.probes == cuda.probes);
@@ -367,7 +379,7 @@ TEST_CASE("CUDA runs are deterministic", "[backend][cuda]")
     require_cuda();
     for (const CudaKernel kernel : KERNELS) {
         INFO("kernel " << int(kernel));
-        const Simulation::Options options = cuda_options(kernel, {32, 8});
+        const Simulation::Options options = settings(cuda_options(kernel, {32, 8}));
         const Run first = run(BackendType::Cuda, options, {67, 45}, Boundary::Pml);
         const Run second = run(BackendType::Cuda, options, {67, 45}, Boundary::Pml);
         CHECK(first.fields == second.fields);
@@ -490,9 +502,9 @@ TEST_CASE("CUDA graphs match plain launches bit for bit", "[backend][cuda]")
     for (const CudaKernel kernel : KERNELS) {
         INFO("kernel " << static_cast<int>(kernel));
         auto options = cuda_options(kernel, {32, 8});
-        const Run plain = run_advances(options, grid, boundary, lengths);
-        options.cuda_graph = true;
-        const Run graph = run_advances(options, grid, boundary, lengths);
+        const Run plain = run_advances(settings(options), grid, boundary, lengths);
+        options.graph = true;
+        const Run graph = run_advances(settings(options), grid, boundary, lengths);
         CHECK(graph.fields == plain.fields);
         CHECK(graph.probes == plain.probes);
         CHECK(plain.probes.size() == 2 * (5 + 16 + 37) + 33);
@@ -528,9 +540,11 @@ TEST_CASE("CUDA coefficient table matches the arrays bit for bit", "[backend][cu
                                  << ", kernel " << static_cast<int>(kernel) << ", block " << block.x
                                  << "x" << block.y);
                 auto options = cuda_options(kernel, block);
-                const Run arrays = run_material(BackendType::Cuda, options, *material, boundary);
-                options.cuda_coeffs = fdtd::TMz::CudaCoeffs::Table;
-                const Run table = run_material(BackendType::Cuda, options, *material, boundary);
+                const Run arrays =
+                    run_material(BackendType::Cuda, settings(options), *material, boundary);
+                options.coeffs = CudaCoeffs::Table;
+                const Run table =
+                    run_material(BackendType::Cuda, settings(options), *material, boundary);
                 CHECK(table.fields == arrays.fields);
                 CHECK(table.probes == arrays.probes);
             }
@@ -547,9 +561,9 @@ TEST_CASE("CUDA coefficient table matches serial", "[backend][cuda]")
     const Run serial = run(BackendType::Serial, {}, size, boundary);
     for (const CudaKernel kernel : KERNELS) {
         auto options = cuda_options(kernel, {32, 8});
-        options.cuda_coeffs = fdtd::TMz::CudaCoeffs::Table;
-        options.cuda_graph = true;
-        const Run cuda = run(BackendType::Cuda, options, size, boundary);
+        options.coeffs = CudaCoeffs::Table;
+        options.graph = true;
+        const Run cuda = run(BackendType::Cuda, settings(options), size, boundary);
         CHECK(relative_difference(serial.fields, cuda.fields) <= bound());
         CHECK(relative_difference(serial.probes, cuda.probes) <= bound());
     }
@@ -567,9 +581,9 @@ TEST_CASE("CUDA models the traffic of the coefficient table", "[unit][backend][c
         options.backend = BackendType::Cuda;
         options.boundary = boundary;
         options.pml_thickness = 2;
-        options.cuda_coeffs = fdtd::TMz::CudaCoeffs::Arrays;
+        options.variant = "tiled+graph";
         const Simulation arrays(8, 6, options);
-        options.cuda_coeffs = fdtd::TMz::CudaCoeffs::Table;
+        options.variant = "tiled+table+graph";
         const Simulation table(8, 6, options);
         const double core = boundary == Boundary::Pml ? 3 : 15;
         CHECK(table.step_traffic().bytes ==
@@ -605,11 +619,12 @@ TEST_CASE("CUDA tiled kernel matches the fused kernel bit for bit", "[backend][c
             for (const CudaKernel kernel : {CudaKernel::Fused, CudaKernel::Tiled}) {
                 auto options = cuda_options(kernel, {32, 8});
                 if (table) {
-                    options.cuda_coeffs = fdtd::TMz::CudaCoeffs::Table;
+                    options.coeffs = CudaCoeffs::Table;
                 }
                 Fields fields(grid);
                 fill_distinct(fields);
-                const auto backend = fdtd::TMz::make_backend(BackendType::Cuda, grid, options);
+                const auto backend =
+                    fdtd::TMz::make_backend(BackendType::Cuda, grid, settings(options));
                 backend->upload(fields);
                 backend->upload(coeffs);
                 backend->set_boundary(boundary);
@@ -638,13 +653,12 @@ TEST_CASE("CUDA models the traffic of the tiled kernel", "[unit][backend][cuda]"
     options.backend = BackendType::Cuda;
     options.boundary = Boundary::Pml;
     options.pml_thickness = 2;
-    options.cuda_kernel = CudaKernel::Tiled;
-    options.cuda_coeffs = fdtd::TMz::CudaCoeffs::Arrays;
+    options.variant = "tiled";
     const Simulation tiled(8, 6, options);
     const double word = sizeof(FloatType);
     CHECK(tiled.step_traffic().bytes == (6 * 48 + 2 * 82 + 2 * 8 + 8 * 16 + 2 * 24) * word);
     CHECK(tiled.step_traffic().flops == 5 * 82 + 8 * 8 + 16 * 11);
-    options.cuda_coeffs = fdtd::TMz::CudaCoeffs::Table;
+    options.variant = "tiled+table";
     const Simulation table(8, 6, options);
     CHECK(table.step_traffic().bytes == tiled.step_traffic().bytes - 6 * 3 * word);
 }
@@ -667,12 +681,13 @@ TEST_CASE("CUDA async snapshots match the stopping ones bit for bit", "[backend]
             INFO("kernel " << static_cast<int>(kernel) << ", graph " << graph);
             Taken taken[2];
             for (const bool async : {false, true}) {
-                auto options = cuda_options(kernel, {32, 8});
+                CudaOptions cuda = cuda_options(kernel, {32, 8});
+                cuda.graph = graph;
+                cuda.async_snapshots = async;
+                Simulation::Options options = settings(cuda);
                 options.backend = BackendType::Cuda;
                 options.boundary = boundary;
                 options.pml_thickness = 6;
-                options.cuda_graph = graph;
-                options.cuda_async_snapshots = async;
                 Simulation sim(53, 41, options);
                 sim.add_source(20, 20, Component::Ez, fdtd::TMz::Gaussian::from_steps(sim.dt(), 6));
                 sim.add_source(30, 12, Component::Hy, fdtd::TMz::Gaussian::from_steps(sim.dt(), 6));
@@ -712,26 +727,20 @@ TEST_CASE("CUDA backend checks its options", "[unit][backend][cuda]")
     CHECK(backend->type() == BackendType::Cuda);
     CHECK_THROWS_AS(backend->step(1), std::logic_error);
 
-    options.cuda_block_x = 0;
-    CHECK_THROWS_AS(fdtd::TMz::make_backend(BackendType::Cuda, grid, options),
+    const auto block = [](std::size_t x, std::size_t y) {
+        CudaOptions cuda;
+        cuda.block_x = x;
+        cuda.block_y = y;
+        return settings(cuda);
+    };
+    for (const Block bad : {Block{0, 8}, Block{32, 0}, Block{64, 32}, Block{2048, 1}}) {
+        INFO("block " << bad.x << "x" << bad.y);
+        CHECK_THROWS_AS(fdtd::TMz::make_backend(BackendType::Cuda, grid, block(bad.x, bad.y)),
+                        std::invalid_argument);
+    }
+    CHECK_THROWS_AS(fdtd::TMz::make_backend(BackendType::Cuda, Grid(16, 70000), block(32, 1)),
                     std::invalid_argument);
-    options.cuda_block_x = 32;
-    options.cuda_block_y = 0;
-    CHECK_THROWS_AS(fdtd::TMz::make_backend(BackendType::Cuda, grid, options),
-                    std::invalid_argument);
-    options.cuda_block_x = 64;
-    options.cuda_block_y = 32;
-    CHECK_THROWS_AS(fdtd::TMz::make_backend(BackendType::Cuda, grid, options),
-                    std::invalid_argument);
-    options.cuda_block_x = 2048;
-    options.cuda_block_y = 1;
-    CHECK_THROWS_AS(fdtd::TMz::make_backend(BackendType::Cuda, grid, options),
-                    std::invalid_argument);
-    options.cuda_block_x = 32;
-    options.cuda_block_y = 1;
-    CHECK_THROWS_AS(fdtd::TMz::make_backend(BackendType::Cuda, Grid(16, 70000), options),
-                    std::invalid_argument);
-    options.cuda_block_y = 8;
+    options = block(32, 8);
     CHECK_THROWS_AS(fdtd::TMz::make_backend(BackendType::Cuda, Grid(50000, 50000), options),
                     std::invalid_argument);
     CHECK_THROWS_AS(fdtd::TMz::make_backend(BackendType::Cuda, Grid(30000, 30000), options),

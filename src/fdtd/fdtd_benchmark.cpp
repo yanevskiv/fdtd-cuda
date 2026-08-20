@@ -207,8 +207,8 @@ namespace fdtd
                 }
             }
             for (const std::string &variant : variants) {
-                if (!backend_reads_variant(TMz::BackendType::OpenMP, variant) &&
-                    !backend_reads_variant(TMz::BackendType::Cuda, variant)) {
+                if (!TMz::reads_variant(TMz::BackendType::OpenMP, variant) &&
+                    !TMz::reads_variant(TMz::BackendType::Cuda, variant)) {
                     std::ostringstream message;
                     message << "run_benchmark: no backend reads the variant ";
                     message << variant;
@@ -225,8 +225,8 @@ namespace fdtd
             TMz::Simulation::Options simOptions;
             simOptions.boundary = options.boundary;
             simOptions.backend = backend;
-            parse_variant_arg("run_benchmark: variant", backend, variant, simOptions);
-            simOptions.omp_threads = threads;
+            simOptions.variant = variant;
+            simOptions.threads = threads;
             TMz::Simulation sim(options.nx, ny, simOptions);
             sim.add_source(options.nx / 2, ny / 2, TMz::Component::Ez,
                            TMz::Gaussian::from_steps(sim.dt(), PULSE_WIDTH_STEPS));
@@ -248,7 +248,7 @@ namespace fdtd
             const TMz::StepTraffic traffic = sim.step_traffic();
             return {
                 .backend = backend,
-                .variant = variant_name(backend, simOptions),
+                .variant = TMz::variant_name(backend, variant),
                 .threads = threads,
                 .nx = options.nx,
                 .ny = ny,
@@ -286,7 +286,7 @@ namespace fdtd
         {
             std::vector<std::string> names;
             for (const std::string &variant : variants) {
-                if (backend_reads_variant(backend, variant)) {
+                if (TMz::reads_variant(backend, variant)) {
                     names.push_back(variant);
                 }
             }

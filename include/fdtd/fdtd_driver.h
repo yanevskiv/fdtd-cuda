@@ -105,7 +105,7 @@ namespace fdtd
         /** Thread count of the OpenMP backend, 0 for the OpenMP default. */
         std::size_t threads = 0;
 
-        /** Variant name of the backend, as parse_variant_arg reads it. */
+        /** Variant name of the backend, as TMz::variant_name() reads it. */
         std::string variant = "default";
 
         /** Directory the files are written to. */
