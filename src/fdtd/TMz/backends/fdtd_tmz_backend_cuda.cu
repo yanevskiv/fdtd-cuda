@@ -115,6 +115,24 @@ namespace fdtd::TMz::backends
             return options;
         }
 
+        // FP32 and FP64 lanes per multiprocessor of a compute capability, zero when not known.
+        std::pair<int, int> lanes_per_sm(int major, int minor)
+        {
+            if (major == 6) {
+                return minor == 0 ? std::pair{64, 32} : std::pair{128, 4};
+            }
+            if (major == 7) {
+                return minor == 5 ? std::pair{64, 2} : std::pair{64, 32};
+            }
+            if (major == 8) {
+                return minor == 0 ? std::pair{64, 32} : std::pair{128, 2};
+            }
+            if (major == 9) {
+                return {128, 64};
+            }
+            return {0, 0};
+        }
+
         // Check that data is on the backend's grid.
         void require_same_grid(const Grid &expected, const Grid &actual)
         {
@@ -287,6 +305,37 @@ namespace fdtd::TMz::backends
     const CudaOptions &CudaBackend::options() const noexcept
     {
         return m_options;
+    }
+
+    // Query the device and time the copy, then derive the peak bandwidth and flops.
+    std::vector<MachinePeak> CudaBackend::machine_peaks(std::size_t bytes, std::size_t repeats)
+    {
+        const gpu::DeviceInfo info = gpu::device_info();
+        const auto [fp32, fp64] = lanes_per_sm(info.major, info.minor);
+        const double sms = static_cast<double>(info.sms);
+        const double bandwidth = 2 * info.memory_clock * static_cast<double>(info.bus_bits) / 8;
+        const double copy = gpu::copy_bandwidth(2 * bytes, repeats);
+        std::vector<MachinePeak> peaks{
+            {.name = "gpu_sm_count", .value = sms, .unit = "", .decimals = 0},
+            {.name = "gpu_clock", .value = info.clock / 1e6, .unit = "MHz", .decimals = 0},
+            {.name = "gpu_l2_cache",
+             .value = static_cast<double>(info.l2_bytes) / (1 << 20),
+             .unit = "MiB",
+             .decimals = 1},
+            {.name = "gpu_peak_bandwidth", .value = bandwidth / 1e9, .unit = "GB/s", .decimals = 1},
+            {.name = "gpu_copy_bandwidth", .value = copy / 1e9, .unit = "GB/s", .decimals = 1},
+        };
+        if (fp32 > 0) {
+            peaks.push_back({.name = "gpu_peak_flops_float",
+                             .value = 2 * fp32 * sms * info.clock / 1e9,
+                             .unit = "GFLOPS",
+                             .decimals = 0});
+            peaks.push_back({.name = "gpu_peak_flops_double",
+                             .value = 2 * fp64 * sms * info.clock / 1e9,
+                             .unit = "GFLOPS",
+                             .decimals = 0});
+        }
+        return peaks;
     }
 
     // Return the device pitch.

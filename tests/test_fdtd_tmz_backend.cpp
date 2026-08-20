@@ -27,12 +27,13 @@
 #include "fdtd/TMz/fdtd_tmz_grid.h"
 #include "fdtd/TMz/fdtd_tmz_simulation.h"
 
-// Standard library for algorithms, sizes and errors.
+// Standard library for algorithms, sizes, errors and text.
 #include <algorithm>
 #include <array>
 #include <cstddef>
 #include <span>
 #include <stdexcept>
+#include <string>
 #include <vector>
 
 // Shorthand for the types under test.
@@ -503,6 +504,32 @@ TEST_CASE("Serial backend splits Ez in the PML only under Boundary::Pml",
         }
     }
     CHECK(anyPart == split);
+}
+
+// Verify that serial gives no peaks, a backend not built in none, and the others positive values
+// under names of their own, on small arrays.
+TEST_CASE("Backends give the machine's peaks by name", "[unit][backend]")
+{
+    using fdtd::TMz::BackendType;
+    CHECK(fdtd::TMz::machine_peaks(BackendType::Serial, 1 << 20, 1).empty());
+    for (const BackendType type : {BackendType::OpenMP, BackendType::Cuda}) {
+        INFO(fdtd::TMz::backend_name(type));
+        const auto peaks = fdtd::TMz::machine_peaks(type, 1 << 20, 1);
+        if (!fdtd::TMz::is_backend_available(type)) {
+            CHECK(peaks.empty());
+            continue;
+        }
+        REQUIRE_FALSE(peaks.empty());
+        const std::string prefix = type == BackendType::OpenMP ? "cpu_" : "gpu_";
+        for (std::size_t k = 0; k < peaks.size(); ++k) {
+            INFO(peaks[k].name);
+            CHECK(peaks[k].name.starts_with(prefix));
+            CHECK(peaks[k].value > 0);
+            for (std::size_t m = 0; m < k; ++m) {
+                CHECK(peaks[m].name != peaks[k].name);
+            }
+        }
+    }
 }
 
 // Verify which backend reads which name, whether compiled in or not, and the name each writes.

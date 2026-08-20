@@ -418,6 +418,40 @@ namespace fdtd
          * @return True when variant_name() takes the name for the backend.
          */
         bool reads_variant(BackendType type, std::string_view variant);
+
+        /** A peak of the machine a backend runs on, measured or derived from what it reports. */
+        struct MachinePeak
+        {
+            /** Name, unique over the backends, as `cpu_triad_bandwidth`. */
+            std::string name;
+
+            /** Value, in the unit. */
+            double value;
+
+            /** Unit, as `GB/s`, or empty for a count. */
+            std::string unit;
+
+            /** Decimals worth writing. */
+            int decimals;
+        };
+
+        /**
+         * The peaks of the machine as a backend sees them, for the roofline of a report.
+         *
+         * OpenMP measures the best bandwidth of the STREAM triad over three arrays of the given
+         * size on 1, 2, 4 and so on up to every thread, and gives its thread count. CUDA gives the
+         * device's multiprocessors, clock and L2 size, its peak memory bandwidth and peak float
+         * and double flops from those, and the bandwidth a copy kernel measures over two buffers
+         * of twice the size. Serial gives none. Each measurement is the median of the runs.
+         *
+         * @param type Backend type.
+         * @param bytes Size of each array of a measurement.
+         * @param repeats Timed runs of each measurement, at least one.
+         * @return The peaks, none when the backend is not available.
+         * @throws std::runtime_error When a CUDA call fails.
+         */
+        std::vector<MachinePeak> machine_peaks(BackendType type, std::size_t bytes,
+                                               std::size_t repeats);
     }
 }
 

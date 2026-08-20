@@ -23,18 +23,11 @@
 // Shared argument parsing.
 #include "fdtd/fdtd_args.h"
 
-// The simulation, the backend variants and the source waveform.
+// The backend registry with the variants and the peaks, the simulation and the source waveform.
+#include "fdtd/TMz/fdtd_tmz_backend.h"
 #include "fdtd/TMz/fdtd_tmz_simulation.h"
 #include "fdtd/TMz/fdtd_tmz_waveform.h"
 #include "fdtd/fdtd_float.h"
-
-// The machine's peaks: the CPU triad and the GPU's queries and copy.
-#if FDTD_WITH_OPENMP
-#include "fdtd/TMz/backends/fdtd_tmz_backend_omp.h"
-#endif
-#if FDTD_WITH_CUDA
-#include "fdtd/TMz/backends/gpu/fdtd_tmz_backend_gpu_device.h"
-#endif
 
 // Standard library for timing, sorting, string building, files and errors.
 #include <algorithm>
@@ -43,7 +36,6 @@
 #include <iomanip>
 #include <sstream>
 #include <stdexcept>
-#include <utility>
 
 // Namespace for the fdtd library.
 namespace fdtd
@@ -81,27 +73,6 @@ namespace fdtd
             line << '\n';
             out << line.str();
         }
-
-#if FDTD_WITH_CUDA
-
-        // FP32 and FP64 lanes per multiprocessor of a compute capability, zero when not known.
-        std::pair<int, int> lanes_per_sm(int major, int minor)
-        {
-            if (major == 6) {
-                return minor == 0 ? std::pair{64, 32} : std::pair{128, 4};
-            }
-            if (major == 7) {
-                return minor == 5 ? std::pair{64, 2} : std::pair{64, 32};
-            }
-            if (major == 8) {
-                return minor == 0 ? std::pair{64, 32} : std::pair{128, 2};
-            }
-            if (major == 9) {
-                return {128, 64};
-            }
-            return {0, 0};
-        }
-#endif
 
         // Add a backend to the list unless it is there already.
         void add_backend(std::vector<TMz::BackendType> &backends, TMz::BackendType type)
@@ -460,36 +431,15 @@ namespace fdtd
         return row.str();
     }
 
-    // Query and measure the GPU, then measure the CPU, each where it is built in.
+    // Write the peaks each available backend gives.
     void write_benchmark_peaks(std::ostream &out)
     {
-#if FDTD_WITH_CUDA
-        if (TMz::is_backend_available(TMz::BackendType::Cuda)) {
-            namespace gpu = TMz::backends::gpu;
-            const gpu::DeviceInfo info = gpu::device_info();
-            const auto [fp32, fp64] = lanes_per_sm(info.major, info.minor);
-            const double sms = static_cast<double>(info.sms);
-            const double bandwidth = 2 * info.memory_clock * static_cast<double>(info.bus_bits) / 8;
-            peak_line(out, "gpu_sm_count", sms, 0, "");
-            peak_line(out, "gpu_clock", info.clock / 1e6, 0, "MHz");
-            peak_line(out, "gpu_l2_cache", static_cast<double>(info.l2_bytes) / (1 << 20), 1,
-                      "MiB");
-            peak_line(out, "gpu_peak_bandwidth", bandwidth / 1e9, 1, "GB/s");
-            const double copy = gpu::copy_bandwidth(2 * PEAK_BYTES, PEAK_REPEATS);
-            peak_line(out, "gpu_copy_bandwidth", copy / 1e9, 1, "GB/s");
-            if (fp32 > 0) {
-                peak_line(out, "gpu_peak_flops_float", 2 * fp32 * sms * info.clock / 1e9, 0,
-                          "GFLOPS");
-                peak_line(out, "gpu_peak_flops_double", 2 * fp64 * sms * info.clock / 1e9, 0,
-                          "GFLOPS");
+        for (const TMz::BackendType type : TMz::available_backends()) {
+            for (const TMz::MachinePeak &peak :
+                 TMz::machine_peaks(type, PEAK_BYTES, PEAK_REPEATS)) {
+                peak_line(out, peak.name, peak.value, peak.decimals, peak.unit);
             }
         }
-#endif
-#if FDTD_WITH_OPENMP
-        const auto best = TMz::backends::best_triad_bandwidth(PEAK_BYTES, PEAK_REPEATS);
-        peak_line(out, "cpu_triad_bandwidth", best.bandwidth / 1e9, 1, "GB/s");
-        peak_line(out, "cpu_triad_threads", static_cast<double>(best.threads), 0, "");
-#endif
         out << std::flush;
     }
 

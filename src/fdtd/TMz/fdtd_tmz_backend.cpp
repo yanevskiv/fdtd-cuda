@@ -24,18 +24,24 @@
 #include "fdtd/TMz/backends/fdtd_tmz_backend_cuda_options.h"
 #include "fdtd/TMz/backends/fdtd_tmz_backend_omp_options.h"
 
-// The CUDA device count, for the registry.
+// The backends built in, for their peaks, and the CUDA device count.
+#if FDTD_WITH_OPENMP
+#include "fdtd/TMz/backends/fdtd_tmz_backend_omp.h"
+#endif
 #if FDTD_WITH_CUDA
+#include "fdtd/TMz/backends/fdtd_tmz_backend_cuda.h"
 #include "fdtd/TMz/backends/gpu/fdtd_tmz_backend_gpu_device.h"
 #endif
 
-// Standard library for algorithms, limits, text, errors and pairs.
+// Standard library for algorithms, sizes, limits, text, errors, pairs and lists.
 #include <algorithm>
+#include <cstddef>
 #include <limits>
 #include <sstream>
 #include <stdexcept>
 #include <string>
 #include <utility>
+#include <vector>
 
 // Namespace for the 2D TMz module.
 namespace fdtd::TMz
@@ -231,5 +237,25 @@ namespace fdtd::TMz
             return false;
         }
         return true;
+    }
+
+    // Ask the backend for its peaks when it is available.
+    std::vector<MachinePeak> machine_peaks(BackendType type, [[maybe_unused]] std::size_t bytes,
+                                           [[maybe_unused]] std::size_t repeats)
+    {
+        if (!is_backend_available(type)) {
+            return {};
+        }
+#if FDTD_WITH_OPENMP
+        if (type == BackendType::OpenMP) {
+            return backends::OmpBackend::machine_peaks(bytes, repeats);
+        }
+#endif
+#if FDTD_WITH_CUDA
+        if (type == BackendType::Cuda) {
+            return backends::CudaBackend::machine_peaks(bytes, repeats);
+        }
+#endif
+        return {};
     }
 }

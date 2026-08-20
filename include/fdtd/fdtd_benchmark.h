@@ -176,12 +176,10 @@ namespace fdtd
     /**
      * Write the peaks of the machine as '# key: value' lines, for the roofline of a report.
      *
-     * With CUDA available: the device's multiprocessors, clock and L2 size; its peak memory
-     * bandwidth and peak float and double flops from those; and the bandwidth a copy kernel
-     * measures over two 256 MiB buffers. With OpenMP: the best bandwidth of the STREAM triad over
-     * three 128 MiB arrays on 1, 2, 4 and so on up to every thread, and the thread count of it;
-     * on a machine shared with other processes, every thread can be slower than fewer. Each
-     * measurement is the median of 10 runs.
+     * The peaks are TMz::machine_peaks() of each available backend, over 128 MiB arrays with
+     * 10 timed runs each: the OpenMP triad over three such arrays, the CUDA copy over two of
+     * twice that. On a machine shared with other processes, every thread can be slower than
+     * fewer, which the triad's thread count shows.
      *
      * @param out Stream for the lines.
      * @throws std::runtime_error When a CUDA call fails.

@@ -185,6 +185,20 @@ namespace fdtd
                  */
                 std::size_t device_pitch() const noexcept;
 
+                /**
+                 * Peaks of the device, as machine_peaks() names them: its multiprocessors, clock
+                 * and L2 size, its peak memory bandwidth and, for the compute capabilities it
+                 * knows, its peak float and double flops from those, and the bandwidth of a copy
+                 * kernel.
+                 *
+                 * @param bytes Half the size of each buffer of the copy.
+                 * @param repeats Timed copies, at least one.
+                 * @return The peaks, `gpu_` before each name.
+                 * @throws gpu::CudaError When a query or the copy fails.
+                 */
+                static std::vector<MachinePeak> machine_peaks(std::size_t bytes,
+                                                              std::size_t repeats);
+
             protected:
                 /**
                  * Replace the probes and clear the records.

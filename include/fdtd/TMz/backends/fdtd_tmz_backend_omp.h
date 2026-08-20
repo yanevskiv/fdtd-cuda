@@ -30,6 +30,7 @@
 #include <optional>
 #include <span>
 #include <string_view>
+#include <vector>
 
 /** Namespace for the fdtd library. */
 namespace fdtd
@@ -105,6 +106,17 @@ namespace fdtd
                  *         model of the level.
                  */
                 StepTraffic step_traffic() const noexcept override;
+
+                /**
+                 * Peaks of the CPU: the best bandwidth of the STREAM triad and its thread count,
+                 * as machine_peaks() names them.
+                 *
+                 * @param bytes Size of each array of the triad.
+                 * @param repeats Timed passes per thread count, at least one.
+                 * @return `cpu_triad_bandwidth` in GB/s and `cpu_triad_threads`.
+                 */
+                static std::vector<MachinePeak> machine_peaks(std::size_t bytes,
+                                                              std::size_t repeats);
 
             protected:
                 /**

@@ -155,6 +155,22 @@ namespace fdtd::TMz::backends
         omp::run_v4(run, shared_tuple());
     }
 
+    // Measure the best triad and name it.
+    std::vector<MachinePeak> OmpBackend::machine_peaks(std::size_t bytes, std::size_t repeats)
+    {
+        const TriadResult best = best_triad_bandwidth(bytes, repeats);
+        return {
+            {.name = "cpu_triad_bandwidth",
+             .value = best.bandwidth / 1e9,
+             .unit = "GB/s",
+             .decimals = 1},
+            {.name = "cpu_triad_threads",
+             .value = static_cast<double>(best.threads),
+             .unit = "",
+             .decimals = 0},
+        };
+    }
+
     // Time each pass of the triad and take the median.
     TriadResult triad_bandwidth(std::size_t bytes, std::size_t repeats, std::size_t threads)
     {
