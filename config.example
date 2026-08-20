@@ -21,7 +21,7 @@ BENCH_THREADS="12"
 # PASSIVE sleeps at barriers, kind to a shared machine; a value set in the environment wins
 export OMP_WAIT_POLICY="${OMP_WAIT_POLICY:-PASSIVE}"
 
-# Variant names or default; each backend runs the ones it reads (see benchmark --help)
+# Variant names, levels v1 to v4, or default; each backend runs the ones it reads (see benchmark --help)
 BENCH_VARIANTS="default"
 
 # Weak scaling: OpenMP on nx = BENCH_WEAK_NX by ny = threads * BENCH_WEAK_NX; empty for none

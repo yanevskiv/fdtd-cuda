@@ -60,7 +60,7 @@ def load(runs):
     """Read the samples of the CSVs of the runs, a (path, label) pair each, into one array.
 
     Where the runs differ in precision or label, the variant name carries both, as
-    'fused:32x8 [double / passive]', so that every figure tells the runs apart, and the column
+    'v1:32x8 [double / passive]', so that every figure tells the runs apart, and the column
     'run' holds them for the speedup to pair each sample with the serial samples of its own run.
     Columns are only ever added at the end of the CSV, so a run that lacks the last ones gets
     nan in them.
