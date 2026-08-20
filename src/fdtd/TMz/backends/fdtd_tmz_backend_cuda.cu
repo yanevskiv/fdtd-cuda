@@ -79,7 +79,8 @@ namespace fdtd::TMz::backends
         }
 
         // Advance Ez of the thread's cell by the edge, PML or interior update.
-        __global__ void update_e_fused_kernel(gpu::DeviceFields fields, gpu::DeviceCoeffs coeffs, Boundary boundary)
+        __global__ void update_e_fused_kernel(gpu::DeviceFields fields, gpu::DeviceCoeffs coeffs,
+                                              Boundary boundary)
         {
             const int i = thread_i();
             const int j = thread_j();
@@ -95,8 +96,9 @@ namespace fdtd::TMz::backends
         }
 
         // Add one step's value to the thread's source cell, the step on the device picking the row.
-        __global__ void add_sources_kernel(gpu::DeviceFields fields, const gpu::DevicePoint *points, int count, const FloatType *values,
-                                           const int *step, int stride)
+        __global__ void add_sources_kernel(gpu::DeviceFields fields, const gpu::DevicePoint *points,
+                                           int count, const FloatType *values, const int *step,
+                                           int stride)
         {
             const int t = thread_i();
             if (t < count) {
@@ -107,13 +109,15 @@ namespace fdtd::TMz::backends
         }
 
         // Copy the thread's probe cell into one step's records, the step picking the row.
-        __global__ void record_probes_kernel(gpu::DeviceFields fields, const gpu::DevicePoint *points, int count, FloatType *records,
-                                             const int *step, int stride)
+        __global__ void record_probes_kernel(gpu::DeviceFields fields,
+                                             const gpu::DevicePoint *points, int count,
+                                             FloatType *records, const int *step, int stride)
         {
             const int t = thread_i();
             if (t < count) {
                 const gpu::DevicePoint point = points[t];
-                records[step_row(step, stride) + point.column] = gpu::field_of(fields, point.component)[point.cell];
+                records[step_row(step, stride) + point.column] =
+                    gpu::field_of(fields, point.component)[point.cell];
             }
         }
 
@@ -130,8 +134,9 @@ namespace fdtd::TMz::backends
         }
 
         // Add the magnetic sources on a cell to its new H, as add_sources_kernel would.
-        __device__ inline void add_h_sources(gpu::HValues &h, int k, const gpu::DevicePoint *points, int count, const FloatType *values,
-                                             const int *step, int stride)
+        __device__ inline void add_h_sources(gpu::HValues &h, int k, const gpu::DevicePoint *points,
+                                             int count, const FloatType *values, const int *step,
+                                             int stride)
         {
             for (int s = 0; s < count; ++s) {
                 const gpu::DevicePoint point = points[s];
@@ -147,15 +152,17 @@ namespace fdtd::TMz::backends
         }
 
         // Advance H and E of the thread's cell in one pass, with the tile's H in shared memory.
-        __global__ void update_tiled_kernel(gpu::DeviceFields fields, gpu::DeviceCoeffs coeffs, Boundary boundary,
-                                            const gpu::DevicePoint *points, int magnetic, const FloatType *values, const int *step,
+        __global__ void update_tiled_kernel(gpu::DeviceFields fields, gpu::DeviceCoeffs coeffs,
+                                            Boundary boundary, const gpu::DevicePoint *points,
+                                            int magnetic, const FloatType *values, const int *step,
                                             int stride)
         {
             extern __shared__ FloatType tile[];
             const int width = static_cast<int>(blockDim.x) + 1;
             FloatType *tileHx = tile;
             FloatType *tileHy = tile + width * (static_cast<int>(blockDim.y) + 1);
-            const int c = (static_cast<int>(threadIdx.y) + 1) * width + static_cast<int>(threadIdx.x) + 1;
+            const int c =
+                (static_cast<int>(threadIdx.y) + 1) * width + static_cast<int>(threadIdx.x) + 1;
             const int i = thread_i();
             const int j = thread_j();
             const bool inside = i < fields.nx && j < fields.ny;
@@ -207,7 +214,9 @@ namespace fdtd::TMz::backends
                 arrays += 10;
             }
             const std::size_t index = options.coeffs == CudaCoeffs::Table ? cells : 0;
-            const std::size_t table = options.coeffs == CudaCoeffs::Table ? gpu::CoeffTable::CAPACITY * sizeof(gpu::CoeffTuple) : 0;
+            const std::size_t table = options.coeffs == CudaCoeffs::Table
+                                          ? gpu::CoeffTable::CAPACITY * sizeof(gpu::CoeffTuple)
+                                          : 0;
             return arrays * cells * sizeof(FloatType) + index + table + sizeof(int);
         }
 
@@ -262,8 +271,9 @@ namespace fdtd::TMz::backends
         // Check that data is on the backend's grid.
         void require_same_grid(const Grid &expected, const Grid &actual)
         {
-            if (expected.nx() != actual.nx() || expected.ny() != actual.ny() || expected.pitch() != actual.pitch() ||
-                expected.dx() != actual.dx() || expected.dy() != actual.dy()) {
+            if (expected.nx() != actual.nx() || expected.ny() != actual.ny() ||
+                expected.pitch() != actual.pitch() || expected.dx() != actual.dx() ||
+                expected.dy() != actual.dy()) {
                 throw std::invalid_argument("cuda backend: the data is on a different grid");
             }
         }
@@ -312,8 +322,9 @@ namespace fdtd::TMz::backends
         , m_coeff_hy_2(m_pitch * grid.ny())
         , m_device_step(1)
     {
-        for (gpu::DeviceBuffer<FloatType> *buffer : {&m_ez, &m_hx, &m_hy, &m_ezx, &m_ezy, &m_coeff_ez_x1, &m_coeff_ez_x2, &m_coeff_ez_y1,
-                                                     &m_coeff_ez_y2, &m_coeff_hx_1, &m_coeff_hx_2, &m_coeff_hy_1, &m_coeff_hy_2}) {
+        for (gpu::DeviceBuffer<FloatType> *buffer :
+             {&m_ez, &m_hx, &m_hy, &m_ezx, &m_ezy, &m_coeff_ez_x1, &m_coeff_ez_x2, &m_coeff_ez_y1,
+              &m_coeff_ez_y2, &m_coeff_hx_1, &m_coeff_hx_2, &m_coeff_hy_1, &m_coeff_hy_2}) {
             buffer->zero(m_stream);
         }
         if (m_options.kernel == CudaKernel::Tiled) {
@@ -396,7 +407,8 @@ namespace fdtd::TMz::backends
             gpu::upload(m_table_entries, table.entries(), m_stream);
             reserve(m_table_index, m_pitch * ny);
             gpu::upload_rows(m_table_index, m_pitch, table.index(), host, nx, ny, m_stream);
-            m_uniform_pml = tuple_of(table.uniform_entry(std::max<std::size_t>(coeffs.pml_thickness(), 1)));
+            m_uniform_pml =
+                tuple_of(table.uniform_entry(std::max<std::size_t>(coeffs.pml_thickness(), 1)));
             m_uniform_plain = tuple_of(table.uniform_entry(1));
         }
         m_stream.synchronize();
@@ -444,7 +456,8 @@ namespace fdtd::TMz::backends
             model.table = true;
             model.index = !uniform_tuple().has_value();
         }
-        return two_pass_traffic(m_grid, m_boundary == Boundary::Pml ? m_pml_thickness : 0, m_boundary, model);
+        return two_pass_traffic(m_grid, m_boundary == Boundary::Pml ? m_pml_thickness : 0,
+                                m_boundary, model);
     }
 
     // Pick the interior's tuple for the boundary in force.
@@ -485,7 +498,8 @@ namespace fdtd::TMz::backends
     }
 
     // Put the sources on the device, run the steps, and bring the records back.
-    void CudaBackend::advance(std::size_t nsteps, std::span<const PointInjection> points, std::span<const FloatType> values)
+    void CudaBackend::advance(std::size_t nsteps, std::span<const PointInjection> points,
+                              std::span<const FloatType> values)
     {
         require_coeffs();
         const std::size_t magnetic = put_sources(nsteps, points, values);
@@ -495,8 +509,10 @@ namespace fdtd::TMz::backends
     }
 
     // Copy each snapshot out while the steps after it run, and hand it over after the next.
-    void CudaBackend::advance_snapshots(std::size_t nsteps, std::span<const PointInjection> points, std::span<const FloatType> values,
-                                        std::span<const std::size_t> snapshots, const SnapshotHandler &handler)
+    void CudaBackend::advance_snapshots(std::size_t nsteps, std::span<const PointInjection> points,
+                                        std::span<const FloatType> values,
+                                        std::span<const std::size_t> snapshots,
+                                        const SnapshotHandler &handler)
     {
         if (!m_options.async_snapshots || snapshots.empty()) {
             Backend::advance_snapshots(nsteps, points, values, snapshots, handler);
@@ -521,7 +537,8 @@ namespace fdtd::TMz::backends
     }
 
     // Copy the sources to the device, magnetic first, and make room for the records.
-    std::size_t CudaBackend::put_sources(std::size_t nsteps, std::span<const PointInjection> points, std::span<const FloatType> values)
+    std::size_t CudaBackend::put_sources(std::size_t nsteps, std::span<const PointInjection> points,
+                                         std::span<const FloatType> values)
     {
         std::vector<gpu::DevicePoint> sources;
         sources.reserve(points.size());
@@ -532,9 +549,10 @@ namespace fdtd::TMz::backends
                 .column = static_cast<int>(k),
             });
         }
-        const auto firstElectric = std::stable_partition(sources.begin(), sources.end(), [](const gpu::DevicePoint &p) {
-            return p.component != Component::Ez;
-        });
+        const auto firstElectric =
+            std::stable_partition(sources.begin(), sources.end(), [](const gpu::DevicePoint &p) {
+                return p.component != Component::Ez;
+            });
         reserve(m_device_sources, sources.size());
         gpu::upload(m_device_sources, std::span<const gpu::DevicePoint>(sources), m_stream);
         reserve(m_device_values, values.size());
@@ -544,8 +562,8 @@ namespace fdtd::TMz::backends
     }
 
     // Replay the graph over whole runs of GRAPH_STEPS steps, and launch the rest one by one.
-    void CudaBackend::queue_steps(const gpu::DeviceCoeffs &coeffs, std::size_t from, std::size_t to, std::size_t magnetic,
-                                  std::size_t electric)
+    void CudaBackend::queue_steps(const gpu::DeviceCoeffs &coeffs, std::size_t from, std::size_t to,
+                                  std::size_t magnetic, std::size_t electric)
     {
         std::size_t n = from;
         if (m_options.graph && to - from >= GRAPH_STEPS) {
@@ -569,7 +587,8 @@ namespace fdtd::TMz::backends
                 });
                 m_graph_key = key;
             }
-            set_step_kernel<<<1, 1, 0, m_stream.handle()>>>(m_device_step.data(), static_cast<int>(from));
+            set_step_kernel<<<1, 1, 0, m_stream.handle()>>>(m_device_step.data(),
+                                                            static_cast<int>(from));
             check_launch();
             for (; n + GRAPH_STEPS <= to; n += GRAPH_STEPS) {
                 m_graph.launch(m_stream);
@@ -606,11 +625,16 @@ namespace fdtd::TMz::backends
         const std::size_t device = m_pitch * sizeof(FloatType);
         const std::size_t ny = m_grid.ny();
         const gpu::Stream &copies = m_async->stream;
-        gpu::queue_rows_to_host(slot.fields.ez().data(), host, slot.ez.data(), device, width, ny, copies);
-        gpu::queue_rows_to_host(slot.fields.hx().data(), host, slot.hx.data(), device, width, ny, copies);
-        gpu::queue_rows_to_host(slot.fields.hy().data(), host, slot.hy.data(), device, width, ny, copies);
-        gpu::queue_rows_to_host(slot.fields.ezx().data(), host, slot.ezx.data(), device, width, ny, copies);
-        gpu::queue_rows_to_host(slot.fields.ezy().data(), host, slot.ezy.data(), device, width, ny, copies);
+        gpu::queue_rows_to_host(slot.fields.ez().data(), host, slot.ez.data(), device, width, ny,
+                                copies);
+        gpu::queue_rows_to_host(slot.fields.hx().data(), host, slot.hx.data(), device, width, ny,
+                                copies);
+        gpu::queue_rows_to_host(slot.fields.hy().data(), host, slot.hy.data(), device, width, ny,
+                                copies);
+        gpu::queue_rows_to_host(slot.fields.ezx().data(), host, slot.ezx.data(), device, width, ny,
+                                copies);
+        gpu::queue_rows_to_host(slot.fields.ezy().data(), host, slot.ezy.data(), device, width, ny,
+                                copies);
         slot.landed.record(copies);
         slot.steps = steps;
     }
@@ -712,7 +736,8 @@ namespace fdtd::TMz::backends
     }
 
     // Queue the kernels of step n, or of the step on the device, which is then counted.
-    void CudaBackend::launch_step(const gpu::DeviceCoeffs &coeffs, std::size_t n, std::size_t magnetic, std::size_t electric, Launch launch)
+    void CudaBackend::launch_step(const gpu::DeviceCoeffs &coeffs, std::size_t n,
+                                  std::size_t magnetic, std::size_t electric, Launch launch)
     {
         const bool replay = launch == Launch::Replay;
         const gpu::DeviceFields fields = device_fields();
@@ -720,7 +745,8 @@ namespace fdtd::TMz::backends
         const auto bx = static_cast<unsigned>(m_options.block_x);
         const auto by = static_cast<unsigned>(m_options.block_y);
         const dim3 block(bx, by);
-        const dim3 cells(static_cast<unsigned>((m_grid.nx() + bx - 1) / bx), static_cast<unsigned>((m_grid.ny() + by - 1) / by));
+        const dim3 cells(static_cast<unsigned>((m_grid.nx() + bx - 1) / bx),
+                         static_cast<unsigned>((m_grid.ny() + by - 1) / by));
         const std::size_t npoints = magnetic + electric;
         const std::size_t nprobes = m_probes.size();
         const FloatType *values = m_device_values.data() + (replay ? 0 : n * npoints);
@@ -731,8 +757,9 @@ namespace fdtd::TMz::backends
         gpu::DeviceFields after = fields;
         if (m_options.kernel == CudaKernel::Tiled) {
             const std::size_t shared = 2 * (bx + 1) * (by + 1) * sizeof(FloatType);
-            update_tiled_kernel<<<cells, block, shared, stream>>>(fields, coeffs, m_boundary, sources, static_cast<int>(magnetic), values,
-                                                                  step, static_cast<int>(npoints));
+            update_tiled_kernel<<<cells, block, shared, stream>>>(
+                fields, coeffs, m_boundary, sources, static_cast<int>(magnetic), values, step,
+                static_cast<int>(npoints));
             std::swap(m_ez, m_ez_next);
             std::swap(m_hx, m_hx_next);
             std::swap(m_hy, m_hy_next);
@@ -740,18 +767,21 @@ namespace fdtd::TMz::backends
         } else {
             update_h_kernel<<<cells, block, 0, stream>>>(fields, coeffs);
             if (magnetic > 0) {
-                add_sources_kernel<<<line_blocks(magnetic), LINE_BLOCK, 0, stream>>>(fields, sources, static_cast<int>(magnetic), values,
-                                                                                     step, static_cast<int>(npoints));
+                add_sources_kernel<<<line_blocks(magnetic), LINE_BLOCK, 0, stream>>>(
+                    fields, sources, static_cast<int>(magnetic), values, step,
+                    static_cast<int>(npoints));
             }
             update_e_fused_kernel<<<cells, block, 0, stream>>>(fields, coeffs, m_boundary);
         }
         if (electric > 0) {
-            add_sources_kernel<<<line_blocks(electric), LINE_BLOCK, 0, stream>>>(after, sources + magnetic, static_cast<int>(electric),
-                                                                                 values, step, static_cast<int>(npoints));
+            add_sources_kernel<<<line_blocks(electric), LINE_BLOCK, 0, stream>>>(
+                after, sources + magnetic, static_cast<int>(electric), values, step,
+                static_cast<int>(npoints));
         }
         if (nprobes > 0) {
-            record_probes_kernel<<<line_blocks(nprobes), LINE_BLOCK, 0, stream>>>(after, m_device_probes.data(), static_cast<int>(nprobes),
-                                                                                  records, step, static_cast<int>(nprobes));
+            record_probes_kernel<<<line_blocks(nprobes), LINE_BLOCK, 0, stream>>>(
+                after, m_device_probes.data(), static_cast<int>(nprobes), records, step,
+                static_cast<int>(nprobes));
         }
         if (replay && npoints + nprobes > 0) {
             next_step_kernel<<<1, 1, 0, stream>>>(m_device_step.data());

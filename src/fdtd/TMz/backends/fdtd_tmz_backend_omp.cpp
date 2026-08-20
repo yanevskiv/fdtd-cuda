@@ -67,7 +67,8 @@ namespace fdtd::TMz::backends
     OmpBackend::OmpBackend(const Grid &grid, const OmpOptions &options)
         : SerialBackend(grid)
         , m_options(options)
-        , m_threads(options.threads > 0 ? options.threads : static_cast<std::size_t>(omp_get_max_threads()))
+        , m_threads(options.threads > 0 ? options.threads
+                                        : static_cast<std::size_t>(omp_get_max_threads()))
         , m_partition(serial::Partition::tiles(grid, grid.nx(), 1))
     {
         // Empty.
@@ -125,11 +126,13 @@ namespace fdtd::TMz::backends
     }
 
     // Build the stepper over the rows and run the advance at the level of the options.
-    void OmpBackend::advance(std::size_t nsteps, std::span<const PointInjection> points, std::span<const FloatType> values)
+    void OmpBackend::advance(std::size_t nsteps, std::span<const PointInjection> points,
+                             std::span<const FloatType> values)
     {
         require_coeffs();
         FloatType *records = add_records(nsteps);
-        const serial::Stepper stepper(fields(), coeffs(), active_pml(), boundary(), m_partition, points, values, probes(), records);
+        const serial::Stepper stepper(fields(), coeffs(), active_pml(), boundary(), m_partition,
+                                      points, values, probes(), records);
         const omp::Advance run{
             .stepper = stepper,
             .nsteps = nsteps,

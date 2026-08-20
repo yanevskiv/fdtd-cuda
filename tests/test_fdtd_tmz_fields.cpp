@@ -49,7 +49,8 @@ static bool is_aligned(const void *pointer)
 // Verify that each array has the grid's size, is aligned and starts zeroed.
 TEST_CASE("Fields allocates aligned zeroed arrays", "[unit][fields]")
 {
-    const auto [nx, ny] = GENERATE(table<std::size_t, std::size_t>({{1, 1}, {7, 5}, {64, 64}, {13, 31}}));
+    const auto [nx, ny] =
+        GENERATE(table<std::size_t, std::size_t>({{1, 1}, {7, 5}, {64, 64}, {13, 31}}));
     const fdtd::TMz::Fields fields(fdtd::TMz::Grid(nx, ny));
 
     CHECK(fields.grid().nx() == nx);

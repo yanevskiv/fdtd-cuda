@@ -176,7 +176,8 @@ namespace
     }
 
     // Step a backend from distinct fields, with sources and probes on any cells, and collect.
-    Run run_backend(BackendType type, const Simulation::Options &options, const Grid &grid, Boundary boundary, std::size_t pml)
+    Run run_backend(BackendType type, const Simulation::Options &options, const Grid &grid,
+                    Boundary boundary, std::size_t pml)
     {
         Material material(grid);
         material.set_pml(pml, 3, 1e-6);
@@ -189,16 +190,20 @@ namespace
         backend->set_boundary(boundary);
 
         const std::size_t last = grid.index(grid.nx() - 1, grid.ny() - 1);
-        const std::vector<PointProbe> probes{
-            {Component::Ez, 0}, {Component::Hx, last}, {Component::Hy, last / 2}, {Component::Ez, last / 2}};
+        const std::vector<PointProbe> probes{{Component::Ez, 0},
+                                             {Component::Hx, last},
+                                             {Component::Hy, last / 2},
+                                             {Component::Ez, last / 2}};
         backend->set_probes(probes);
-        const std::vector<PointInjection> points{{Component::Ez, last / 2}, {Component::Hx, 0}, {Component::Hy, last}};
+        const std::vector<PointInjection> points{
+            {Component::Ez, last / 2}, {Component::Hx, 0}, {Component::Hy, last}};
         std::vector<FloatType> values(STEPS * points.size());
         for (std::size_t k = 0; k < values.size(); ++k) {
             values[k] = FloatType(k % 5) / FloatType(10);
         }
         backend->step(STEPS / 3);
-        backend->step(STEPS - STEPS / 3, std::span(points), std::span(values).first((STEPS - STEPS / 3) * points.size()));
+        backend->step(STEPS - STEPS / 3, std::span(points),
+                      std::span(values).first((STEPS - STEPS / 3) * points.size()));
         backend->download(fields);
 
         Run result;
@@ -207,9 +212,10 @@ namespace
         return result;
     }
 
-    // Step a backend through advances of the given lengths, each with sources on Ez, Hx and Hy and values of its own, and probes set before
-    // the first and again before the last.
-    Run run_advances(const Simulation::Options &options, const Grid &grid, Boundary boundary, std::span<const std::size_t> lengths)
+    // Step a backend through advances of the given lengths, each with sources on Ez, Hx and Hy
+    // and values of its own, and probes set before the first and again before the last.
+    Run run_advances(const Simulation::Options &options, const Grid &grid, Boundary boundary,
+                     std::span<const std::size_t> lengths)
     {
         Material material(grid);
         material.set_pml(5, 3, 1e-6);
@@ -223,7 +229,8 @@ namespace
 
         const std::size_t last = grid.index(grid.nx() - 1, grid.ny() - 1);
         const std::vector<PointProbe> probes{{Component::Ez, last / 2}, {Component::Hy, last}};
-        const std::vector<PointInjection> points{{Component::Hx, last / 3}, {Component::Ez, last / 2}, {Component::Hy, 1}};
+        const std::vector<PointInjection> points{
+            {Component::Hx, last / 3}, {Component::Ez, last / 2}, {Component::Hy, 1}};
         Run result;
         backend->set_probes(probes);
         for (std::size_t a = 0; a < lengths.size(); ++a) {
@@ -244,7 +251,8 @@ namespace
     }
 
     // Step a backend from distinct fields on a material, with sources and probes, and collect.
-    Run run_material(BackendType type, const Simulation::Options &options, const Material &material, Boundary boundary)
+    Run run_material(BackendType type, const Simulation::Options &options, const Material &material,
+                     Boundary boundary)
     {
         const Grid &grid = material.grid();
         const Coeffs coeffs(material, fdtd::TMz::courant_dt(grid, 0.9));
@@ -307,9 +315,10 @@ TEST_CASE("CUDA matches serial", "[backend][cuda]")
 
     for (const CudaKernel kernel : KERNELS) {
         for (const Block block : {Block{32, 8}, Block{16, 16}, Block{128, 1}, Block{7, 5}}) {
-            INFO("size " << size.nx << "x" << size.ny << ", boundary " << int(boundary) << ", kernel " << int(kernel) << ", block "
-                         << block.x << "x" << block.y);
-            const Run cuda = run(BackendType::Cuda, settings(cuda_options(kernel, block)), size, boundary);
+            INFO("size " << size.nx << "x" << size.ny << ", boundary " << int(boundary)
+                         << ", kernel " << int(kernel) << ", block " << block.x << "x" << block.y);
+            const Run cuda =
+                run(BackendType::Cuda, settings(cuda_options(kernel, block)), size, boundary);
             CHECK(relative_difference(serial.fields, cuda.fields) <= bound());
             CHECK(relative_difference(serial.probes, cuda.probes) <= bound());
         }
@@ -328,9 +337,10 @@ TEST_CASE("CUDA matches serial on small grids", "[backend][cuda]")
 
     for (const CudaKernel kernel : KERNELS) {
         for (const Block block : {Block{32, 8}, Block{7, 5}, Block{1, 1}}) {
-            INFO("size " << size.nx << "x" << size.ny << ", boundary " << int(boundary) << ", kernel " << int(kernel) << ", block "
-                         << block.x << "x" << block.y);
-            const Run cuda = run_backend(BackendType::Cuda, settings(cuda_options(kernel, block)), grid, boundary, pml);
+            INFO("size " << size.nx << "x" << size.ny << ", boundary " << int(boundary)
+                         << ", kernel " << int(kernel) << ", block " << block.x << "x" << block.y);
+            const Run cuda = run_backend(BackendType::Cuda, settings(cuda_options(kernel, block)),
+                                         grid, boundary, pml);
             CHECK(relative_difference(serial.fields, cuda.fields) <= bound());
             CHECK(relative_difference(serial.probes, cuda.probes) <= bound());
         }
@@ -457,7 +467,8 @@ TEST_CASE("CUDA probes over several advances", "[backend][cuda]")
     const Grid grid(20, 16);
     const auto backend = fdtd::TMz::make_backend(BackendType::Cuda, grid);
     backend->upload(Coeffs(Material(grid), fdtd::TMz::courant_dt(grid, 0.9)));
-    const std::vector<PointProbe> probes{{Component::Ez, grid.index(10, 8)}, {Component::Ez, grid.index(10, 8)}};
+    const std::vector<PointProbe> probes{{Component::Ez, grid.index(10, 8)},
+                                         {Component::Ez, grid.index(10, 8)}};
     backend->set_probes(probes);
     const std::vector<PointInjection> points{{Component::Ez, grid.index(10, 8)}};
     const std::vector<FloatType> values{FloatType(1), FloatType(2), FloatType(3)};
@@ -479,8 +490,9 @@ TEST_CASE("CUDA probes over several advances", "[backend][cuda]")
     CHECK(backend->fetch_probes().size() == 4);
 }
 
-// Verify that replaying captured steps as a graph gives the plain launches' results bit for bit: advances shorter than a graph, as long as
-// one and longer, the sources and probes changing between them so the graph is captured again, and the remainder steps launched plainly.
+// Verify that replaying captured steps as a graph gives the plain launches' results bit for bit:
+// advances shorter than a graph, as long as one and longer, the sources and probes changing
+// between them so the graph is captured again, and the remainder steps launched plainly.
 TEST_CASE("CUDA graphs match plain launches bit for bit", "[backend][cuda]")
 {
     require_cuda();
@@ -499,9 +511,9 @@ TEST_CASE("CUDA graphs match plain launches bit for bit", "[backend][cuda]")
     }
 }
 
-// Verify that reading the coefficients from the table gives the arrays' results bit for bit, on vacuum with a PML (one tuple for the
-// interior), on a slab and a lossy circle (a byte per cell), and past the table's capacity (cells that read the arrays among cells that
-// read the table).
+// Verify that reading the coefficients from the table gives the arrays' results bit for bit, on
+// vacuum with a PML (one tuple for the interior), on a slab and a lossy circle (a byte per cell),
+// and past the table's capacity (cells that read the arrays among cells that read the table).
 TEST_CASE("CUDA coefficient table matches the arrays bit for bit", "[backend][cuda]")
 {
     require_cuda();
@@ -525,11 +537,14 @@ TEST_CASE("CUDA coefficient table matches the arrays bit for bit", "[backend][cu
                 INFO("material " << (material == &vacuum  ? "vacuum"
                                      : material == &media ? "media"
                                                           : "crowded")
-                                 << ", kernel " << static_cast<int>(kernel) << ", block " << block.x << "x" << block.y);
+                                 << ", kernel " << static_cast<int>(kernel) << ", block " << block.x
+                                 << "x" << block.y);
                 auto options = cuda_options(kernel, block);
-                const Run arrays = run_material(BackendType::Cuda, settings(options), *material, boundary);
+                const Run arrays =
+                    run_material(BackendType::Cuda, settings(options), *material, boundary);
                 options.coeffs = CudaCoeffs::Table;
-                const Run table = run_material(BackendType::Cuda, settings(options), *material, boundary);
+                const Run table =
+                    run_material(BackendType::Cuda, settings(options), *material, boundary);
                 CHECK(table.fields == arrays.fields);
                 CHECK(table.probes == arrays.probes);
             }
@@ -554,8 +569,9 @@ TEST_CASE("CUDA coefficient table matches serial", "[backend][cuda]")
     }
 }
 
-// Verify the traffic model of the table: on vacuum the core, the interior less its last column and row, shares a tuple and reads no
-// coefficients, 6 words a cell fewer than the arrays, and no index.
+// Verify the traffic model of the table: on vacuum the core, the interior less its last column
+// and row, shares a tuple and reads no coefficients, 6 words a cell fewer than the arrays, and
+// no index.
 TEST_CASE("CUDA models the traffic of the coefficient table", "[unit][backend][cuda]")
 {
     require_cuda();
@@ -570,13 +586,15 @@ TEST_CASE("CUDA models the traffic of the coefficient table", "[unit][backend][c
         options.variant = "tiled+table+graph";
         const Simulation table(8, 6, options);
         const double core = boundary == Boundary::Pml ? 3 : 15;
-        CHECK(table.step_traffic().bytes == arrays.step_traffic().bytes - 6 * core * static_cast<double>(sizeof(FloatType)));
+        CHECK(table.step_traffic().bytes ==
+              arrays.step_traffic().bytes - 6 * core * static_cast<double>(sizeof(FloatType)));
         CHECK(table.step_traffic().flops == arrays.step_traffic().flops);
     }
 }
 
-// Verify that the tiled kernel gives the fused kernel's results bit for bit: H sources on the column and row a tile takes from its
-// neighbours, every step count from 1 to 5 so the arrays end swapped and not, and probes on both H components.
+// Verify that the tiled kernel gives the fused kernel's results bit for bit: H sources on the
+// column and row a tile takes from its neighbours, every step count from 1 to 5 so the arrays
+// end swapped and not, and probes on both H components.
 TEST_CASE("CUDA tiled kernel matches the fused kernel bit for bit", "[backend][cuda]")
 {
     require_cuda();
@@ -591,8 +609,9 @@ TEST_CASE("CUDA tiled kernel matches the fused kernel bit for bit", "[backend][c
                                              {Component::Hx, grid.index(31, 15)},
                                              {Component::Hy, grid.index(31, 15)},
                                              {Component::Ez, grid.index(50, 30)}};
-    const std::vector<PointProbe> probes{
-        {Component::Hy, grid.index(31, 20)}, {Component::Hx, grid.index(20, 8)}, {Component::Ez, grid.index(32, 16)}};
+    const std::vector<PointProbe> probes{{Component::Hy, grid.index(31, 20)},
+                                         {Component::Hx, grid.index(20, 8)},
+                                         {Component::Ez, grid.index(32, 16)}};
     for (const bool table : {false, true}) {
         for (std::size_t steps = 1; steps <= 5; ++steps) {
             INFO("table " << table << ", steps " << steps);
@@ -604,7 +623,8 @@ TEST_CASE("CUDA tiled kernel matches the fused kernel bit for bit", "[backend][c
                 }
                 Fields fields(grid);
                 fill_distinct(fields);
-                const auto backend = fdtd::TMz::make_backend(BackendType::Cuda, grid, settings(options));
+                const auto backend =
+                    fdtd::TMz::make_backend(BackendType::Cuda, grid, settings(options));
                 backend->upload(fields);
                 backend->upload(coeffs);
                 backend->set_boundary(boundary);
@@ -643,8 +663,9 @@ TEST_CASE("CUDA models the traffic of the tiled kernel", "[unit][backend][cuda]"
     CHECK(table.step_traffic().bytes == tiled.step_traffic().bytes - 6 * 3 * word);
 }
 
-// Verify that snapshots copied out while the steps go on equal those of a run that stops for each, bit for bit: every kernel, with and
-// without graphs, snapshots on consecutive steps (the two slots taking turns), across a graph's span and on the last step, over two runs.
+// Verify that snapshots copied out while the steps go on equal those of a run that stops for
+// each, bit for bit: every kernel, with and without graphs, snapshots on consecutive steps (the
+// two slots taking turns), across a graph's span and on the last step, over two runs.
 TEST_CASE("CUDA async snapshots match the stopping ones bit for bit", "[backend][cuda]")
 {
     require_cuda();
@@ -671,7 +692,8 @@ TEST_CASE("CUDA async snapshots match the stopping ones bit for bit", "[backend]
                 sim.add_source(20, 20, Component::Ez, fdtd::TMz::Gaussian::from_steps(sim.dt(), 6));
                 sim.add_source(30, 12, Component::Hy, fdtd::TMz::Gaussian::from_steps(sim.dt(), 6));
                 sim.add_probe(25, 25, Component::Ez);
-                for (const std::size_t step : std::vector<std::size_t>{1, 2, 3, 20, 37, 40, 41, 60}) {
+                for (const std::size_t step :
+                     std::vector<std::size_t>{1, 2, 3, 20, 37, 40, 41, 60}) {
                     sim.add_snapshot(step);
                 }
                 Taken &into = taken[async ? 1 : 0];
@@ -693,8 +715,8 @@ TEST_CASE("CUDA async snapshots match the stopping ones bit for bit", "[backend]
     }
 }
 
-// Verify that the backend has its name and rejects settings it cannot run, and a grid of 30000 squared, whose 13 arrays the card cannot
-// hold, before it allocates.
+// Verify that the backend has its name and rejects settings it cannot run, and a grid of 30000
+// squared, whose 13 arrays the card cannot hold, before it allocates.
 TEST_CASE("CUDA backend checks its options", "[unit][backend][cuda]")
 {
     require_cuda();
@@ -713,12 +735,16 @@ TEST_CASE("CUDA backend checks its options", "[unit][backend][cuda]")
     };
     for (const Block bad : {Block{0, 8}, Block{32, 0}, Block{64, 32}, Block{2048, 1}}) {
         INFO("block " << bad.x << "x" << bad.y);
-        CHECK_THROWS_AS(fdtd::TMz::make_backend(BackendType::Cuda, grid, block(bad.x, bad.y)), std::invalid_argument);
+        CHECK_THROWS_AS(fdtd::TMz::make_backend(BackendType::Cuda, grid, block(bad.x, bad.y)),
+                        std::invalid_argument);
     }
-    CHECK_THROWS_AS(fdtd::TMz::make_backend(BackendType::Cuda, Grid(16, 70000), block(32, 1)), std::invalid_argument);
+    CHECK_THROWS_AS(fdtd::TMz::make_backend(BackendType::Cuda, Grid(16, 70000), block(32, 1)),
+                    std::invalid_argument);
     options = block(32, 8);
-    CHECK_THROWS_AS(fdtd::TMz::make_backend(BackendType::Cuda, Grid(50000, 50000), options), std::invalid_argument);
-    CHECK_THROWS_AS(fdtd::TMz::make_backend(BackendType::Cuda, Grid(30000, 30000), options), std::invalid_argument);
+    CHECK_THROWS_AS(fdtd::TMz::make_backend(BackendType::Cuda, Grid(50000, 50000), options),
+                    std::invalid_argument);
+    CHECK_THROWS_AS(fdtd::TMz::make_backend(BackendType::Cuda, Grid(30000, 30000), options),
+                    std::invalid_argument);
 }
 
 // Reject a grid beyond the index limit before allocating the simulation's host arrays.

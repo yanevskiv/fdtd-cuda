@@ -35,7 +35,8 @@ namespace fdtd::TMz::backends::gpu
     // Create a stream that does not wait for the legacy default stream.
     Stream::Stream()
     {
-        check(cudaStreamCreateWithFlags(&m_handle, cudaStreamNonBlocking), "cudaStreamCreateWithFlags");
+        check(cudaStreamCreateWithFlags(&m_handle, cudaStreamNonBlocking),
+              "cudaStreamCreateWithFlags");
     }
 
     // Destroy the stream, if any.

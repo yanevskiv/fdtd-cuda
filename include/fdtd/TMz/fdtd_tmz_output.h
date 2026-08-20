@@ -73,9 +73,10 @@ namespace fdtd
         /**
          * Write Ez to a binary snapshot file.
          *
-         * The file is little-endian with no padding: the magic "FDTDSNAP", then uint32 version and uint32 sizeof(FloatType), uint64 nx, ny
-         * and step, float64 dt, dx and dy, 64 bytes in all, then the nx * ny Ez values as FloatType, row by row with x fastest. Ez is at
-         * step * dt.
+         * The file is little-endian with no padding: the magic "FDTDSNAP", then uint32
+         * version and uint32 sizeof(FloatType), uint64 nx, ny and step, float64 dt, dx and
+         * dy, 64 bytes in all, then the nx * ny Ez values as FloatType, row by row with x
+         * fastest. Ez is at step * dt.
          *
          * @param path File to create or replace.
          * @param fields Fields to write Ez from.
@@ -83,22 +84,25 @@ namespace fdtd
          * @param dt Time step in seconds.
          * @throws std::runtime_error When the file cannot be written.
          */
-        void write_snapshot(const std::filesystem::path &path, const Fields &fields, std::size_t step, double dt);
+        void write_snapshot(const std::filesystem::path &path, const Fields &fields,
+                            std::size_t step, double dt);
 
         /**
          * Read a snapshot file written with float or double values.
          *
          * @param path File to read.
          * @return The contents.
-         * @throws std::runtime_error When the file cannot be read, has another magic or version, a value size other than 4 or 8, or a
-         *         length that does not match its header.
+         * @throws std::runtime_error When the file cannot be read, has another magic or
+         *         version, a value size other than 4 or 8, or a length that does not match
+         *         its header.
          */
         SnapshotData read_snapshot(const std::filesystem::path &path);
 
         /**
          * Write a probe's record as CSV with the columns step, time and ez.
          *
-         * Row n holds step n + 1, the time of the value and the value. Lines that start with '#' before the header describe the probe.
+         * Row n holds step n + 1, the time of the value and the value. Lines that start
+         * with '#' before the header describe the probe.
          *
          * @param path File to create or replace.
          * @param comment Text of the leading comment line, or empty for none.
@@ -107,8 +111,8 @@ namespace fdtd
          * @throws std::invalid_argument When times and values differ in length.
          * @throws std::runtime_error When the file cannot be written.
          */
-        void write_probe_csv(const std::filesystem::path &path, std::string_view comment, std::span<const double> times,
-                             std::span<const FloatType> values);
+        void write_probe_csv(const std::filesystem::path &path, std::string_view comment,
+                             std::span<const double> times, std::span<const FloatType> values);
     }
 }
 

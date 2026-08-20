@@ -56,28 +56,34 @@ namespace fdtd::TMz
     }
 
     // Check the values, cells and distinctness, then advance.
-    void Backend::step(std::size_t nsteps, std::span<const PointInjection> points, std::span<const FloatType> values)
+    void Backend::step(std::size_t nsteps, std::span<const PointInjection> points,
+                       std::span<const FloatType> values)
     {
         check_sources(nsteps, points, values);
         advance(nsteps, points, values);
     }
 
     // Check the sources and the snapshot steps, then advance and take the snapshots.
-    void Backend::step(std::size_t nsteps, std::span<const PointInjection> points, std::span<const FloatType> values,
-                       std::span<const std::size_t> snapshots, const SnapshotHandler &handler)
+    void Backend::step(std::size_t nsteps, std::span<const PointInjection> points,
+                       std::span<const FloatType> values, std::span<const std::size_t> snapshots,
+                       const SnapshotHandler &handler)
     {
         check_sources(nsteps, points, values);
         for (std::size_t k = 0; k < snapshots.size(); ++k) {
-            if (snapshots[k] == 0 || snapshots[k] > nsteps || (k > 0 && snapshots[k] <= snapshots[k - 1])) {
-                throw std::invalid_argument("Backend: snapshot steps must increase within 1 to the step count");
+            if (snapshots[k] == 0 || snapshots[k] > nsteps ||
+                (k > 0 && snapshots[k] <= snapshots[k - 1])) {
+                throw std::invalid_argument(
+                    "Backend: snapshot steps must increase within 1 to the step count");
             }
         }
         advance_snapshots(nsteps, points, values, snapshots, handler);
     }
 
     // Step to each snapshot, download the fields and hand them over, then step to the end.
-    void Backend::advance_snapshots(std::size_t nsteps, std::span<const PointInjection> points, std::span<const FloatType> values,
-                                    std::span<const std::size_t> snapshots, const SnapshotHandler &handler)
+    void Backend::advance_snapshots(std::size_t nsteps, std::span<const PointInjection> points,
+                                    std::span<const FloatType> values,
+                                    std::span<const std::size_t> snapshots,
+                                    const SnapshotHandler &handler)
     {
         if (snapshots.empty()) {
             advance(nsteps, points, values);
@@ -96,7 +102,8 @@ namespace fdtd::TMz
     }
 
     // Check that the values match the points and steps, and the points are distinct cells.
-    void Backend::check_sources(std::size_t nsteps, std::span<const PointInjection> points, std::span<const FloatType> values) const
+    void Backend::check_sources(std::size_t nsteps, std::span<const PointInjection> points,
+                                std::span<const FloatType> values) const
     {
         const std::size_t npoints = points.size();
         if (npoints != 0 && nsteps > std::numeric_limits<std::size_t>::max() / npoints) {
@@ -133,7 +140,8 @@ namespace fdtd::TMz
     }
 
     // Count the cells of each kind and weigh them by the words and flops of their updates.
-    StepTraffic two_pass_traffic(const Grid &grid, std::size_t pml, Boundary boundary, const TrafficModel &model)
+    StepTraffic two_pass_traffic(const Grid &grid, std::size_t pml, Boundary boundary,
+                                 const TrafficModel &model)
     {
         const double nx = static_cast<double>(grid.nx());
         const double ny = static_cast<double>(grid.ny());
@@ -149,9 +157,10 @@ namespace fdtd::TMz
 
         const double core = std::max(nx - 2 * lo - 1, 0.0) * std::max(ny - 2 * lo - 1, 0.0);
         const double tabled = model.table ? core : 0;
-        const double words = model.one_pass
-                                 ? 6 * nx * ny + 2 * (hx + hy) - 4 * tabled + 2 * interior - 2 * tabled + 8 * split + 2 * edge
-                                 : nx * ny + 4 * (hx + hy) - 4 * tabled + 6 * interior - 2 * tabled + 11 * split + (pmc ? 6 : 3) * edge;
+        const double words = model.one_pass ? 6 * nx * ny + 2 * (hx + hy) - 4 * tabled +
+                                                  2 * interior - 2 * tabled + 8 * split + 2 * edge
+                                            : nx * ny + 4 * (hx + hy) - 4 * tabled + 6 * interior -
+                                                  2 * tabled + 11 * split + (pmc ? 6 : 3) * edge;
         const double index = model.index ? (model.one_pass ? 1 : 2) * nx * ny : 0;
         const double flops = 5 * (hx + hy) + 8 * interior + 11 * split + (pmc ? 8 : 0) * edge;
         return {.bytes = words * static_cast<double>(sizeof(FloatType)) + index, .flops = flops};

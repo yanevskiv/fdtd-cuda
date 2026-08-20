@@ -183,11 +183,14 @@ TEST_CASE("Material set_pml rejects bad settings", "[unit][material][pml]")
     CHECK_THROWS_AS(Material(Grid(20, 21)).set_pml(10, 3, 1e-6), std::invalid_argument);
     CHECK_THROWS_AS(Material(Grid(21, 20)).set_pml(10, 3, 1e-6), std::invalid_argument);
     CHECK_THROWS_AS(mat.set_pml(4, 0, 1e-6), std::invalid_argument);
-    CHECK_THROWS_AS(mat.set_pml(4, std::numeric_limits<double>::infinity(), 1e-6), std::invalid_argument);
-    CHECK_THROWS_AS(mat.set_pml(4, std::numeric_limits<double>::quiet_NaN(), 1e-6), std::invalid_argument);
+    CHECK_THROWS_AS(mat.set_pml(4, std::numeric_limits<double>::infinity(), 1e-6),
+                    std::invalid_argument);
+    CHECK_THROWS_AS(mat.set_pml(4, std::numeric_limits<double>::quiet_NaN(), 1e-6),
+                    std::invalid_argument);
     CHECK_THROWS_AS(mat.set_pml(4, 3, 0), std::invalid_argument);
     CHECK_THROWS_AS(mat.set_pml(4, 3, 1), std::invalid_argument);
-    CHECK_THROWS_AS(mat.set_pml(4, 3, std::numeric_limits<double>::quiet_NaN()), std::invalid_argument);
+    CHECK_THROWS_AS(mat.set_pml(4, 3, std::numeric_limits<double>::quiet_NaN()),
+                    std::invalid_argument);
     CHECK(mat.pml_thickness() == 10);
     CHECK(mat.sigma_e_x()[mat.grid().index(0, 10)] > fdtd::FloatType(0));
 

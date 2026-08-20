@@ -67,7 +67,8 @@ namespace fdtd::TMz::backends::gpu
                 if (bits(ezX1[k]) != bits(ezY1[k]) || bits(ezX2[k]) != bits(ezY2[k])) {
                     continue;
                 }
-                const Key key{bits(ezX1[k]), bits(ezX2[k]), bits(hx1[k]), bits(hx2[k]), bits(hy1[k]), bits(hy2[k])};
+                const Key key{bits(ezX1[k]), bits(ezX2[k]), bits(hx1[k]),
+                              bits(hx2[k]),  bits(hy1[k]),  bits(hy2[k])};
                 const auto it = found.find(key);
                 if (it != found.end()) {
                     m_index[k] = it->second;

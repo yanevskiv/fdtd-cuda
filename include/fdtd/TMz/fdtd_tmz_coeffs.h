@@ -40,14 +40,17 @@ namespace fdtd
          *
          *     C1 = (1 - a) / (1 + a),  C2 = (dt / eps) / (1 + a),  a = sigma dt / (2 eps),
          *
-         * with eps = eps_r EPS_0 for Ez and mu_r MU_0 in its place for Hx and Hy. The conductivity is the isotropic one of the material
-         * plus its PML profile along one direction, scaled by eps_r or mu_r:
+         * with eps = eps_r EPS_0 for Ez and mu_r MU_0 in its place for Hx and Hy. The
+         * conductivity is the isotropic one of the material plus its PML profile along
+         * one direction, scaled by eps_r or mu_r:
          *
          *     Ez along x: sigma_e + eps_r sigma_e_x,  Ez along y: sigma_e + eps_r sigma_e_y,
          *     Hx:         sigma_m + mu_r sigma_m_y,   Hy:         sigma_m + mu_r sigma_m_x.
          *
-         * Without a PML the x and y pairs of Ez are equal, and Hx and Hy are equal. The curl factors leave out the cell size: the update
-         * applies 1/dx and 1/dy to the differences. Each array has grid().size() elements, indexed with Grid::index. Computed in double.
+         * Without a PML the x and y pairs of Ez are equal, and Hx and Hy are equal. The curl
+         * factors leave out the cell size: the update applies 1/dx and 1/dy to the
+         * differences. Each array has grid().size() elements, indexed with Grid::index.
+         * Computed in double.
          */
         class Coeffs
         {

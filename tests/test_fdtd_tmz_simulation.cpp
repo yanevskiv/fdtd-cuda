@@ -97,7 +97,8 @@ TEST_CASE("Simulation backend defaults", "[unit][simulation]")
     CHECK(opts.threads == 0);
 }
 
-// Verify that a simulation carries the backend settings it was given, and rejects a variant its backend does not read.
+// Verify that a simulation carries the backend settings it was given, and rejects a variant its
+// backend does not read.
 TEST_CASE("Simulation keeps the backend settings", "[unit][simulation]")
 {
     Simulation::Options opts;
@@ -297,7 +298,8 @@ TEST_CASE("Simulation checks source cells", "[unit][simulation]")
     CHECK_THROWS_AS(sim.add_source(2, 5, Component::Ez, ramp), std::invalid_argument);
     CHECK_THROWS_AS(sim.add_source(2, 5, Component::Hx, ramp), std::invalid_argument);
     CHECK_THROWS_AS(sim.add_source(7, 2, Component::Hy, ramp), std::invalid_argument);
-    CHECK_THROWS_AS(sim.add_source(2, 2, Component::Ez, fdtd::TMz::Waveform{}), std::invalid_argument);
+    CHECK_THROWS_AS(sim.add_source(2, 2, Component::Ez, fdtd::TMz::Waveform{}),
+                    std::invalid_argument);
     CHECK(sim.source_count() == 0);
 
     CHECK_NOTHROW(sim.add_source(2, 2, Component::Ez, ramp));
@@ -468,9 +470,10 @@ TEST_CASE("Simulation takes scheduled snapshots", "[unit][simulation]")
         CHECK(std::equal(a.hx().begin(), a.hx().end(), b.hx().begin()));
         CHECK(std::equal(a.hy().begin(), a.hy().end(), b.hy().begin()));
     }
-    CHECK(std::any_of(sim.snapshots()[2].fields.ez().begin(), sim.snapshots()[2].fields.ez().end(), [](FloatType v) {
-        return v != 0;
-    }));
+    CHECK(std::any_of(sim.snapshots()[2].fields.ez().begin(), sim.snapshots()[2].fields.ez().end(),
+                      [](FloatType v) {
+                          return v != 0;
+                      }));
 
     ref.run(5);
     ref.download();
@@ -479,8 +482,8 @@ TEST_CASE("Simulation takes scheduled snapshots", "[unit][simulation]")
     CHECK(std::equal(last.fields.ez().begin(), last.fields.ez().end(), ref.fields().ez().begin()));
 }
 
-// Verify that a run with a handler hands over the scheduled snapshots of the run in order, keeps none, and leaves the later ones scheduled,
-// with the fields of a run that keeps them.
+// Verify that a run with a handler hands over the scheduled snapshots of the run in order,
+// keeps none, and leaves the later ones scheduled, with the fields of a run that keeps them.
 TEST_CASE("Simulation hands snapshots to a handler", "[unit][simulation]")
 {
     Simulation sim(16, 12);
@@ -513,7 +516,8 @@ TEST_CASE("Simulation hands snapshots to a handler", "[unit][simulation]")
     }
     sim.download();
     ref.download();
-    CHECK(std::equal(sim.fields().ez().begin(), sim.fields().ez().end(), ref.fields().ez().begin()));
+    CHECK(
+        std::equal(sim.fields().ez().begin(), sim.fields().ez().end(), ref.fields().ez().begin()));
     const auto probes = sim.probe_data(0);
     const auto refProbes = ref.probe_data(0);
     CHECK(std::equal(probes.begin(), probes.end(), refProbes.begin(), refProbes.end()));

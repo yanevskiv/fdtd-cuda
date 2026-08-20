@@ -55,7 +55,8 @@ TEST_CASE("Grid stores its geometry", "[unit][grid]")
 // Verify that indexing is row-major, x fastest, and covers every cell exactly once.
 TEST_CASE("Grid indexing is row-major and one to one", "[unit][grid]")
 {
-    const auto [nx, ny] = GENERATE(table<std::size_t, std::size_t>({{1, 1}, {1, 9}, {9, 1}, {8, 8}, {7, 5}, {13, 31}}));
+    const auto [nx, ny] = GENERATE(
+        table<std::size_t, std::size_t>({{1, 1}, {1, 9}, {9, 1}, {8, 8}, {7, 5}, {13, 31}}));
     const fdtd::TMz::Grid grid(nx, ny);
     std::set<std::size_t> seen;
 
@@ -82,7 +83,8 @@ TEST_CASE("Grid rejects invalid geometry", "[unit][grid]")
     CHECK_THROWS_AS(Grid(4, 0), std::invalid_argument);
     CHECK_THROWS_AS(Grid(4, 4, 0, 1), std::invalid_argument);
     CHECK_THROWS_AS(Grid(4, 4, 1, -1), std::invalid_argument);
-    CHECK_THROWS_AS(Grid(4, 4, std::numeric_limits<fdtd::FloatType>::quiet_NaN(), 1), std::invalid_argument);
+    CHECK_THROWS_AS(Grid(4, 4, std::numeric_limits<fdtd::FloatType>::quiet_NaN(), 1),
+                    std::invalid_argument);
     CHECK_THROWS_AS(Grid(huge, 2), std::invalid_argument);
 }
 
@@ -118,6 +120,7 @@ TEST_CASE("courant_dt rejects invalid Courant numbers", "[unit][courant]")
     CHECK_THROWS_AS(courant_dt(grid, 0.0), std::invalid_argument);
     CHECK_THROWS_AS(courant_dt(grid, -0.5), std::invalid_argument);
     CHECK_THROWS_AS(courant_dt(grid, 1.01), std::invalid_argument);
-    CHECK_THROWS_AS(courant_dt(grid, std::numeric_limits<double>::quiet_NaN()), std::invalid_argument);
+    CHECK_THROWS_AS(courant_dt(grid, std::numeric_limits<double>::quiet_NaN()),
+                    std::invalid_argument);
     CHECK_NOTHROW(courant_dt(grid, 1.0));
 }

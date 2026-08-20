@@ -160,15 +160,18 @@ namespace
     // Largest relative difference over the five fields.
     double field_difference(const Fields &a, const Fields &b)
     {
-        return std::max({relative_difference(a.ez(), b.ez()), relative_difference(a.hx(), b.hx()), relative_difference(a.hy(), b.hy()),
-                         relative_difference(a.ezx(), b.ezx()), relative_difference(a.ezy(), b.ezy())});
+        return std::max({relative_difference(a.ez(), b.ez()), relative_difference(a.hx(), b.hx()),
+                         relative_difference(a.hy(), b.hy()), relative_difference(a.ezx(), b.ezx()),
+                         relative_difference(a.ezy(), b.ezy())});
     }
 
     // Check that two sets of fields hold the same bits.
     bool same(const Fields &a, const Fields &b)
     {
-        return std::equal(a.ez().begin(), a.ez().end(), b.ez().begin()) && std::equal(a.hx().begin(), a.hx().end(), b.hx().begin()) &&
-               std::equal(a.hy().begin(), a.hy().end(), b.hy().begin()) && std::equal(a.ezx().begin(), a.ezx().end(), b.ezx().begin()) &&
+        return std::equal(a.ez().begin(), a.ez().end(), b.ez().begin()) &&
+               std::equal(a.hx().begin(), a.hx().end(), b.hx().begin()) &&
+               std::equal(a.hy().begin(), a.hy().end(), b.hy().begin()) &&
+               std::equal(a.ezx().begin(), a.ezx().end(), b.ezx().begin()) &&
                std::equal(a.ezy().begin(), a.ezy().end(), b.ezy().begin());
     }
 }
@@ -186,7 +189,8 @@ TEST_CASE("Cell classes match the CPU blocks", "[unit][cell]")
             const auto ui = static_cast<std::size_t>(i);
             const auto uj = static_cast<std::size_t>(j);
             const bool edge = ui == 0 || uj == 0 || ui + 1 == grid.nx() || uj + 1 == grid.ny();
-            const bool inside = ui >= interior.i0 && ui < interior.i1 && uj >= interior.j0 && uj < interior.j1;
+            const bool inside =
+                ui >= interior.i0 && ui < interior.i1 && uj >= interior.j0 && uj < interior.j1;
             CHECK(fdtd::TMz::backends::gpu::is_edge_cell(f, i, j) == edge);
             CHECK(fdtd::TMz::backends::gpu::is_interior_cell(f, i, j) == inside);
         }
@@ -197,7 +201,8 @@ TEST_CASE("Cell classes match the CPU blocks", "[unit][cell]")
 TEST_CASE("Cell updates match the CPU kernels", "[unit][cell]")
 {
     const auto boundary = GENERATE(Boundary::Pec, Boundary::Pmc, Boundary::Pml);
-    const auto size = GENERATE(Case{23, 19, 4}, Case{12, 31, 5}, Case{40, 40, 1}, Case{1, 1, 0}, Case{2, 5, 0}, Case{7, 1, 0});
+    const auto size = GENERATE(Case{23, 19, 4}, Case{12, 31, 5}, Case{40, 40, 1}, Case{1, 1, 0},
+                               Case{2, 5, 0}, Case{7, 1, 0});
     const std::size_t pml = boundary == Boundary::Pml ? size.pml : 0;
     const Grid grid(size.nx, size.ny, FloatType(1e-3), FloatType(2e-3));
     Material material(grid);

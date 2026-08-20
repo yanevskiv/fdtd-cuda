@@ -36,8 +36,10 @@
 // Namespace for the 2D TMz module.
 namespace fdtd::TMz
 {
-    static_assert(std::endian::native == std::endian::little, "snapshot files are written in the host's byte order, little-endian");
-    static_assert(sizeof(float) == 4 && sizeof(double) == 8, "snapshot values are 4-byte floats or 8-byte doubles");
+    static_assert(std::endian::native == std::endian::little,
+                  "snapshot files are written in the host's byte order, little-endian");
+    static_assert(sizeof(float) == 4 && sizeof(double) == 8,
+                  "snapshot values are 4-byte floats or 8-byte doubles");
 
     // Helpers private to this file.
     namespace
@@ -58,7 +60,9 @@ namespace fdtd::TMz
         }
 
         // Widen count values of type T from a buffer into doubles.
-        template <typename T> std::vector<double> widen(const std::vector<char> &buffer, std::size_t offset, std::size_t count)
+        template <typename T>
+        std::vector<double> widen(const std::vector<char> &buffer, std::size_t offset,
+                                  std::size_t count)
         {
             std::vector<double> values(count);
             for (std::size_t k = 0; k < count; ++k) {
@@ -103,7 +107,8 @@ namespace fdtd::TMz
     }
 
     // Write the header and Ez row by row, without the padding.
-    void write_snapshot(const std::filesystem::path &path, const Fields &fields, std::size_t step, double dt)
+    void write_snapshot(const std::filesystem::path &path, const Fields &fields, std::size_t step,
+                        double dt)
     {
         const Grid &grid = fields.grid();
         std::vector<char> header;
@@ -138,9 +143,11 @@ namespace fdtd::TMz
             message << path.string();
             throw std::runtime_error(message.str());
         }
-        const std::vector<char> buffer((std::istreambuf_iterator<char>(in)), std::istreambuf_iterator<char>());
+        const std::vector<char> buffer((std::istreambuf_iterator<char>(in)),
+                                       std::istreambuf_iterator<char>());
         const std::string name = path.string();
-        if (buffer.size() < SNAPSHOT_HEADER_SIZE || !std::equal(std::begin(SNAPSHOT_MAGIC), std::end(SNAPSHOT_MAGIC), buffer.begin())) {
+        if (buffer.size() < SNAPSHOT_HEADER_SIZE ||
+            !std::equal(std::begin(SNAPSHOT_MAGIC), std::end(SNAPSHOT_MAGIC), buffer.begin())) {
             throw snapshot_error(name, "not a snapshot file");
         }
         if (get<std::uint32_t>(buffer, 8) != SNAPSHOT_VERSION) {
@@ -161,16 +168,18 @@ namespace fdtd::TMz
         if (data.ny != 0 && count / data.ny != data.nx) {
             throw snapshot_error(name, "length does not match the header");
         }
-        if ((buffer.size() - SNAPSHOT_HEADER_SIZE) / size != count || (buffer.size() - SNAPSHOT_HEADER_SIZE) % size != 0) {
+        if ((buffer.size() - SNAPSHOT_HEADER_SIZE) / size != count ||
+            (buffer.size() - SNAPSHOT_HEADER_SIZE) % size != 0) {
             throw snapshot_error(name, "length does not match the header");
         }
-        data.ez = size == 4 ? widen<float>(buffer, SNAPSHOT_HEADER_SIZE, count) : widen<double>(buffer, SNAPSHOT_HEADER_SIZE, count);
+        data.ez = size == 4 ? widen<float>(buffer, SNAPSHOT_HEADER_SIZE, count)
+                            : widen<double>(buffer, SNAPSHOT_HEADER_SIZE, count);
         return data;
     }
 
     // Write the comment, the header and one row per value, with full precision.
-    void write_probe_csv(const std::filesystem::path &path, std::string_view comment, std::span<const double> times,
-                         std::span<const FloatType> values)
+    void write_probe_csv(const std::filesystem::path &path, std::string_view comment,
+                         std::span<const double> times, std::span<const FloatType> values)
     {
         if (times.size() != values.size()) {
             throw std::invalid_argument("write_probe_csv: times and values differ in length");

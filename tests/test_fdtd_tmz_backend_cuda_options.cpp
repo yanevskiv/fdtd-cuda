@@ -64,8 +64,9 @@ TEST_CASE("CUDA variant names round-trip", "[unit][cuda][options]")
     CHECK(CudaOptions::parse("fused+async").async_snapshots);
     CHECK_FALSE(CudaOptions::parse("fused+graph").async_snapshots);
     for (const std::string name :
-         {"fused:32x8", "fused:1x1", "tiled:128x1", "tiled:7x5", "tiled:16x16+graph", "fused:32x8+table", "fused:64x4+table+graph",
-          "tiled:32x8", "tiled:16x16+table+graph", "fused:32x8+async", "tiled:32x8+table+graph+async"}) {
+         {"fused:32x8", "fused:1x1", "tiled:128x1", "tiled:7x5", "tiled:16x16+graph",
+          "fused:32x8+table", "fused:64x4+table+graph", "tiled:32x8", "tiled:16x16+table+graph",
+          "fused:32x8+async", "tiled:32x8+table+graph+async"}) {
         CAPTURE(name);
         CHECK(CudaOptions::parse(name).name() == name);
     }

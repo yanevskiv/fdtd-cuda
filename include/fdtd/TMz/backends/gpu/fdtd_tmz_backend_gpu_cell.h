@@ -54,8 +54,8 @@ namespace fdtd
                 /**
                  * The fields and grid an update reads and writes, as raw pointers and int indices.
                  *
-                 * Cell (i, j) of each array is at j * pitch + i. The pointers are to device memory in the CUDA backend and to host memory
-                 * in the tests.
+                 * Cell (i, j) of each array is at j * pitch + i. The pointers are to device memory
+                 * in the CUDA backend and to host memory in the tests.
                  */
                 struct DeviceFields
                 {
@@ -107,7 +107,8 @@ namespace fdtd
                     /** The eight arrays. */
                     Arrays,
 
-                    /** One tuple for every core cell, as is_core_cell() finds them; the arrays for the others. */
+                    /** One tuple for every core cell, as is_core_cell() finds them; the arrays
+                     * for the others. */
                     Uniform,
 
                     /** The table entry of the cell's index, or the arrays for CoeffTable::ARRAYS.
@@ -116,8 +117,8 @@ namespace fdtd
                 };
 
                 /**
-                 * The coefficients an update reads: eight arrays laid out as the fields, and the table that stands in for them outside the
-                 * PML when the source says so.
+                 * The coefficients an update reads: eight arrays laid out as the fields, and the
+                 * table that stands in for them outside the PML when the source says so.
                  */
                 struct DeviceCoeffs
                 {
@@ -179,7 +180,8 @@ namespace fdtd
                  * @param component Ez, Hx or Hy.
                  * @return The array.
                  */
-                FDTD_HOST_DEVICE inline FloatType *field_of(const DeviceFields &fields, Component component) noexcept
+                FDTD_HOST_DEVICE inline FloatType *field_of(const DeviceFields &fields,
+                                                            Component component) noexcept
                 {
                     switch (component) {
                         case Component::Hx:
@@ -193,8 +195,8 @@ namespace fdtd
                 }
 
                 /**
-                 * Read an element that no thread of the running kernel writes, through the read-only data cache on the device and as a
-                 * plain load on the host.
+                 * Read an element that no thread of the running kernel writes, through the
+                 * read-only data cache on the device and as a plain load on the host.
                  *
                  * @param array Array to read.
                  * @param k Index of the element.
@@ -238,35 +240,40 @@ namespace fdtd
                  * @param j Row of the cell.
                  * @return True on the first or last row or column.
                  */
-                FDTD_HOST_DEVICE inline bool is_edge_cell(const DeviceFields &fields, int i, int j) noexcept
+                FDTD_HOST_DEVICE inline bool is_edge_cell(const DeviceFields &fields, int i,
+                                                          int j) noexcept
                 {
                     return i == 0 || j == 0 || i == fields.nx - 1 || j == fields.ny - 1;
                 }
 
                 /**
-                 * Whether a cell takes the plain Ez update: inside the PML and off the edge, as the CPU kernels' interior_block().
+                 * Whether a cell takes the plain Ez update: inside the PML and off the edge, as
+                 * the CPU kernels' interior_block().
                  *
                  * @param fields Fields and grid.
                  * @param i Column of the cell.
                  * @param j Row of the cell.
                  * @return True for max(pml, 1) <= i < nx - max(pml, 1), and the same along j.
                  */
-                FDTD_HOST_DEVICE inline bool is_interior_cell(const DeviceFields &fields, int i, int j) noexcept
+                FDTD_HOST_DEVICE inline bool is_interior_cell(const DeviceFields &fields, int i,
+                                                              int j) noexcept
                 {
                     const int lo = interior_lo(fields);
                     return i >= lo && i < fields.nx - lo && j >= lo && j < fields.ny - lo;
                 }
 
                 /**
-                 * Whether a cell lies in the core of the interior: the interior less its last column and row, where Hy and Hx sit half a
-                 * cell into the PML (see CoeffTable::uniform_entry()).
+                 * Whether a cell lies in the core of the interior: the interior less its last
+                 * column and row, where Hy and Hx sit half a cell into the PML (see
+                 * CoeffTable::uniform_entry()).
                  *
                  * @param fields Fields and grid.
                  * @param i Column of the cell.
                  * @param j Row of the cell.
                  * @return True for max(pml, 1) <= i < nx - max(pml, 1) - 1, and the same along j.
                  */
-                FDTD_HOST_DEVICE inline bool is_core_cell(const DeviceFields &fields, int i, int j) noexcept
+                FDTD_HOST_DEVICE inline bool is_core_cell(const DeviceFields &fields, int i,
+                                                          int j) noexcept
                 {
                     const int lo = interior_lo(fields);
                     return i >= lo && i < fields.nx - lo - 1 && j >= lo && j < fields.ny - lo - 1;
@@ -282,8 +289,9 @@ namespace fdtd
                  * @param j Row of the cell.
                  * @return The tuple, or not found when the cell reads the arrays.
                  */
-                FDTD_HOST_DEVICE inline CellTuple cell_tuple(const DeviceFields &fields, const DeviceCoeffs &coeffs, int k, int i,
-                                                             int j) noexcept
+                FDTD_HOST_DEVICE inline CellTuple cell_tuple(const DeviceFields &fields,
+                                                             const DeviceCoeffs &coeffs, int k,
+                                                             int i, int j) noexcept
                 {
                     if (coeffs.source == CoeffSource::Uniform) {
                         if (is_core_cell(fields, i, j)) {
@@ -348,9 +356,11 @@ namespace fdtd
                 };
 
                 /**
-                 * New Hx and Hy of one cell after one step, as the CPU's update_h_block() makes them, from the fields as they are.
+                 * New Hx and Hy of one cell after one step, as the CPU's update_h_block() makes
+                 * them, from the fields as they are.
                  *
-                 * Hx is updated below the last row and Hy left of the last column; the others lie outside the domain and keep their value.
+                 * Hx is updated below the last row and Hy left of the last column; the others lie
+                 * outside the domain and keep their value.
                  *
                  * @param fields Fields and grid.
                  * @param coeffs Coefficients and their source.
@@ -358,7 +368,9 @@ namespace fdtd
                  * @param j Row of the cell, inside the grid.
                  * @return The new values.
                  */
-                FDTD_HOST_DEVICE inline HValues h_values(const DeviceFields &fields, const DeviceCoeffs &coeffs, int i, int j) noexcept
+                FDTD_HOST_DEVICE inline HValues h_values(const DeviceFields &fields,
+                                                         const DeviceCoeffs &coeffs, int i,
+                                                         int j) noexcept
                 {
                     const int k = j * fields.pitch + i;
                     const CellTuple table = cell_tuple(fields, coeffs, k, i, j);
@@ -368,14 +380,20 @@ namespace fdtd
                         .hy = fields.hy[k],
                     };
                     if (j < fields.ny - 1) {
-                        const FloatType c1 = table.found ? table.tuple.hx_1 : read_only(coeffs.coeff_hx_1, k);
-                        const FloatType c2 = table.found ? table.tuple.hx_2 : read_only(coeffs.coeff_hx_2, k);
-                        h.hx = c1 * h.hx - c2 * fields.inv_dy * (read_only(Ez, k + fields.pitch) - read_only(Ez, k));
+                        const FloatType c1 =
+                            table.found ? table.tuple.hx_1 : read_only(coeffs.coeff_hx_1, k);
+                        const FloatType c2 =
+                            table.found ? table.tuple.hx_2 : read_only(coeffs.coeff_hx_2, k);
+                        h.hx = c1 * h.hx - c2 * fields.inv_dy *
+                                               (read_only(Ez, k + fields.pitch) - read_only(Ez, k));
                     }
                     if (i < fields.nx - 1) {
-                        const FloatType c1 = table.found ? table.tuple.hy_1 : read_only(coeffs.coeff_hy_1, k);
-                        const FloatType c2 = table.found ? table.tuple.hy_2 : read_only(coeffs.coeff_hy_2, k);
-                        h.hy = c1 * h.hy + c2 * fields.inv_dx * (read_only(Ez, k + 1) - read_only(Ez, k));
+                        const FloatType c1 =
+                            table.found ? table.tuple.hy_1 : read_only(coeffs.coeff_hy_1, k);
+                        const FloatType c2 =
+                            table.found ? table.tuple.hy_2 : read_only(coeffs.coeff_hy_2, k);
+                        h.hy = c1 * h.hy +
+                               c2 * fields.inv_dx * (read_only(Ez, k + 1) - read_only(Ez, k));
                     }
                     return h;
                 }
@@ -388,7 +406,9 @@ namespace fdtd
                  * @param i Column of the cell, inside the grid.
                  * @param j Row of the cell, inside the grid.
                  */
-                FDTD_HOST_DEVICE inline void update_h_cell(const DeviceFields &fields, const DeviceCoeffs &coeffs, int i, int j) noexcept
+                FDTD_HOST_DEVICE inline void update_h_cell(const DeviceFields &fields,
+                                                           const DeviceCoeffs &coeffs, int i,
+                                                           int j) noexcept
                 {
                     const int k = j * fields.pitch + i;
                     const HValues h = h_values(fields, coeffs, i, j);
@@ -418,14 +438,16 @@ namespace fdtd
                 }
 
                 /**
-                 * The H around the Ez of an edge cell, read from the fields, with every H outside the domain read as zero.
+                 * The H around the Ez of an edge cell, read from the fields, with every H outside
+                 * the domain read as zero.
                  *
                  * @param fields Fields and grid.
                  * @param i Column of the cell.
                  * @param j Row of the cell.
                  * @return The four values.
                  */
-                FDTD_HOST_DEVICE inline HAround h_around_edge(const DeviceFields &fields, int i, int j) noexcept
+                FDTD_HOST_DEVICE inline HAround h_around_edge(const DeviceFields &fields, int i,
+                                                              int j) noexcept
                 {
                     const int k = j * fields.pitch + i;
                     return {
@@ -437,8 +459,8 @@ namespace fdtd
                 }
 
                 /**
-                 * New Ez of a cell by the interior update, from its Ez and the H around it, as the CPU's update_e_interior_block(); the PMC
-                 * edge takes it too.
+                 * New Ez of a cell by the interior update, from its Ez and the H around it, as the
+                 * CPU's update_e_interior_block(); the PMC edge takes it too.
                  *
                  * @param fields Fields and grid.
                  * @param coeffs Coefficients and their source.
@@ -448,19 +470,25 @@ namespace fdtd
                  * @param h The H around the cell.
                  * @return The new Ez.
                  */
-                FDTD_HOST_DEVICE inline FloatType e_interior_value(const DeviceFields &fields, const DeviceCoeffs &coeffs, int i, int j,
-                                                                   FloatType ez, const HAround &h) noexcept
+                FDTD_HOST_DEVICE inline FloatType e_interior_value(const DeviceFields &fields,
+                                                                   const DeviceCoeffs &coeffs,
+                                                                   int i, int j, FloatType ez,
+                                                                   const HAround &h) noexcept
                 {
                     const int k = j * fields.pitch + i;
-                    const FloatType curl = (h.hy - h.hy_left) * fields.inv_dx - (h.hx - h.hx_below) * fields.inv_dy;
+                    const FloatType curl =
+                        (h.hy - h.hy_left) * fields.inv_dx - (h.hx - h.hx_below) * fields.inv_dy;
                     const CellTuple table = cell_tuple(fields, coeffs, k, i, j);
-                    const FloatType c1 = table.found ? table.tuple.ez_1 : read_only(coeffs.coeff_ez_x1, k);
-                    const FloatType c2 = table.found ? table.tuple.ez_2 : read_only(coeffs.coeff_ez_x2, k);
+                    const FloatType c1 =
+                        table.found ? table.tuple.ez_1 : read_only(coeffs.coeff_ez_x1, k);
+                    const FloatType c2 =
+                        table.found ? table.tuple.ez_2 : read_only(coeffs.coeff_ez_x2, k);
                     return c1 * ez + c2 * curl;
                 }
 
                 /**
-                 * New Ezx and Ezy of a PML cell, from their values and the H around it, as the CPU's update_split_rect().
+                 * New Ezx and Ezy of a PML cell, from their values and the H around it, as the
+                 * CPU's update_split_rect().
                  *
                  * @param fields Fields and grid.
                  * @param coeffs Coefficients and their source.
@@ -471,15 +499,21 @@ namespace fdtd
                  * @param h The H around the cell.
                  * @return The new Ezx and Ezy, whose sum is the new Ez.
                  */
-                FDTD_HOST_DEVICE inline EzSplit e_split_values(const DeviceFields &fields, const DeviceCoeffs &coeffs, int i, int j,
-                                                               FloatType ezx, FloatType ezy, const HAround &h) noexcept
+                FDTD_HOST_DEVICE inline EzSplit e_split_values(const DeviceFields &fields,
+                                                               const DeviceCoeffs &coeffs, int i,
+                                                               int j, FloatType ezx, FloatType ezy,
+                                                               const HAround &h) noexcept
                 {
                     const int k = j * fields.pitch + i;
                     const CellTuple table = cell_tuple(fields, coeffs, k, i, j);
-                    const FloatType x1 = table.found ? table.tuple.ez_1 : read_only(coeffs.coeff_ez_x1, k);
-                    const FloatType x2 = table.found ? table.tuple.ez_2 : read_only(coeffs.coeff_ez_x2, k);
-                    const FloatType y1 = table.found ? table.tuple.ez_1 : read_only(coeffs.coeff_ez_y1, k);
-                    const FloatType y2 = table.found ? table.tuple.ez_2 : read_only(coeffs.coeff_ez_y2, k);
+                    const FloatType x1 =
+                        table.found ? table.tuple.ez_1 : read_only(coeffs.coeff_ez_x1, k);
+                    const FloatType x2 =
+                        table.found ? table.tuple.ez_2 : read_only(coeffs.coeff_ez_x2, k);
+                    const FloatType y1 =
+                        table.found ? table.tuple.ez_1 : read_only(coeffs.coeff_ez_y1, k);
+                    const FloatType y2 =
+                        table.found ? table.tuple.ez_2 : read_only(coeffs.coeff_ez_y2, k);
                     return {
                         .ezx = x1 * ezx + x2 * fields.inv_dx * (h.hy - h.hy_left),
                         .ezy = y1 * ezy - y2 * fields.inv_dy * (h.hx - h.hx_below),
@@ -487,33 +521,39 @@ namespace fdtd
                 }
 
                 /**
-                 * Advance Ez of an interior cell by one step from the curl of H, as the CPU's update_e_interior_block().
+                 * Advance Ez of an interior cell by one step from the curl of H, as the CPU's
+                 * update_e_interior_block().
                  *
                  * @param fields Fields and grid.
                  * @param coeffs Coefficients and their source.
                  * @param i Column of the cell, off the edge.
                  * @param j Row of the cell, off the edge.
                  */
-                FDTD_HOST_DEVICE inline void update_e_interior_cell(const DeviceFields &fields, const DeviceCoeffs &coeffs, int i,
-                                                                    int j) noexcept
+                FDTD_HOST_DEVICE inline void update_e_interior_cell(const DeviceFields &fields,
+                                                                    const DeviceCoeffs &coeffs,
+                                                                    int i, int j) noexcept
                 {
                     const int k = j * fields.pitch + i;
-                    fields.ez[k] = e_interior_value(fields, coeffs, i, j, fields.ez[k], h_around(fields, k));
+                    fields.ez[k] =
+                        e_interior_value(fields, coeffs, i, j, fields.ez[k], h_around(fields, k));
                 }
 
                 /**
-                 * Advance Ezx and Ezy of a PML cell by one step, and Ez as their sum, as the CPU's update_split_rect().
+                 * Advance Ezx and Ezy of a PML cell by one step, and Ez as their sum, as the CPU's
+                 * update_split_rect().
                  *
                  * @param fields Fields and grid.
                  * @param coeffs Coefficients and their source.
                  * @param i Column of the cell, off the edge.
                  * @param j Row of the cell, off the edge.
                  */
-                FDTD_HOST_DEVICE inline void update_e_split_cell(const DeviceFields &fields, const DeviceCoeffs &coeffs, int i,
+                FDTD_HOST_DEVICE inline void update_e_split_cell(const DeviceFields &fields,
+                                                                 const DeviceCoeffs &coeffs, int i,
                                                                  int j) noexcept
                 {
                     const int k = j * fields.pitch + i;
-                    const EzSplit split = e_split_values(fields, coeffs, i, j, fields.ezx[k], fields.ezy[k], h_around(fields, k));
+                    const EzSplit split = e_split_values(fields, coeffs, i, j, fields.ezx[k],
+                                                         fields.ezy[k], h_around(fields, k));
                     fields.ezx[k] = split.ezx;
                     fields.ezy[k] = split.ezy;
                     fields.ez[k] = split.ezx + split.ezy;
@@ -522,8 +562,9 @@ namespace fdtd
                 /**
                  * Update Ez of an edge cell, as the CPU's update_boundary_block().
                  *
-                 * Under PEC and PML the cell's Ez, Ezx and Ezy are set to zero. Under PMC Ez takes the interior update with the x
-                 * coefficients and every H outside the domain read as zero.
+                 * Under PEC and PML the cell's Ez, Ezx and Ezy are set to zero. Under PMC Ez takes
+                 * the interior update with the x coefficients and every H outside the domain read
+                 * as zero.
                  *
                  * @param fields Fields and grid.
                  * @param coeffs Coefficients and their source.
@@ -531,8 +572,9 @@ namespace fdtd
                  * @param j Row of the cell, on the edge.
                  * @param boundary Outer boundary condition.
                  */
-                FDTD_HOST_DEVICE inline void update_e_edge_cell(const DeviceFields &fields, const DeviceCoeffs &coeffs, int i, int j,
-                                                                Boundary boundary) noexcept
+                FDTD_HOST_DEVICE inline void update_e_edge_cell(const DeviceFields &fields,
+                                                                const DeviceCoeffs &coeffs, int i,
+                                                                int j, Boundary boundary) noexcept
                 {
                     const int k = j * fields.pitch + i;
                     if (boundary != Boundary::Pmc) {
@@ -541,12 +583,14 @@ namespace fdtd
                         fields.ezy[k] = 0;
                         return;
                     }
-                    fields.ez[k] = e_interior_value(fields, coeffs, i, j, fields.ez[k], h_around_edge(fields, i, j));
+                    fields.ez[k] = e_interior_value(fields, coeffs, i, j, fields.ez[k],
+                                                    h_around_edge(fields, i, j));
                 }
 
                 /**
-                 * New Ez of any cell after one step, from the H around it: the edge, PML or interior update, whichever the cell takes. A
-                 * PML cell's Ezx and Ezy are updated in place, and an edge cell's set to zero under PEC and PML.
+                 * New Ez of any cell after one step, from the H around it: the edge, PML or
+                 * interior update, whichever the cell takes. A PML cell's Ezx and Ezy are updated
+                 * in place, and an edge cell's set to zero under PEC and PML.
                  *
                  * @param fields Fields and grid; Ez is read from fields.ez.
                  * @param coeffs Coefficients and their source.
@@ -556,8 +600,10 @@ namespace fdtd
                  * @param h The H around the cell, zero outside the domain.
                  * @return The new Ez.
                  */
-                FDTD_HOST_DEVICE inline FloatType e_value(const DeviceFields &fields, const DeviceCoeffs &coeffs, int i, int j,
-                                                          Boundary boundary, const HAround &h) noexcept
+                FDTD_HOST_DEVICE inline FloatType e_value(const DeviceFields &fields,
+                                                          const DeviceCoeffs &coeffs, int i, int j,
+                                                          Boundary boundary,
+                                                          const HAround &h) noexcept
                 {
                     const int k = j * fields.pitch + i;
                     if (is_edge_cell(fields, i, j)) {
@@ -571,14 +617,16 @@ namespace fdtd
                     if (is_interior_cell(fields, i, j)) {
                         return e_interior_value(fields, coeffs, i, j, fields.ez[k], h);
                     }
-                    const EzSplit split = e_split_values(fields, coeffs, i, j, fields.ezx[k], fields.ezy[k], h);
+                    const EzSplit split =
+                        e_split_values(fields, coeffs, i, j, fields.ezx[k], fields.ezy[k], h);
                     fields.ezx[k] = split.ezx;
                     fields.ezy[k] = split.ezy;
                     return split.ezx + split.ezy;
                 }
 
                 /**
-                 * Advance Ez of any cell by one step: the edge, PML or interior update, whichever the cell takes.
+                 * Advance Ez of any cell by one step: the edge, PML or interior update, whichever
+                 * the cell takes.
                  *
                  * @param fields Fields and grid.
                  * @param coeffs Coefficient arrays.
@@ -586,7 +634,8 @@ namespace fdtd
                  * @param j Row of the cell, inside the grid.
                  * @param boundary Outer boundary condition.
                  */
-                FDTD_HOST_DEVICE inline void update_e_cell(const DeviceFields &fields, const DeviceCoeffs &coeffs, int i, int j,
+                FDTD_HOST_DEVICE inline void update_e_cell(const DeviceFields &fields,
+                                                           const DeviceCoeffs &coeffs, int i, int j,
                                                            Boundary boundary) noexcept
                 {
                     if (is_edge_cell(fields, i, j)) {

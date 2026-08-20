@@ -50,9 +50,11 @@ namespace fdtd
      * @param args Arguments in order.
      * @param flags Names of the options that take no value.
      * @return The options in order.
-     * @throws std::invalid_argument On an argument that is not an option, a missing value, or a flag given a value.
+     * @throws std::invalid_argument On an argument that is not an option, a missing
+     *         value, or a flag given a value.
      */
-    std::vector<Argument> split_arguments(std::span<const std::string_view> args, std::span<const std::string_view> flags);
+    std::vector<Argument> split_arguments(std::span<const std::string_view> args,
+                                          std::span<const std::string_view> flags);
 
     /**
      * Parse a whole non-negative integer.

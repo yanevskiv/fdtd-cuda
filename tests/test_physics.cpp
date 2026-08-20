@@ -81,7 +81,8 @@ namespace
     }
 
     // Sum the energy with Ez from one set of fields and the product of H from two.
-    double energy(std::span<const FloatType> ez, const Fields &h0, const Fields &h1, const Material &material)
+    double energy(std::span<const FloatType> ez, const Fields &h0, const Fields &h1,
+                  const Material &material)
     {
         const Grid &grid = material.grid();
         const auto epsR = material.eps_r();
@@ -91,7 +92,8 @@ namespace
             for (std::size_t i = 0; i < grid.nx(); ++i) {
                 const std::size_t k = grid.index(i, j);
                 const double e = double(ez[k]);
-                const double hh = double(h0.hx()[k]) * double(h1.hx()[k]) + double(h0.hy()[k]) * double(h1.hy()[k]);
+                const double hh = double(h0.hx()[k]) * double(h1.hx()[k]) +
+                                  double(h0.hy()[k]) * double(h1.hy()[k]);
                 sum += fdtd::EPS_0 * double(epsR[k]) * e * e + fdtd::MU_0 * double(muR[k]) * hh;
             }
         }
@@ -130,8 +132,10 @@ namespace
     }
 
     // Add an Ez source and probes to an unrun simulation, run it and return one trace per probe.
-    std::vector<std::vector<FloatType>> point_source_traces(Simulation &sim, Cell source, fdtd::TMz::Waveform waveform,
-                                                            std::span<const Cell> probes, std::size_t nsteps)
+    std::vector<std::vector<FloatType>> point_source_traces(Simulation &sim, Cell source,
+                                                            fdtd::TMz::Waveform waveform,
+                                                            std::span<const Cell> probes,
+                                                            std::size_t nsteps)
     {
         sim.add_source(source.i, source.j, Component::Ez, std::move(waveform));
         std::vector<std::size_t> ids;
@@ -171,12 +175,14 @@ namespace
     }
 
     // Record Ez at a probe from a Gaussian source in an interior inside a border of cells.
-    std::vector<FloatType> interior_trace(const Simulation::Options &opts, std::size_t border, Cell source, Cell probe)
+    std::vector<FloatType> interior_trace(const Simulation::Options &opts, std::size_t border,
+                                          Cell source, Cell probe)
     {
         const std::size_t n = REFLECTION_INTERIOR + 2 * border;
         Simulation sim(n, n, opts);
         const std::vector<Cell> probes{{border + probe.i, border + probe.j}};
-        return point_source_traces(sim, {border + source.i, border + source.j}, fdtd::TMz::Gaussian::from_steps(sim.dt(), 8), probes,
+        return point_source_traces(sim, {border + source.i, border + source.j},
+                                   fdtd::TMz::Gaussian::from_steps(sim.dt(), 8), probes,
                                    REFLECTION_STEPS)[0];
     }
 
@@ -187,7 +193,8 @@ namespace
         opts.boundary = Boundary::Pml;
         opts.pml_thickness = thickness;
         const auto trace = interior_trace(opts, thickness, source, probe);
-        const auto reference = interior_trace(Simulation::Options(), REFLECTION_MARGIN, source, probe);
+        const auto reference =
+            interior_trace(Simulation::Options(), REFLECTION_MARGIN, source, probe);
         double error = 0;
         for (std::size_t k = 0; k < trace.size(); ++k) {
             error = std::max(error, std::abs(double(trace[k]) - double(reference[k])));
@@ -268,7 +275,8 @@ TEST_CASE("point_source_traces records every probe", "[unit][helpers]")
 {
     Simulation sim(16, 16);
     const std::vector<Cell> probes{{8, 8}, {12, 8}};
-    const auto traces = point_source_traces(sim, {8, 8}, fdtd::TMz::Gaussian::from_steps(sim.dt(), 4), probes, 20);
+    const auto traces =
+        point_source_traces(sim, {8, 8}, fdtd::TMz::Gaussian::from_steps(sim.dt(), 4), probes, 20);
     REQUIRE(traces.size() == 2);
     CHECK(traces[0].size() == 20);
     CHECK(traces[1].size() == 20);
@@ -310,7 +318,8 @@ TEST_CASE("Pulses travel at the speed of light", "[physics][speed]")
 {
     Simulation sim(256, 256);
     const std::vector<Cell> probes{{168, 128}, {218, 128}, {156, 156}, {191, 191}};
-    const auto traces = point_source_traces(sim, {128, 128}, fdtd::TMz::Gaussian::from_steps(sim.dt(), 8), probes, 220);
+    const auto traces = point_source_traces(
+        sim, {128, 128}, fdtd::TMz::Gaussian::from_steps(sim.dt(), 8), probes, 220);
     const double cellSteps = double(sim.grid().dx()) / (fdtd::C_0 * sim.dt());
 
     const double axial = peak_step(traces[1]) - peak_step(traces[0]);
@@ -332,11 +341,13 @@ TEST_CASE("Far-field peak follows 1 / sqrt(r)", "[physics][falloff]")
     for (const std::size_t r : distances) {
         probes.push_back({128 + r, 128});
     }
-    const auto traces = point_source_traces(sim, {128, 128}, fdtd::TMz::Gaussian::from_steps(sim.dt(), 8), probes, 240);
+    const auto traces = point_source_traces(
+        sim, {128, 128}, fdtd::TMz::Gaussian::from_steps(sim.dt(), 8), probes, 240);
 
     const double reference = find_peak(traces[0]).value * std::sqrt(30.0);
     for (std::size_t k = 1; k < probes.size(); ++k) {
-        const double ratio = find_peak(traces[k]).value * std::sqrt(double(distances[k])) / reference;
+        const double ratio =
+            find_peak(traces[k]).value * std::sqrt(double(distances[k])) / reference;
         CAPTURE(distances[k], ratio);
         CHECK(std::abs(ratio - 1) < 0.03);
     }
@@ -408,10 +419,12 @@ TEST_CASE("PML reflects below the threshold", "[physics][pml]")
         std::size_t thickness;
         double threshold;
     };
-    const Case c = GENERATE(Case{"normal", {20, 30}, {5, 30}, 10, -80}, Case{"normal", {20, 30}, {5, 30}, 20, -90},
-                            Case{"45 degrees", {10, 15}, {10, 35}, 10, -80}, Case{"45 degrees", {10, 15}, {10, 35}, 20, -90},
-                            Case{"grazing", {10, 3}, {50, 3}, 10, -60}, Case{"grazing", {10, 3}, {50, 3}, 20, -80},
-                            Case{"corner", {15, 15}, {5, 5}, 10, -75}, Case{"corner", {15, 15}, {5, 5}, 20, -85});
+    const Case c = GENERATE(
+        Case{"normal", {20, 30}, {5, 30}, 10, -80}, Case{"normal", {20, 30}, {5, 30}, 20, -90},
+        Case{"45 degrees", {10, 15}, {10, 35}, 10, -80},
+        Case{"45 degrees", {10, 15}, {10, 35}, 20, -90}, Case{"grazing", {10, 3}, {50, 3}, 10, -60},
+        Case{"grazing", {10, 3}, {50, 3}, 20, -80}, Case{"corner", {15, 15}, {5, 5}, 10, -75},
+        Case{"corner", {15, 15}, {5, 5}, 20, -85});
     const double reflection = pml_reflection_db(c.thickness, c.source, c.probe);
     CAPTURE(c.name, c.thickness, reflection, c.threshold);
     CHECK(reflection < c.threshold);

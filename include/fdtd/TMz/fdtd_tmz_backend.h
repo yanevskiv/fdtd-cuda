@@ -75,8 +75,9 @@ namespace fdtd
         /**
          * Modelled memory traffic and arithmetic of one time step.
          *
-         * The model counts each array element a kernel touches as read once and written once per pass, with the neighbours of a cell coming
-         * from cache, so it is the traffic to main memory a kernel cannot avoid. Sources and probes are left out.
+         * The model counts each array element a kernel touches as read once and written once
+         * per pass, with the neighbours of a cell coming from cache, so it is the traffic to
+         * main memory a kernel cannot avoid. Sources and probes are left out.
          */
         struct StepTraffic
         {
@@ -90,7 +91,8 @@ namespace fdtd
         /** Where the kernels of a traffic model take their coefficients from. */
         struct TrafficModel
         {
-            /** Whether the core cells, the interior less its last column and row, read a table of a few tuples instead of the arrays. */
+            /** Whether the core cells, the interior less its last column and row, read a table
+             * of a few tuples instead of the arrays. */
             bool table = false;
 
             /** Whether every cell reads a one-byte table index in each pass. */
@@ -103,15 +105,19 @@ namespace fdtd
         /**
          * Traffic of one step of the kernels with separate H and E passes, the serial backend's.
          *
-         * The H pass reads Ez once per cell, and per Hx or Hy update reads the field and its two coefficients and writes the field: 4 words
-         * and 5 flops. The E pass takes per interior cell 6 words (Hx, Hy, Ez and two coefficients read, Ez written) and 8 flops; per PML
-         * cell 11 words (Hx, Hy, Ezx, Ezy and four coefficients read, Ezx, Ezy and Ez written) and 11 flops; per edge cell 3 words written
-         * under PEC and PML, and the interior's count under PMC. With a table, the core cells read no coefficients, in either pass; with an
-         * index, every cell reads one byte in each pass.
+         * The H pass reads Ez once per cell, and per Hx or Hy update reads the field and its two
+         * coefficients and writes the field: 4 words and 5 flops. The E pass takes per interior
+         * cell 6 words (Hx, Hy, Ez and two coefficients read, Ez written) and 8 flops; per PML
+         * cell 11 words (Hx, Hy, Ezx, Ezy and four coefficients read, Ezx, Ezy and Ez written)
+         * and 11 flops; per edge cell 3 words written under PEC and PML, and the interior's
+         * count under PMC. With a table, the core cells read no coefficients, in either pass;
+         * with an index, every cell reads one byte in each pass.
          *
-         * In one pass, a cell reads Ez, Hx and Hy once and writes them once (6 words), its H coefficients as in two passes, and its E
-         * coefficients: 2 words in the interior, 4 and Ezx and Ezy read and written in the PML (8), Ezx and Ezy written on the edge under
-         * PEC and PML or 2 coefficients under PMC (2). The halo a tile computes again is left out, and the flops are those of two passes.
+         * In one pass, a cell reads Ez, Hx and Hy once and writes them once (6 words), its H
+         * coefficients as in two passes, and its E coefficients: 2 words in the interior, 4 and
+         * Ezx and Ezy read and written in the PML (8), Ezx and Ezy written on the edge under PEC
+         * and PML or 2 coefficients under PMC (2). The halo a tile computes again is left out,
+         * and the flops are those of two passes.
          *
          * @param grid Grid of the fields.
          * @param pml Thickness of the active PML in cells, zero for none.
@@ -119,14 +125,16 @@ namespace fdtd
          * @param model Where the coefficients come from; the arrays by default.
          * @return The traffic, a word being sizeof(FloatType) bytes.
          */
-        StepTraffic two_pass_traffic(const Grid &grid, std::size_t pml, Boundary boundary, const TrafficModel &model = {});
+        StepTraffic two_pass_traffic(const Grid &grid, std::size_t pml, Boundary boundary,
+                                     const TrafficModel &model = {});
 
         /**
          * A backend that owns a copy of the fields and advances them in time.
          *
-         * Fields move in with upload() and out with download(); step() works on the backend's own copy, which may live on another device.
-         * The coefficients move in with upload() too, and must be there before the first step. The outer boundary is PEC until
-         * set_boundary() says otherwise.
+         * Fields move in with upload() and out with download(); step() works on the
+         * backend's own copy, which may live on another device. The coefficients move in
+         * with upload() too, and must be there before the first step. The outer boundary
+         * is PEC until set_boundary() says otherwise.
          */
         class Backend
         {
@@ -204,46 +212,53 @@ namespace fdtd
             /**
              * Advance the fields and add soft point sources.
              *
-             * Per step: H, then the Hx and Hy sources, then Ez inside, then the edge Ez, then the Ez sources. Step n adds values[n *
-             * points.size() + k] to point k.
+             * Per step: H, then the Hx and Hy sources, then Ez inside, then the edge Ez,
+             * then the Ez sources. Step n adds values[n * points.size() + k] to point k.
              *
              * @param nsteps Number of time steps.
              * @param points Distinct cells to add to.
              * @param values One value per point per step, step-major.
-             * @throws std::invalid_argument When the values do not match the points and steps, a point lies outside the grid, or two points
-             *         are the same.
+             * @throws std::invalid_argument When the values do not match the points and
+             *         steps, a point lies outside the grid, or two points are the same.
              * @throws std::logic_error When no coefficients were uploaded.
              */
-            void step(std::size_t nsteps, std::span<const PointInjection> points, std::span<const FloatType> values);
+            void step(std::size_t nsteps, std::span<const PointInjection> points,
+                      std::span<const FloatType> values);
 
             /**
-             * Receives a snapshot taken during a step() call: the steps of the call run before it, and the fields then. The fields are
-             * valid only during the call.
+             * Receives a snapshot taken during a step() call: the steps of the call run before
+             * it, and the fields then. The fields are valid only during the call.
              */
             using SnapshotHandler = std::function<void(std::size_t steps, const Fields &fields)>;
 
             /**
-             * Advance the fields, add soft point sources, and hand over the fields after given steps of the call.
+             * Advance the fields, add soft point sources, and hand over the fields after given
+             * steps of the call.
              *
-             * As step() with sources, and after each step count in snapshots the handler receives the fields, in order. A backend may copy
-             * the fields out while it goes on stepping, and call the handler while the steps after the snapshot run.
+             * As step() with sources, and after each step count in snapshots the handler
+             * receives the fields, in order. A backend may copy the fields out while it goes on
+             * stepping, and call the handler while the steps after the snapshot run.
              *
              * @param nsteps Number of time steps.
              * @param points Distinct cells to add to.
              * @param values One value per point per step, step-major.
-             * @param snapshots Step counts of the call to take the fields after, increasing, each from 1 to nsteps.
+             * @param snapshots Step counts of the call to take the fields after, increasing,
+             *        each from 1 to nsteps.
              * @param handler Receives each snapshot.
-             * @throws std::invalid_argument As step(), or when the snapshot steps are out of order or range.
+             * @throws std::invalid_argument As step(), or when the snapshot steps are out of
+             *         order or range.
              * @throws std::logic_error When no coefficients were uploaded.
              */
-            void step(std::size_t nsteps, std::span<const PointInjection> points, std::span<const FloatType> values,
-                      std::span<const std::size_t> snapshots, const SnapshotHandler &handler);
+            void step(std::size_t nsteps, std::span<const PointInjection> points,
+                      std::span<const FloatType> values, std::span<const std::size_t> snapshots,
+                      const SnapshotHandler &handler);
 
             /**
              * Replace the probes and drop everything recorded so far.
              *
-             * Every step after this appends the value of each probe at the end of the step, after the sources: Ez is then at (n + 1) * dt
-             * and H at (n + 1/2) * dt. The records stay in the backend until fetch_probes() copies them out.
+             * Every step after this appends the value of each probe at the end of the
+             * step, after the sources: Ez is then at (n + 1) * dt and H at (n + 1/2) * dt.
+             * The records stay in the backend until fetch_probes() copies them out.
              *
              * @param points Cells to record; the same cell may appear twice.
              * @throws std::invalid_argument When a point lies outside the grid.
@@ -267,7 +282,8 @@ namespace fdtd
             /**
              * Copy the probe records out.
              *
-             * @return probe_steps() * probe_count() values, step-major: step n of probe k is at n * probe_count() + k.
+             * @return probe_steps() * probe_count() values, step-major: step n of probe k
+             *         is at n * probe_count() + k.
              */
             virtual std::vector<FloatType> fetch_probes() const = 0;
 
@@ -280,7 +296,8 @@ namespace fdtd
 
         protected:
             /**
-             * Replace the probes and clear the records; called by set_probes() after its checks.
+             * Replace the probes and clear the records; called by set_probes() after its
+             * checks.
              *
              * @param points Cells inside the grid.
              */
@@ -294,13 +311,16 @@ namespace fdtd
              * @param values One value per point per step, step-major.
              * @throws std::logic_error When no coefficients were uploaded.
              */
-            virtual void advance(std::size_t nsteps, std::span<const PointInjection> points, std::span<const FloatType> values) = 0;
+            virtual void advance(std::size_t nsteps, std::span<const PointInjection> points,
+                                 std::span<const FloatType> values) = 0;
 
             /**
-             * Advance the fields, add the sources and hand over the snapshots; called by step() after its checks.
+             * Advance the fields, add the sources and hand over the snapshots; called by step()
+             * after its checks.
              *
-             * The default advances to each snapshot, downloads the fields into a copy of its own and hands them over before it goes on.
-             * With no snapshots it advances alone, with no copy to make.
+             * The default advances to each snapshot, downloads the fields into a copy of its
+             * own and hands them over before it goes on. With no snapshots it advances alone,
+             * with no copy to make.
              *
              * @param nsteps Number of time steps.
              * @param points Distinct cells inside the grid.
@@ -309,8 +329,11 @@ namespace fdtd
              * @param handler Receives each snapshot.
              * @throws std::logic_error When no coefficients were uploaded.
              */
-            virtual void advance_snapshots(std::size_t nsteps, std::span<const PointInjection> points, std::span<const FloatType> values,
-                                           std::span<const std::size_t> snapshots, const SnapshotHandler &handler);
+            virtual void advance_snapshots(std::size_t nsteps,
+                                           std::span<const PointInjection> points,
+                                           std::span<const FloatType> values,
+                                           std::span<const std::size_t> snapshots,
+                                           const SnapshotHandler &handler);
 
             /** Create a backend. */
             Backend() = default;
@@ -342,10 +365,11 @@ namespace fdtd
              * @param nsteps Number of time steps.
              * @param points Cells to add to.
              * @param values Values to add.
-             * @throws std::invalid_argument When the values do not match the points and steps, a point lies outside the grid, or two points
-             *         are the same.
+             * @throws std::invalid_argument When the values do not match the points and
+             *         steps, a point lies outside the grid, or two points are the same.
              */
-            void check_sources(std::size_t nsteps, std::span<const PointInjection> points, std::span<const FloatType> values) const;
+            void check_sources(std::size_t nsteps, std::span<const PointInjection> points,
+                               std::span<const FloatType> values) const;
         };
 
         /**
@@ -374,13 +398,15 @@ namespace fdtd
         /**
          * Canonical name of a variant of a backend, which the backend reads back.
          *
-         * Each backend reads its own grammar, whether it is compiled in or not: serial reads only `default`, and OpenMP and CUDA read the
-         * names their settings describe. `default` names a backend's default settings.
+         * Each backend reads its own grammar, whether it is compiled in or not: serial reads only
+         * `default`, and OpenMP and CUDA read the names their settings describe. `default` names
+         * a backend's default settings.
          *
          * @param type Backend type.
          * @param variant Variant name, as `v2` for OpenMP.
          * @return The canonical name: `default` for serial, every setting written for the others.
-         * @throws std::invalid_argument When the backend does not read the name, with the reason and the name in the message.
+         * @throws std::invalid_argument When the backend does not read the name, with the reason
+         *         and the name in the message.
          */
         std::string variant_name(BackendType type, std::string_view variant);
 

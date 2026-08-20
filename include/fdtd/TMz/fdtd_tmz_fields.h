@@ -33,10 +33,13 @@ namespace fdtd
     namespace TMz
     {
         /**
-         * The TMz fields Ez, Hx and Hy over a grid, with the split parts Ezx and Ezy of Ez, as five aligned arrays.
+         * The TMz fields Ez, Hx and Hy over a grid, with the split parts Ezx and Ezy of
+         * Ez, as five aligned arrays.
          *
-         * Each array has grid().size() elements, indexed with Grid::index, and starts zeroed. The Yee staggering is in the update, not the
-         * storage. Ezx and Ezy span the whole grid but are only kept inside a PML, where Ez = Ezx + Ezy; elsewhere they stay zero.
+         * Each array has grid().size() elements, indexed with Grid::index, and starts
+         * zeroed. The Yee staggering is in the update, not the storage. Ezx and Ezy span
+         * the whole grid but are only kept inside a PML, where Ez = Ezx + Ezy; elsewhere
+         * they stay zero.
          */
         class Fields
         {

@@ -49,7 +49,8 @@ namespace fdtd::TMz::backends::gpu
         __global__ void copy_kernel(const float4 *in, float4 *out, std::size_t n)
         {
             const std::size_t stride = static_cast<std::size_t>(gridDim.x) * blockDim.x;
-            for (std::size_t k = static_cast<std::size_t>(blockIdx.x) * blockDim.x + threadIdx.x; k < n; k += stride) {
+            for (std::size_t k = static_cast<std::size_t>(blockIdx.x) * blockDim.x + threadIdx.x;
+                 k < n; k += stride) {
                 out[k] = in[k];
             }
         }
@@ -82,7 +83,8 @@ namespace fdtd::TMz::backends::gpu
         int device = 0;
         check(cudaGetDevice(&device), "cudaGetDevice");
         int threads = 0;
-        check(cudaDeviceGetAttribute(&threads, cudaDevAttrMaxThreadsPerBlock, device), "cudaDeviceGetAttribute");
+        check(cudaDeviceGetAttribute(&threads, cudaDevAttrMaxThreadsPerBlock, device),
+              "cudaDeviceGetAttribute");
         return static_cast<std::size_t>(threads);
     }
 

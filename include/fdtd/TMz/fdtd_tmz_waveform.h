@@ -54,7 +54,8 @@ namespace fdtd
             /**
              * Create a unit pulse whose width is a number of time steps, peaking at three widths.
              *
-             * Starting three widths early keeps the first sample below exp(-9), so switching the source on adds no visible step.
+             * Starting three widths early keeps the first sample below exp(-9), so switching
+             * the source on adds no visible step.
              *
              * @param dt Time step in seconds, positive and finite.
              * @param widthSteps Width in time steps, positive and finite.
@@ -106,8 +107,10 @@ namespace fdtd
         /**
          * Sample a waveform once per time step: value n is taken at (firstStep + n + offset) * dt.
          *
-         * Each time comes from its whole step index, so sampling steps [a, a + b) in one call or in two gives the same values bit for bit.
-         * Times are computed in double and converted to FloatType only for the call, so they do not drift over long runs in float builds.
+         * Each time comes from its whole step index, so sampling steps [a, a + b) in one call
+         * or in two gives the same values bit for bit. Times are computed in double and
+         * converted to FloatType only for the call, so they do not drift over long runs in
+         * float builds.
          *
          * @param waveform Waveform to sample.
          * @param dt Time step in seconds.
@@ -117,7 +120,8 @@ namespace fdtd
          * @return The samples.
          * @throws std::invalid_argument When the waveform is empty.
          */
-        std::vector<FloatType> sample_waveform(const Waveform &waveform, double dt, std::size_t firstStep, std::size_t nsteps,
+        std::vector<FloatType> sample_waveform(const Waveform &waveform, double dt,
+                                               std::size_t firstStep, std::size_t nsteps,
                                                double offset = 0);
     }
 }

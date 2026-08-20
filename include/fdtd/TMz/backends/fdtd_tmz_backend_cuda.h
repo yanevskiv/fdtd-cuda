@@ -53,12 +53,14 @@ namespace fdtd
         namespace backends
         {
             /**
-             * GPU backend: the fields live in device memory and a step is a few kernels, one thread per cell.
+             * GPU backend: the fields live in device memory and a step is a few kernels, one
+             * thread per cell.
              *
-             * Rows on the device are padded to 128 bytes; the host grid keeps its pitch, and the copies and the cells of sources and probes
-             * go from one to the other. A step is H, the Hx and Hy sources, E, the Ez sources and the probes, in that order on one stream;
-             * with the Tiled kernel H, its sources and E are one kernel. Each advance ends with a wait for the stream, so the work is done
-             * when step() returns.
+             * Rows on the device are padded to 128 bytes; the host grid keeps its pitch, and
+             * the copies and the cells of sources and probes go from one to the other. A step
+             * is H, the Hx and Hy sources, E, the Ez sources and the probes, in that order on
+             * one stream; with the Tiled kernel H, its sources and E are one kernel. Each
+             * advance ends with a wait for the stream, so the work is done when step() returns.
              */
             class CudaBackend final : public Backend
             {
@@ -69,9 +71,11 @@ namespace fdtd
                  * @param grid Grid the backend works on.
                  * @param options Settings of the backend.
                  * @throws std::runtime_error When no CUDA device is present.
-                 * @throws std::invalid_argument When a block side is zero, the block holds more threads than the device allows, the blocks
-                 *         along y pass the device's limit of 65535, the padded grid reaches 2^31 elements, or its arrays need more device
-                 *         memory than is free; all before anything is allocated.
+                 * @throws std::invalid_argument When a block side is zero, the block holds more
+                 *         threads than the device allows, the blocks along y pass the device's
+                 *         limit of 65535, the padded grid reaches 2^31 elements, or its arrays
+                 *         need more device memory than is free; all before anything is
+                 *         allocated.
                  * @throws gpu::CudaError When the device memory cannot be had.
                  */
                 CudaBackend(const Grid &grid, const CudaOptions &options);
@@ -156,8 +160,9 @@ namespace fdtd
                 /**
                  * Modelled traffic of one step of the kernel and coefficients in use.
                  *
-                 * @return two_pass_traffic() of the grid, the active PML and the boundary, one pass for Tiled, with the table of
-                 *         CudaCoeffs::Table and its index when the interior's core does not share one tuple.
+                 * @return two_pass_traffic() of the grid, the active PML and the boundary, one
+                 *         pass for Tiled, with the table of CudaCoeffs::Table and its index when
+                 *         the interior's core does not share one tuple.
                  */
                 StepTraffic step_traffic() const noexcept override;
 
@@ -192,14 +197,17 @@ namespace fdtd
                  * @throws std::logic_error When no coefficients were uploaded.
                  * @throws gpu::CudaError When a kernel or a copy fails.
                  */
-                void advance(std::size_t nsteps, std::span<const PointInjection> points, std::span<const FloatType> values) override;
+                void advance(std::size_t nsteps, std::span<const PointInjection> points,
+                             std::span<const FloatType> values) override;
 
                 /**
                  * Advance the fields on the device, add the sources and hand over the snapshots.
                  *
-                 * With async_snapshots, a snapshot is copied to device arrays of its own on the stream, then to page-locked host fields on
-                 * a second stream, and handed over once the steps up to the next snapshot are queued, so the copy to the host and the
-                 * handler run while the device steps. Two slots take turns. Without it, as Backend::advance_snapshots().
+                 * With async_snapshots, a snapshot is copied to device arrays of its own on
+                 * the stream, then to page-locked host fields on a second stream, and handed
+                 * over once the steps up to the next snapshot are queued, so the copy to the host
+                 * and the handler run while the device steps. Two slots take turns. Without it,
+                 * as Backend::advance_snapshots().
                  *
                  * @param nsteps Number of time steps.
                  * @param points Distinct cells inside the grid.
@@ -209,8 +217,10 @@ namespace fdtd
                  * @throws std::logic_error When no coefficients were uploaded.
                  * @throws gpu::CudaError When a kernel or a copy fails.
                  */
-                void advance_snapshots(std::size_t nsteps, std::span<const PointInjection> points, std::span<const FloatType> values,
-                                       std::span<const std::size_t> snapshots, const SnapshotHandler &handler) override;
+                void advance_snapshots(std::size_t nsteps, std::span<const PointInjection> points,
+                                       std::span<const FloatType> values,
+                                       std::span<const std::size_t> snapshots,
+                                       const SnapshotHandler &handler) override;
 
             private:
                 /**
@@ -243,13 +253,15 @@ namespace fdtd
                 gpu::DeviceCoeffs device_coeffs() const noexcept;
 
                 /**
-                 * Tuple every interior cell shares under the boundary in force, under CudaCoeffs::Table.
+                 * Tuple every interior cell shares under the boundary in force, under
+                 * CudaCoeffs::Table.
                  *
                  * @return The tuple, or none when the interior's cells differ.
                  */
                 const std::optional<gpu::CoeffTuple> &uniform_tuple() const noexcept;
 
-                /** A snapshot on its way out: its device copy, its host copy, and the events that mark the two copies done. */
+                /** A snapshot on its way out: its device copy, its host copy, and the events
+                 * that mark the two copies done. */
                 struct SnapshotSlot
                 {
                     /**
@@ -291,7 +303,8 @@ namespace fdtd
                     std::size_t steps = 0;
                 };
 
-                /** What async_snapshots needs, made with the backend so that no run pays for it. */
+                /** What async_snapshots needs, made with the backend so that no run pays
+                 * for it. */
                 struct AsyncSnapshots
                 {
                     /**
@@ -310,21 +323,23 @@ namespace fdtd
                 };
 
                 /**
-                 * Copy the source cells and values of an advance to the device, the magnetic cells first, and make room for its probe
-                 * records.
+                 * Copy the source cells and values of an advance to the device, the magnetic
+                 * cells first, and make room for its probe records.
                  *
                  * @param nsteps Number of time steps.
                  * @param points Distinct cells inside the grid.
                  * @param values One value per point per step, step-major.
                  * @return The number of magnetic sources.
                  */
-                std::size_t put_sources(std::size_t nsteps, std::span<const PointInjection> points, std::span<const FloatType> values);
+                std::size_t put_sources(std::size_t nsteps, std::span<const PointInjection> points,
+                                        std::span<const FloatType> values);
 
                 /**
                  * Queue the steps from one step of the advance to another.
                  *
-                 * With graph, whole runs of GRAPH_STEPS steps replay one captured graph, captured again when its key changes; the steps
-                 * left over are launched one by one.
+                 * With graph, whole runs of GRAPH_STEPS steps replay one captured graph,
+                 * captured again when its key changes; the steps left over are launched one by
+                 * one.
                  *
                  * @param coeffs View of the device coefficients.
                  * @param from First step, from zero.
@@ -332,8 +347,8 @@ namespace fdtd
                  * @param magnetic Sources that add to Hx or Hy.
                  * @param electric Sources that add to Ez.
                  */
-                void queue_steps(const gpu::DeviceCoeffs &coeffs, std::size_t from, std::size_t to, std::size_t magnetic,
-                                 std::size_t electric);
+                void queue_steps(const gpu::DeviceCoeffs &coeffs, std::size_t from, std::size_t to,
+                                 std::size_t magnetic, std::size_t electric);
 
                 /**
                  * Append the probe records of an advance and wait for the device.
@@ -345,8 +360,8 @@ namespace fdtd
                 /**
                  * Queue the copies of the fields as they will be after the work queued so far.
                  *
-                 * The fields go to the slot's device arrays on the stream, then to its page-locked host fields on the copy stream once
-                 * those copies are done.
+                 * The fields go to the slot's device arrays on the stream, then to its page-locked
+                 * host fields on the copy stream once those copies are done.
                  *
                  * @param slot Slot to copy into, its last snapshot handed over.
                  * @param steps Steps of the advance the snapshot is taken after.
@@ -366,15 +381,17 @@ namespace fdtd
                     /** They are given the step. */
                     Plain,
 
-                    /** They read the step from the device counter and count it, so a graph can replay them. */
+                    /** They read the step from the device counter and count it, so a graph can
+                     * replay them. */
                     Replay
                 };
 
                 /**
                  * Run one step's kernels on the stream, on the device fields as they are then.
                  *
-                 * H, the magnetic sources, E, the Ez sources and the probes, in that order. The tiled kernel does H, its sources and E in
-                 * one pass, then the arrays it read are swapped with those it wrote.
+                 * H, the magnetic sources, E, the Ez sources and the probes, in that order. The
+                 * tiled kernel does H, its sources and E in one pass, then the arrays it read
+                 * are swapped with those it wrote.
                  *
                  * @param coeffs View of the device coefficients.
                  * @param n Step of this advance, from zero; unused with Launch::Replay.
@@ -382,7 +399,8 @@ namespace fdtd
                  * @param electric Sources that add to Ez, after the magnetic ones.
                  * @param launch How the kernels learn the step.
                  */
-                void launch_step(const gpu::DeviceCoeffs &coeffs, std::size_t n, std::size_t magnetic, std::size_t electric, Launch launch);
+                void launch_step(const gpu::DeviceCoeffs &coeffs, std::size_t n,
+                                 std::size_t magnetic, std::size_t electric, Launch launch);
 
                 /** What a captured graph depends on besides the backend's fixed arrays. */
                 struct GraphKey
@@ -518,7 +536,8 @@ namespace fdtd
                 /** Table entries on the device, under CudaCoeffs::Table. */
                 gpu::DeviceBuffer<gpu::CoeffTuple> m_table_entries;
 
-                /** Entry of each cell on the device, laid out as the fields, under CudaCoeffs::Table. */
+                /** Entry of each cell on the device, laid out as the fields, under
+                 * CudaCoeffs::Table. */
                 gpu::DeviceBuffer<std::uint8_t> m_table_index;
 
                 /** Tuple every interior cell shares with the PML in force, if one is shared. */

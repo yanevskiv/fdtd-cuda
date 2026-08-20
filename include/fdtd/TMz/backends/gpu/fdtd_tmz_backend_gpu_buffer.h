@@ -57,7 +57,8 @@ namespace fdtd
                 void release(void *pointer) noexcept;
 
                 /**
-                 * Row pitch in elements that pads a row to a multiple of 128 bytes, the size of a fully coalesced warp access of 32 floats.
+                 * Row pitch in elements that pads a row to a multiple of 128 bytes, the size of
+                 * a fully coalesced warp access of 32 floats.
                  *
                  * @param width Elements in a row.
                  * @param size Size of one element in bytes, dividing 128.
@@ -68,7 +69,8 @@ namespace fdtd
                 /**
                  * Queue a copy of rows from the host to the device.
                  *
-                 * Pitches and width are in bytes. The host memory may be reused when the call returns.
+                 * Pitches and width are in bytes. The host memory may be reused when the call
+                 * returns.
                  *
                  * @param target Device memory of height rows.
                  * @param targetPitch Bytes from one target row to the next.
@@ -79,14 +81,16 @@ namespace fdtd
                  * @param stream Stream to queue the copy on.
                  * @throws CudaError When CUDA rejects the copy.
                  */
-                void copy_rows_to_device(void *target, std::size_t targetPitch, const void *source, std::size_t sourcePitch,
-                                         std::size_t width, std::size_t height, const Stream &stream);
+                void copy_rows_to_device(void *target, std::size_t targetPitch, const void *source,
+                                         std::size_t sourcePitch, std::size_t width,
+                                         std::size_t height, const Stream &stream);
 
                 /**
                  * Queue a copy of rows from the device to the host, without waiting for it.
                  *
-                 * Pitches and width are in bytes. The host memory holds the rows once the work queued before the copy and the copy are
-                 * done; it should be page-locked (see HostPin), or the call waits as for copy_rows_to_host().
+                 * Pitches and width are in bytes. The host memory holds the rows once the work
+                 * queued before the copy and the copy are done; it should be page-locked (see
+                 * HostPin), or the call waits as for copy_rows_to_host().
                  *
                  * @param target Host memory of height rows.
                  * @param targetPitch Bytes from one target row to the next.
@@ -97,8 +101,9 @@ namespace fdtd
                  * @param stream Stream to queue the copy on.
                  * @throws CudaError When CUDA rejects the copy.
                  */
-                void queue_rows_to_host(void *target, std::size_t targetPitch, const void *source, std::size_t sourcePitch,
-                                        std::size_t width, std::size_t height, const Stream &stream);
+                void queue_rows_to_host(void *target, std::size_t targetPitch, const void *source,
+                                        std::size_t sourcePitch, std::size_t width,
+                                        std::size_t height, const Stream &stream);
 
                 /**
                  * Queue a copy of bytes from device memory to device memory.
@@ -109,12 +114,14 @@ namespace fdtd
                  * @param stream Stream to queue the copy on.
                  * @throws CudaError When CUDA rejects the copy.
                  */
-                void copy_on_device(void *target, const void *source, std::size_t bytes, const Stream &stream);
+                void copy_on_device(void *target, const void *source, std::size_t bytes,
+                                    const Stream &stream);
 
                 /**
                  * Copy rows from the device to the host, after the work queued before it.
                  *
-                 * Pitches and width are in bytes. The host memory holds the rows when the call returns.
+                 * Pitches and width are in bytes. The host memory holds the rows when the call
+                 * returns.
                  *
                  * @param target Host memory of height rows.
                  * @param targetPitch Bytes from one target row to the next.
@@ -125,8 +132,9 @@ namespace fdtd
                  * @param stream Stream to queue the copy on.
                  * @throws CudaError When CUDA rejects the copy or earlier work failed.
                  */
-                void copy_rows_to_host(void *target, std::size_t targetPitch, const void *source, std::size_t sourcePitch,
-                                       std::size_t width, std::size_t height, const Stream &stream);
+                void copy_rows_to_host(void *target, std::size_t targetPitch, const void *source,
+                                       std::size_t sourcePitch, std::size_t width,
+                                       std::size_t height, const Stream &stream);
 
                 /**
                  * Queue the zeroing of device memory.
@@ -276,11 +284,12 @@ namespace fdtd
                  * @param stream Stream to queue the copy on.
                  */
                 template <typename T>
-                inline void upload_rows(DeviceBuffer<T> &target, std::size_t targetPitch, std::span<const T> source,
-                                        std::size_t sourcePitch, std::size_t width, std::size_t height, const Stream &stream)
+                inline void upload_rows(DeviceBuffer<T> &target, std::size_t targetPitch,
+                                        std::span<const T> source, std::size_t sourcePitch,
+                                        std::size_t width, std::size_t height, const Stream &stream)
                 {
-                    copy_rows_to_device(target.data(), targetPitch * sizeof(T), source.data(), sourcePitch * sizeof(T), width * sizeof(T),
-                                        height, stream);
+                    copy_rows_to_device(target.data(), targetPitch * sizeof(T), source.data(),
+                                        sourcePitch * sizeof(T), width * sizeof(T), height, stream);
                 }
 
                 /**
@@ -296,11 +305,13 @@ namespace fdtd
                  * @param stream Stream to queue the copy on.
                  */
                 template <typename T>
-                inline void download_rows(std::span<T> target, std::size_t targetPitch, const DeviceBuffer<T> &source,
-                                          std::size_t sourcePitch, std::size_t width, std::size_t height, const Stream &stream)
+                inline void download_rows(std::span<T> target, std::size_t targetPitch,
+                                          const DeviceBuffer<T> &source, std::size_t sourcePitch,
+                                          std::size_t width, std::size_t height,
+                                          const Stream &stream)
                 {
-                    copy_rows_to_host(target.data(), targetPitch * sizeof(T), source.data(), sourcePitch * sizeof(T), width * sizeof(T),
-                                      height, stream);
+                    copy_rows_to_host(target.data(), targetPitch * sizeof(T), source.data(),
+                                      sourcePitch * sizeof(T), width * sizeof(T), height, stream);
                 }
 
                 /**
@@ -311,9 +322,12 @@ namespace fdtd
                  * @param source Host array.
                  * @param stream Stream to queue the copy on.
                  */
-                template <typename T> inline void upload(DeviceBuffer<T> &target, std::span<const T> source, const Stream &stream)
+                template <typename T>
+                inline void upload(DeviceBuffer<T> &target, std::span<const T> source,
+                                   const Stream &stream)
                 {
-                    upload_rows(target, source.size(), source, source.size(), source.size(), 1, stream);
+                    upload_rows(target, source.size(), source, source.size(), source.size(), 1,
+                                stream);
                 }
 
                 /**
@@ -324,9 +338,12 @@ namespace fdtd
                  * @param source Device buffer of at least target.size() elements.
                  * @param stream Stream to queue the copy on.
                  */
-                template <typename T> inline void download(std::span<T> target, const DeviceBuffer<T> &source, const Stream &stream)
+                template <typename T>
+                inline void download(std::span<T> target, const DeviceBuffer<T> &source,
+                                     const Stream &stream)
                 {
-                    download_rows(target, target.size(), source, target.size(), target.size(), 1, stream);
+                    download_rows(target, target.size(), source, target.size(), target.size(), 1,
+                                  stream);
                 }
             }
         }

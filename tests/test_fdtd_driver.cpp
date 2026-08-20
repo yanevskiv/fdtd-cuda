@@ -71,10 +71,18 @@ TEST_CASE("Driver defaults", "[unit][driver]")
 // Verify every option, with the value after '=' or as the next argument.
 TEST_CASE("Driver parses every option", "[unit][driver]")
 {
-    const auto options =
-        parse({"--nx",      "64",     "--ny=32",         "--dx",    "2e-3",   "--dy=1e-3",   "--courant",        "0.5", "--steps=40",
-               "--pulse",   "10,12",  "--pulse=20,22,8", "--probe", "5,6",    "--probe=7,8", "--snapshot-every", "10",  "--boundary=pmc",
-               "--backend", "serial", "--output",        "dir",     "--help", "-v"});
+    const auto options = parse({"--nx",        "64",
+                                "--ny=32",     "--dx",
+                                "2e-3",        "--dy=1e-3",
+                                "--courant",   "0.5",
+                                "--steps=40",  "--pulse",
+                                "10,12",       "--pulse=20,22,8",
+                                "--probe",     "5,6",
+                                "--probe=7,8", "--snapshot-every",
+                                "10",          "--boundary=pmc",
+                                "--backend",   "serial",
+                                "--output",    "dir",
+                                "--help",      "-v"});
     CHECK(options.nx == 64);
     CHECK(options.ny == 32);
     CHECK(options.dx == 2e-3);
@@ -99,7 +107,8 @@ TEST_CASE("Driver parses every option", "[unit][driver]")
 // Verify the PML boundary and its settings.
 TEST_CASE("Driver parses the PML options", "[unit][driver]")
 {
-    const auto options = parse({"--boundary", "pml", "--pml-thickness", "8", "--pml-order=2", "--pml-reflection", "1e-4"});
+    const auto options = parse(
+        {"--boundary", "pml", "--pml-thickness", "8", "--pml-order=2", "--pml-reflection", "1e-4"});
     CHECK(options.boundary == Boundary::Pml);
     CHECK(options.pml_thickness == 8);
     CHECK(options.pml_order == 2);
@@ -158,12 +167,14 @@ TEST_CASE("Driver smoke run", "[unit][driver]")
 {
     const auto dir = std::filesystem::temp_directory_path() / "fdtd_test_driver_smoke";
     std::filesystem::remove_all(dir);
-    auto options = parse({"--nx", "32", "--ny", "24", "--steps", "25", "--probe", "20,12", "--snapshot-every", "10", "--boundary", "pmc"});
+    auto options = parse({"--nx", "32", "--ny", "24", "--steps", "25", "--probe", "20,12",
+                          "--snapshot-every", "10", "--boundary", "pmc"});
     options.output = dir;
     std::ostringstream log;
     fdtd::run_driver(options, log);
 
-    for (const char *name : {"snapshot_000000.bin", "snapshot_000010.bin", "snapshot_000020.bin", "snapshot_000025.bin", "probe_0.csv"}) {
+    for (const char *name : {"snapshot_000000.bin", "snapshot_000010.bin", "snapshot_000020.bin",
+                             "snapshot_000025.bin", "probe_0.csv"}) {
         CAPTURE(name);
         CHECK(std::filesystem::exists(dir / name));
     }
@@ -190,8 +201,8 @@ TEST_CASE("Driver smoke run with the PML", "[unit][driver]")
 {
     const auto dir = std::filesystem::temp_directory_path() / "fdtd_test_driver_pml";
     std::filesystem::remove_all(dir);
-    auto options = parse({"--nx", "48", "--ny", "40", "--steps", "60", "--probe", "30,20", "--snapshot-every", "30", "--boundary", "pml",
-                          "--pml-thickness", "8"});
+    auto options = parse({"--nx", "48", "--ny", "40", "--steps", "60", "--probe", "30,20",
+                          "--snapshot-every", "30", "--boundary", "pml", "--pml-thickness", "8"});
     options.output = dir;
     std::ostringstream log;
     fdtd::run_driver(options, log);
@@ -225,7 +236,8 @@ TEST_CASE("Driver smoke run on OpenMP", "[unit][driver][openmp]")
     options.output = dir / "serial";
     std::ostringstream log;
     fdtd::run_driver(options, log);
-    options = parse({"--nx", "32", "--steps", "20", "--probe", "20,16", "--backend", "openmp", "--threads", "2", "--variant", "v1"});
+    options = parse({"--nx", "32", "--steps", "20", "--probe", "20,16", "--backend", "openmp",
+                     "--threads", "2", "--variant", "v1"});
     options.output = dir / "openmp";
     fdtd::run_driver(options, log);
 
@@ -252,7 +264,8 @@ TEST_CASE("Driver smoke run on CUDA", "[unit][driver][cuda]")
     options.output = dir / "serial";
     std::ostringstream log;
     fdtd::run_driver(options, log);
-    options = parse({"--nx", "32", "--steps", "20", "--probe", "20,16", "--backend", "cuda", "--variant", "tiled:16x16"});
+    options = parse({"--nx", "32", "--steps", "20", "--probe", "20,16", "--backend", "cuda",
+                     "--variant", "tiled:16x16"});
     options.output = dir / "cuda";
     fdtd::run_driver(options, log);
 
@@ -278,13 +291,16 @@ TEST_CASE("Driver rejects bad PML settings", "[unit][driver]")
 {
     const auto dir = std::filesystem::temp_directory_path() / "fdtd_test_driver_pml_bad";
     std::ostringstream log;
-    auto reflection = parse({"--nx", "32", "--steps", "1", "--boundary", "pml", "--pml-thickness", "4", "--pml-reflection", "2"});
+    auto reflection = parse({"--nx", "32", "--steps", "1", "--boundary", "pml", "--pml-thickness",
+                             "4", "--pml-reflection", "2"});
     reflection.output = dir;
     CHECK_THROWS_AS(fdtd::run_driver(reflection, log), std::invalid_argument);
-    auto inside = parse({"--nx", "32", "--steps", "1", "--boundary", "pml", "--pml-thickness", "4", "--pulse", "2,16"});
+    auto inside = parse({"--nx", "32", "--steps", "1", "--boundary", "pml", "--pml-thickness", "4",
+                         "--pulse", "2,16"});
     inside.output = dir;
     CHECK_THROWS_AS(fdtd::run_driver(inside, log), std::invalid_argument);
-    auto thick = parse({"--nx", "32", "--steps", "1", "--boundary", "pml", "--pml-thickness", "16"});
+    auto thick =
+        parse({"--nx", "32", "--steps", "1", "--boundary", "pml", "--pml-thickness", "16"});
     thick.output = dir;
     CHECK_THROWS_AS(fdtd::run_driver(thick, log), std::invalid_argument);
     std::filesystem::remove_all(dir);

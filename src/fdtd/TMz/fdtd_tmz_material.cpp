@@ -37,8 +37,10 @@ namespace fdtd::TMz
         // Throw unless the medium is finite, with positive eps_r and mu_r and conductivities >= 0.
         void check_medium(const Material::Medium &m)
         {
-            const bool finite = std::isfinite(m.eps_r) && std::isfinite(m.mu_r) && std::isfinite(m.sigma_e) && std::isfinite(m.sigma_m);
-            if (!finite || !(m.eps_r > 0) || !(m.mu_r > 0) || !(m.sigma_e >= 0) || !(m.sigma_m >= 0)) {
+            const bool finite = std::isfinite(m.eps_r) && std::isfinite(m.mu_r) &&
+                                std::isfinite(m.sigma_e) && std::isfinite(m.sigma_m);
+            if (!finite || !(m.eps_r > 0) || !(m.mu_r > 0) || !(m.sigma_e >= 0) ||
+                !(m.sigma_m >= 0)) {
                 throw std::invalid_argument("Material: medium is not physical");
             }
         }
@@ -58,13 +60,15 @@ namespace fdtd::TMz
         }
 
         // Size sigma_max for a round trip through the layer damped to the target reflection.
-        double pml_sigma_max(std::size_t thickness, double cellSize, double order, double reflection) noexcept
+        double pml_sigma_max(std::size_t thickness, double cellSize, double order,
+                             double reflection) noexcept
         {
             return -(order + 1) * std::log(reflection) / (2 * ETA_0 * double(thickness) * cellSize);
         }
 
         // Grade sigma_max by the depth into the nearer layer over its thickness, to the order.
-        double pml_sigma(double position, std::size_t n, std::size_t thickness, double order, double sigmaMax) noexcept
+        double pml_sigma(double position, std::size_t n, std::size_t thickness, double order,
+                         double sigmaMax) noexcept
         {
             const double low = double(thickness) - position;
             const double high = position - double(n - 1 - thickness);
@@ -114,7 +118,8 @@ namespace fdtd::TMz
     }
 
     // Clip the rectangle to the grid and set its cells.
-    void Material::fill_rect(std::size_t i0, std::size_t j0, std::size_t i1, std::size_t j1, const Medium &medium)
+    void Material::fill_rect(std::size_t i0, std::size_t j0, std::size_t i1, std::size_t j1,
+                             const Medium &medium)
     {
         check_medium(medium);
         i1 = std::min(i1, m_grid.nx());
@@ -206,8 +211,10 @@ namespace fdtd::TMz
                 const std::size_t k = m_grid.index(i, j);
                 m_sigma_e_x[k] = FloatType(pml_sigma(x, nx, thickness, order, maxX));
                 m_sigma_e_y[k] = FloatType(pml_sigma(y, ny, thickness, order, maxY));
-                m_sigma_m_x[k] = FloatType(magnetic * pml_sigma(x + 0.5, nx, thickness, order, maxX));
-                m_sigma_m_y[k] = FloatType(magnetic * pml_sigma(y + 0.5, ny, thickness, order, maxY));
+                m_sigma_m_x[k] =
+                    FloatType(magnetic * pml_sigma(x + 0.5, nx, thickness, order, maxX));
+                m_sigma_m_y[k] =
+                    FloatType(magnetic * pml_sigma(y + 0.5, ny, thickness, order, maxY));
             }
         }
         m_pml_thickness = thickness;

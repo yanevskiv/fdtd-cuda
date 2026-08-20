@@ -64,7 +64,8 @@ namespace fdtd::TMz
         // Grade the material's PML from the options, or clear it unless the boundary is Pml.
         void apply_pml(Material &material, const Simulation::Options &options)
         {
-            const std::size_t thickness = options.boundary == Boundary::Pml ? options.pml_thickness : 0;
+            const std::size_t thickness =
+                options.boundary == Boundary::Pml ? options.pml_thickness : 0;
             material.set_pml(thickness, options.pml_order, options.pml_reflection);
         }
     }
@@ -125,7 +126,8 @@ namespace fdtd::TMz
     void Simulation::set_material(const Material &material)
     {
         const Grid &grid = material.grid();
-        if (grid.nx() != m_grid.nx() || grid.ny() != m_grid.ny() || grid.dx() != m_grid.dx() || grid.dy() != m_grid.dy()) {
+        if (grid.nx() != m_grid.nx() || grid.ny() != m_grid.ny() || grid.dx() != m_grid.dx() ||
+            grid.dy() != m_grid.dy()) {
             throw std::invalid_argument("Simulation: material grid does not match");
         }
         Material next = material;
@@ -141,7 +143,8 @@ namespace fdtd::TMz
     }
 
     // Check that the source may drive the cell and is outside the PML, then keep it.
-    void Simulation::add_source(std::size_t i, std::size_t j, Component component, Waveform waveform)
+    void Simulation::add_source(std::size_t i, std::size_t j, Component component,
+                                Waveform waveform)
     {
         const std::size_t nx = m_grid.nx();
         const std::size_t ny = m_grid.ny();
@@ -152,7 +155,8 @@ namespace fdtd::TMz
             throw std::invalid_argument("Simulation: empty source waveform");
         }
         const bool edge = i == 0 || j == 0 || i + 1 == nx || j + 1 == ny;
-        if ((component == Component::Ez && edge && m_options.boundary != Boundary::Pmc) || (component == Component::Hx && j + 1 == ny) ||
+        if ((component == Component::Ez && edge && m_options.boundary != Boundary::Pmc) ||
+            (component == Component::Hx && j + 1 == ny) ||
             (component == Component::Hy && i + 1 == nx)) {
             throw std::invalid_argument("Simulation: source on a cell that is never updated");
         }
@@ -224,9 +228,10 @@ namespace fdtd::TMz
         if (step < m_step_count) {
             throw std::invalid_argument("Simulation: snapshot step already passed");
         }
-        const bool taken = std::any_of(m_snapshots.begin(), m_snapshots.end(), [step](const Snapshot &snap) {
-            return snap.step == step;
-        });
+        const bool taken =
+            std::any_of(m_snapshots.begin(), m_snapshots.end(), [step](const Snapshot &snap) {
+                return snap.step == step;
+            });
         const auto it = std::lower_bound(m_snapshot_steps.begin(), m_snapshot_steps.end(), step);
         if (taken || (it != m_snapshot_steps.end() && *it == step)) {
             return;
@@ -289,22 +294,26 @@ namespace fdtd::TMz
         std::vector<PointInjection> points;
         std::vector<FloatType> values;
         sample_sources(nsteps, points, values);
-        m_backend->step(nsteps, points, values, snapshots, [&](std::size_t steps, const Fields &fields) {
-            handler(start + steps, fields);
-        });
+        m_backend->step(nsteps, points, values, snapshots,
+                        [&](std::size_t steps, const Fields &fields) {
+                            handler(start + steps, fields);
+                        });
         m_step_count += nsteps;
     }
 
     // Find the distinct cells of the sources and sum the sources' samples on each.
-    void Simulation::sample_sources(std::size_t nsteps, std::vector<PointInjection> &points, std::vector<FloatType> &values) const
+    void Simulation::sample_sources(std::size_t nsteps, std::vector<PointInjection> &points,
+                                    std::vector<FloatType> &values) const
     {
         points.clear();
         std::vector<std::size_t> slots;
         slots.reserve(m_sources.size());
         for (const Source &source : m_sources) {
-            const auto it = std::find_if(points.begin(), points.end(), [&source](const PointInjection &point) {
-                return point.component == source.point.component && point.index == source.point.index;
-            });
+            const auto it =
+                std::find_if(points.begin(), points.end(), [&source](const PointInjection &point) {
+                    return point.component == source.point.component &&
+                           point.index == source.point.index;
+                });
             slots.push_back(static_cast<std::size_t>(it - points.begin()));
             if (it == points.end()) {
                 points.push_back(source.point);
@@ -316,7 +325,8 @@ namespace fdtd::TMz
         for (std::size_t s = 0; s < m_sources.size(); ++s) {
             const Source &source = m_sources[s];
             const double offset = source.point.component == Component::Ez ? 1.0 : 0.5;
-            const auto samples = sample_waveform(source.waveform, m_dt, m_step_count, nsteps, offset);
+            const auto samples =
+                sample_waveform(source.waveform, m_dt, m_step_count, nsteps, offset);
             for (std::size_t n = 0; n < nsteps; ++n) {
                 values[n * npoints + slots[s]] += samples[n];
             }
@@ -360,7 +370,8 @@ namespace fdtd::TMz
     }
 
     // Read the backend's settings from the variant, or report that it is not compiled in.
-    std::unique_ptr<Backend> make_backend(BackendType type, const Grid &grid, const Simulation::Options &options)
+    std::unique_ptr<Backend> make_backend(BackendType type, const Grid &grid,
+                                          const Simulation::Options &options)
     {
         switch (type) {
             case BackendType::Serial:
@@ -378,7 +389,8 @@ namespace fdtd::TMz
 #endif
             case BackendType::Cuda:
 #if FDTD_WITH_CUDA
-                return std::make_unique<backends::CudaBackend>(grid, backends::CudaOptions::parse(options.variant));
+                return std::make_unique<backends::CudaBackend>(
+                    grid, backends::CudaOptions::parse(options.variant));
 #else
                 break;
 #endif

@@ -49,7 +49,8 @@ using fdtd::TMz::PointInjection;
 using fdtd::TMz::PointProbe;
 
 // Create a serial backend in vacuum at a Courant number, with a unit Ez impulse at (ci, cj).
-static auto make_impulse(const Grid &grid, double courant, std::size_t ci, std::size_t cj, Boundary boundary)
+static auto make_impulse(const Grid &grid, double courant, std::size_t ci, std::size_t cj,
+                         Boundary boundary)
 {
     auto backend = fdtd::TMz::make_backend(fdtd::TMz::BackendType::Serial, grid);
     backend->upload(Coeffs(Material(grid), fdtd::TMz::courant_dt(grid, courant)));
@@ -84,7 +85,8 @@ TEST_CASE("Registry reports what was compiled in", "[unit][backend]")
     const fdtd::TMz::Grid grid(4, 4);
 
     const bool cuda = fdtd::TMz::is_backend_available(BackendType::Cuda);
-    CHECK(fdtd::TMz::available_backends().size() == 1 + (FDTD_WITH_OPENMP ? 1U : 0U) + (cuda ? 1U : 0U));
+    CHECK(fdtd::TMz::available_backends().size() ==
+          1 + (FDTD_WITH_OPENMP ? 1U : 0U) + (cuda ? 1U : 0U));
     CHECK(fdtd::TMz::is_backend_available(BackendType::OpenMP) == bool(FDTD_WITH_OPENMP));
     if (!FDTD_WITH_OPENMP) {
         CHECK_THROWS_AS(fdtd::TMz::make_backend(BackendType::OpenMP, grid), std::runtime_error);
@@ -103,7 +105,8 @@ TEST_CASE("Serial backend ignores the thread count", "[unit][backend][serial]")
     options.threads = 3;
     fdtd::TMz::Simulation::Options level = options;
     level.variant = "v1";
-    CHECK_THROWS_AS(fdtd::TMz::make_backend(fdtd::TMz::BackendType::Serial, grid, level), std::invalid_argument);
+    CHECK_THROWS_AS(fdtd::TMz::make_backend(fdtd::TMz::BackendType::Serial, grid, level),
+                    std::invalid_argument);
     auto plain = make_impulse(grid, 0.9, 4, 3, Boundary::Pmc);
     auto backend = fdtd::TMz::make_backend(fdtd::TMz::BackendType::Serial, grid, options);
     backend->upload(Coeffs(Material(grid), fdtd::TMz::courant_dt(grid, 0.9)));
@@ -120,8 +123,9 @@ TEST_CASE("Serial backend ignores the thread count", "[unit][backend][serial]")
     CHECK(std::equal(a.hy().begin(), a.hy().end(), b.hy().begin()));
 }
 
-// Verify the traffic model of every available backend against a count by hand on an 8 by 6 grid with a PML 2 cells thick: 48 Ez reads, 40
-// Hx and 42 Hy updates at 4 words and 5 flops, 24 edge cells, and 24 cells off the edge, 8 of them interior and 16 in the PML when it is
+// Verify the traffic model of every available backend against a count by hand on an 8 by 6
+// grid with a PML 2 cells thick: 48 Ez reads, 40 Hx and 42 Hy updates at 4 words and 5 flops,
+// 24 edge cells, and 24 cells off the edge, 8 of them interior and 16 in the PML when it is
 // active.
 TEST_CASE("Backends model the traffic of a step", "[unit][backend]")
 {
@@ -153,7 +157,8 @@ TEST_CASE("Backends model the traffic of a step", "[unit][backend]")
             const auto traffic = sim.step_traffic();
             CHECK(traffic.bytes == c.words * word);
             CHECK(traffic.flops == c.flops);
-            const auto model = fdtd::TMz::two_pass_traffic(Grid(8, 6), c.boundary == Boundary::Pml ? 2 : 0, c.boundary);
+            const auto model = fdtd::TMz::two_pass_traffic(
+                Grid(8, 6), c.boundary == Boundary::Pml ? 2 : 0, c.boundary);
             CHECK(model.bytes == traffic.bytes);
         }
     }
@@ -180,8 +185,11 @@ TEST_CASE("Backends hand over snapshots and check their steps", "[unit][backend]
         CHECK(taken == snapshots);
         CHECK(centre[0] == FloatType(1));
         for (const std::vector<std::size_t> &bad :
-             {std::vector<std::size_t>{0}, std::vector<std::size_t>{7}, std::vector<std::size_t>{2, 2}, std::vector<std::size_t>{3, 1}}) {
-            CHECK_THROWS_AS(backend->step(6, points, values, bad, [](std::size_t, const Fields &) {}), std::invalid_argument);
+             {std::vector<std::size_t>{0}, std::vector<std::size_t>{7},
+              std::vector<std::size_t>{2, 2}, std::vector<std::size_t>{3, 1}}) {
+            CHECK_THROWS_AS(
+                backend->step(6, points, values, bad, [](std::size_t, const Fields &) {}),
+                std::invalid_argument);
         }
     }
 }
@@ -350,7 +358,8 @@ TEST_CASE("Serial backend adds point sources", "[unit][backend][serial]")
     auto backend = make_impulse(grid, 0.5, 4, 3, Boundary::Pec);
     backend->upload(Fields(grid));
 
-    const std::array points{PointInjection{Component::Ez, grid.index(4, 3)}, PointInjection{Component::Hx, grid.index(1, 1)},
+    const std::array points{PointInjection{Component::Ez, grid.index(4, 3)},
+                            PointInjection{Component::Hx, grid.index(1, 1)},
                             PointInjection{Component::Hy, grid.index(6, 5)}};
     const std::array values{FloatType(2), FloatType(3), FloatType(5)};
     backend->step(1, points, values);
@@ -411,8 +420,9 @@ TEST_CASE("Serial backend records probes", "[unit][backend][serial]")
 {
     const Grid grid(9, 9);
     auto backend = make_impulse(grid, 0.5, 4, 4, Boundary::Pec);
-    const std::array probes{PointProbe{Component::Ez, grid.index(4, 4)}, PointProbe{Component::Hx, grid.index(4, 3)},
-                            PointProbe{Component::Hy, grid.index(3, 4)}, PointProbe{Component::Ez, grid.index(4, 4)}};
+    const std::array probes{
+        PointProbe{Component::Ez, grid.index(4, 4)}, PointProbe{Component::Hx, grid.index(4, 3)},
+        PointProbe{Component::Hy, grid.index(3, 4)}, PointProbe{Component::Ez, grid.index(4, 4)}};
     backend->set_probes(probes);
     CHECK(backend->probe_count() == 4);
     CHECK(backend->probe_steps() == 0);
@@ -455,7 +465,8 @@ TEST_CASE("Serial backend rejects probes outside the grid", "[unit][backend][ser
 }
 
 // Verify that only Boundary::Pml runs the split update, Ez being the sum of its parts there.
-TEST_CASE("Serial backend splits Ez in the PML only under Boundary::Pml", "[unit][backend][serial][pml]")
+TEST_CASE("Serial backend splits Ez in the PML only under Boundary::Pml",
+          "[unit][backend][serial][pml]")
 {
     const std::size_t pml = 4;
     const Grid grid(16, 16);
@@ -500,7 +511,8 @@ TEST_CASE("Variant names belong to their backend", "[unit][backend]")
     using fdtd::TMz::BackendType;
     using fdtd::TMz::reads_variant;
     using fdtd::TMz::variant_name;
-    for (const BackendType backend : {BackendType::Serial, BackendType::OpenMP, BackendType::Cuda}) {
+    for (const BackendType backend :
+         {BackendType::Serial, BackendType::OpenMP, BackendType::Cuda}) {
         CHECK(reads_variant(backend, "default"));
         CHECK_FALSE(reads_variant(backend, "fast"));
     }

@@ -38,10 +38,12 @@ namespace fdtd
             namespace gpu
             {
                 /**
-                 * An executable CUDA graph: work captured once from a stream, then replayed on it with one launch.
+                 * An executable CUDA graph: work captured once from a stream, then replayed on it
+                 * with one launch.
                  *
-                 * Its header holds no CUDA type but the graph's opaque pointer, so host code can keep one. A replay runs the captured
-                 * kernels with the arguments they had when captured.
+                 * Its header holds no CUDA type but the graph's opaque pointer, so host code can
+                 * keep one. A replay runs the captured kernels with the arguments they had when
+                 * captured.
                  */
                 class Graph
                 {
@@ -74,7 +76,8 @@ namespace fdtd
                     Graph &operator=(Graph &&other) noexcept;
 
                     /**
-                     * Capture the work a callable queues on a stream, in place of any graph held; the work is recorded, not run.
+                     * Capture the work a callable queues on a stream, in place of any graph
+                     * held; the work is recorded, not run.
                      *
                      * @param stream Stream the callable queues on.
                      * @param queue Callable that queues the work.

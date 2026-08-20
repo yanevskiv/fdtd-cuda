@@ -42,8 +42,8 @@ namespace fdtd
             namespace gpu
             {
                 /**
-                 * The update coefficients of a cell whose Ez takes the same pair along x and y, as every cell outside the PML does: the
-                 * pairs of Ez, Hx and Hy.
+                 * The update coefficients of a cell whose Ez takes the same pair along x and y, as
+                 * every cell outside the PML does: the pairs of Ez, Hx and Hy.
                  */
                 struct CoeffTuple
                 {
@@ -67,12 +67,14 @@ namespace fdtd
                 };
 
                 /**
-                 * The distinct coefficient tuples of a grid and the entry each cell takes, for kernels that read a few tuples instead of
-                 * eight arrays per cell.
+                 * The distinct coefficient tuples of a grid and the entry each cell takes, for
+                 * kernels that read a few tuples instead of eight arrays per cell.
                  *
-                 * A cell takes an entry when its Ez pairs along x and y are equal; the entries hold the cells' values exactly, compared bit
-                 * by bit, so a kernel that reads them computes what it would from the arrays. A cell whose pairs differ, as in the PML, or
-                 * whose tuple finds no room once the table holds CAPACITY entries, takes ARRAYS and reads the arrays.
+                 * A cell takes an entry when its Ez pairs along x and y are equal; the entries hold
+                 * the cells' values exactly, compared bit by bit, so a kernel that reads them
+                 * computes what it would from the arrays. A cell whose pairs differ, as in the PML,
+                 * or whose tuple finds no room once the table holds CAPACITY entries, takes ARRAYS
+                 * and reads the arrays.
                  */
                 class CoeffTable
                 {
@@ -116,8 +118,8 @@ namespace fdtd
                     /**
                      * The one entry every cell of the core of an interior shares.
                      *
-                     * The core is the interior less its last column and row, where Hy and Hx sit half a cell into the PML and take its
-                     * grading.
+                     * The core is the interior less its last column and row, where Hy and Hx sit
+                     * half a cell into the PML and take its grading.
                      *
                      * @param lo Lower bound of the interior along both axes: the core holds the
                      * cells with lo <= i < nx - lo - 1 and lo <= j < ny - lo - 1.

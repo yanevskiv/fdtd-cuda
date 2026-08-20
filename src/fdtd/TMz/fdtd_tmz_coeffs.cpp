@@ -35,8 +35,8 @@ namespace fdtd::TMz
     namespace
     {
         // Store a cell's decay and curl factors for a conductivity and eps or mu.
-        void set_pair(AlignedBuffer<FloatType> &decay, AlignedBuffer<FloatType> &curl, std::size_t k, double sigma, double perm,
-                      double dt) noexcept
+        void set_pair(AlignedBuffer<FloatType> &decay, AlignedBuffer<FloatType> &curl,
+                      std::size_t k, double sigma, double perm, double dt) noexcept
         {
             const double a = sigma * dt / (2.0 * perm);
             decay.data()[k] = FloatType((1.0 - a) / (1.0 + a));

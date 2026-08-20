@@ -44,8 +44,8 @@ namespace fdtd
         /**
          * A 2D TMz simulation: grid, material, fields and the backend that steps them.
          *
-         * The material starts as vacuum and the fields at zero. The coefficients for the material and time step are uploaded to the backend
-         * on construction.
+         * The material starts as vacuum and the fields at zero. The coefficients for the
+         * material and time step are uploaded to the backend on construction.
          */
         class Simulation
         {
@@ -90,10 +90,12 @@ namespace fdtd
                 /** Backend to run on. */
                 BackendType backend = BackendType::Serial;
 
-                /** Variant of the backend, in its own grammar (see variant_name()); `default` names the backend's default settings. */
+                /** Variant of the backend, in its own grammar (see variant_name()); `default`
+                 * names the backend's default settings. */
                 std::string variant = "default";
 
-                /** Thread count of the OpenMP backend, 0 for the OpenMP default; the other backends ignore it. */
+                /** Thread count of the OpenMP backend, 0 for the OpenMP default; the other
+                 * backends ignore it. */
                 std::size_t threads = 0;
 
                 /** Whether an explicit dt above the Courant limit is rejected. */
@@ -115,11 +117,12 @@ namespace fdtd
              * @param nx Cells along x, at least 1.
              * @param ny Cells along y, at least 1.
              * @param options Settings of the simulation.
-             * @throws std::invalid_argument On a bad grid, a Courant number outside (0, 1], a negative or non-finite dt, or, with
-             *         check_stability, an explicit dt above the Courant limit, or, with an active PML, PML settings that
+             * @throws std::invalid_argument On a bad grid, a Courant number outside (0, 1],
+             *         a negative or non-finite dt, or, with check_stability, an explicit
+             *         dt above the Courant limit, or, with an active PML, PML settings that
              *         Material::set_pml() rejects, or backend settings the backend rejects.
-             * @throws std::runtime_error When the backend is not compiled in, or is CUDA and no device is present, or a CUDA call of the
-             *         backend fails.
+             * @throws std::runtime_error When the backend is not compiled in, or is CUDA and no
+             *         device is present, or a CUDA call of the backend fails.
              */
             Simulation(std::size_t nx, std::size_t ny, const Options &options);
 
@@ -154,7 +157,8 @@ namespace fdtd
             /**
              * Replace the material and upload the coefficients rebuilt from it.
              *
-             * The PML of the options replaces any the material carries, so the PML always follows the boundary.
+             * The PML of the options replaces any the material carries, so the PML always
+             * follows the boundary.
              *
              * @param material New material, on a grid with the same size and cells.
              * @throws std::invalid_argument When the material's grid does not match.
@@ -178,16 +182,18 @@ namespace fdtd
             /**
              * Add a soft point source: the waveform is added to one cell every step.
              *
-             * Ez sources are sampled at the end of each step, (n + 1) * dt, and added after the edge update. Hx and Hy sources are sampled
-             * at (n + 1/2) * dt and added after the H update. Sources on the same cell add up.
+             * Ez sources are sampled at the end of each step, (n + 1) * dt, and added after
+             * the edge update. Hx and Hy sources are sampled at (n + 1/2) * dt and added
+             * after the H update. Sources on the same cell add up.
              *
              * @param i Column of the cell.
              * @param j Row of the cell.
              * @param component Field the waveform is added to.
              * @param waveform Value at a time in seconds.
-             * @throws std::invalid_argument When the cell is outside the grid, is never updated (Ez on the edge under PEC or PML, Hx in the
-             *         last row, Hy in the last column) or lies in the PML (within pml_thickness() cells of the edge, for any component), or
-             *         the waveform is empty.
+             * @throws std::invalid_argument When the cell is outside the grid, is never
+             *         updated (Ez on the edge under PEC or PML, Hx in the last row, Hy in the last
+             *         column) or lies in the PML (within pml_thickness() cells of the edge, for
+             *         any component), or the waveform is empty.
              */
             void add_source(std::size_t i, std::size_t j, Component component, Waveform waveform);
 
@@ -201,8 +207,9 @@ namespace fdtd
             /**
              * Add a point probe that records one component of a cell every step.
              *
-             * Each step records the value at its end: Ez at (n + 1) * dt and Hx or Hy at (n + 1/2) * dt, as probe_times() gives them.
-             * Probes are added before the first run so that they all cover the same steps.
+             * Each step records the value at its end: Ez at (n + 1) * dt and Hx or Hy at
+             * (n + 1/2) * dt, as probe_times() gives them. Probes are added before the
+             * first run so that they all cover the same steps.
              *
              * @param i Column of the cell.
              * @param j Row of the cell.
@@ -241,8 +248,9 @@ namespace fdtd
             /**
              * Schedule a snapshot of Ez, Hx and Hy after a number of steps.
              *
-             * A later run() stops at the step to copy the fields, then carries on. A step equal to step_count() is taken at once, and a
-             * step already scheduled or taken is ignored.
+             * A later run() stops at the step to copy the fields, then carries on. A step
+             * equal to step_count() is taken at once, and a step already scheduled or taken
+             * is ignored.
              *
              * @param step Steps run when the snapshot is taken.
              * @throws std::invalid_argument When the step is below step_count().
@@ -270,14 +278,16 @@ namespace fdtd
              */
             void run(std::size_t nsteps);
 
-            /** Receives a snapshot: the steps run when it was taken, and the fields then, valid only during the call. */
+            /** Receives a snapshot: the steps run when it was taken, and the fields then, valid
+             * only during the call. */
             using SnapshotHandler = std::function<void(std::size_t step, const Fields &fields)>;
 
             /**
-             * Advance the simulation and hand the scheduled snapshots of the run to a handler, instead of keeping them in snapshots().
+             * Advance the simulation and hand the scheduled snapshots of the run to a handler,
+             * instead of keeping them in snapshots().
              *
-             * The run is one call to the backend, which may copy a snapshot out while it goes on stepping, and call the handler while the
-             * steps after it run.
+             * The run is one call to the backend, which may copy a snapshot out while it goes
+             * on stepping, and call the handler while the steps after it run.
              *
              * @param nsteps Number of time steps to run.
              * @param handler Receives each snapshot, in step order.
@@ -324,13 +334,15 @@ namespace fdtd
             void advance(std::size_t nsteps);
 
             /**
-             * The distinct source cells, and the summed values of the sources on each, for the next steps.
+             * The distinct source cells, and the summed values of the sources on each, for the
+             * next steps.
              *
              * @param nsteps Number of time steps.
              * @param points Set to the cells.
              * @param values Set to one value per cell per step, step-major.
              */
-            void sample_sources(std::size_t nsteps, std::vector<PointInjection> &points, std::vector<FloatType> &values) const;
+            void sample_sources(std::size_t nsteps, std::vector<PointInjection> &points,
+                                std::vector<FloatType> &values) const;
 
             /** A point source: the cell it adds to and its waveform. */
             struct Source
@@ -382,7 +394,8 @@ namespace fdtd
          * @param type Backend type.
          * @param grid Grid the backend works on.
          * @return The new backend.
-         * @throws std::runtime_error When the backend is not compiled in, or is CUDA and no device is present.
+         * @throws std::runtime_error When the backend is not compiled in, or is CUDA and no
+         *         device is present.
          */
         std::unique_ptr<Backend> make_backend(BackendType type, const Grid &grid);
 
@@ -393,10 +406,12 @@ namespace fdtd
          * @param grid Grid the backend works on.
          * @param options Settings; a backend reads only its own, from the variant and threads.
          * @return The new backend.
-         * @throws std::runtime_error When the backend is not compiled in, or is CUDA and no device is present.
+         * @throws std::runtime_error When the backend is not compiled in, or is CUDA and no
+         *         device is present.
          * @throws std::invalid_argument When the backend's settings are invalid.
          */
-        std::unique_ptr<Backend> make_backend(BackendType type, const Grid &grid, const Simulation::Options &options);
+        std::unique_ptr<Backend> make_backend(BackendType type, const Grid &grid,
+                                              const Simulation::Options &options);
     }
 }
 

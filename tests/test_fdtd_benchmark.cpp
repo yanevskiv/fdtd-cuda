@@ -85,7 +85,8 @@ namespace
         fdtd::TMz::Simulation::Options options;
         options.boundary = boundary;
         fdtd::TMz::Simulation sim(nx, ny, options);
-        sim.add_source(nx / 2, ny / 2, fdtd::TMz::Component::Ez, fdtd::TMz::Gaussian::from_steps(sim.dt(), 12));
+        sim.add_source(nx / 2, ny / 2, fdtd::TMz::Component::Ez,
+                       fdtd::TMz::Gaussian::from_steps(sim.dt(), 12));
         sim.run(steps);
         sim.download();
         double sum = 0;
@@ -174,8 +175,10 @@ TEST_CASE("Benchmark parses every option", "[unit][benchmark]")
 TEST_CASE("Benchmark backend all lists the registry", "[unit][benchmark]")
 {
     CHECK(parse({"--backend", "all"}).backends == fdtd::TMz::available_backends());
-    CHECK(parse({"--backend", "all", "--backend", "serial"}).backends == fdtd::TMz::available_backends());
-    CHECK(parse({"--backend", "serial", "--backend", "all"}).backends.front() == BackendType::Serial);
+    CHECK(parse({"--backend", "all", "--backend", "serial"}).backends ==
+          fdtd::TMz::available_backends());
+    CHECK(parse({"--backend", "serial", "--backend", "all"}).backends.front() ==
+          BackendType::Serial);
 }
 
 // Verify that malformed arguments throw.
@@ -203,11 +206,14 @@ TEST_CASE("Benchmark rejects bad arguments", "[unit][benchmark]")
 // Verify the header and the format of a row, the checksum with all 17 digits.
 TEST_CASE("Benchmark CSV header and row format", "[unit][benchmark]")
 {
-    CHECK(fdtd::benchmark_csv_header() == "backend,variant,precision,threads,nx,ny,nsteps,repeat,seconds,checksum,"
-                                          "bytes_per_step,flops_per_step");
-    const BenchmarkSample sample{BackendType::Serial, "default", 1, 64, 32, 100, 3, 0.25, 0.1, 2688, 650};
-    const std::string expected = FDTD_DOUBLE ? "serial,default,double,1,64,32,100,3,0.250000000,0.10000000000000001,2688,650"
-                                             : "serial,default,float,1,64,32,100,3,0.250000000,0.10000000000000001,2688,650";
+    CHECK(fdtd::benchmark_csv_header() ==
+          "backend,variant,precision,threads,nx,ny,nsteps,repeat,seconds,checksum,"
+          "bytes_per_step,flops_per_step");
+    const BenchmarkSample sample{
+        BackendType::Serial, "default", 1, 64, 32, 100, 3, 0.25, 0.1, 2688, 650};
+    const std::string expected =
+        FDTD_DOUBLE ? "serial,default,double,1,64,32,100,3,0.250000000,0.10000000000000001,2688,650"
+                    : "serial,default,float,1,64,32,100,3,0.250000000,0.10000000000000001,2688,650";
     CHECK(fdtd::format_benchmark_row(sample) == expected);
 }
 
@@ -271,8 +277,8 @@ TEST_CASE("Benchmark warm-up does not leak into samples", "[unit][benchmark]")
     }
 }
 
-// Verify that interleaved writes the rows of grouped, with the same checksums, round by round: grouped holds sample r of configuration k at
-// k * repeat + r, interleaved at r * count + k.
+// Verify that interleaved writes the rows of grouped, with the same checksums, round by round:
+// grouped holds sample r of configuration k at k * repeat + r, interleaved at r * count + k.
 TEST_CASE("Benchmark interleaves the configurations", "[unit][benchmark]")
 {
     auto options = small();
