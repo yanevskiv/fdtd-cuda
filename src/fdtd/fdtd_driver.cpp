@@ -220,9 +220,7 @@ namespace fdtd
         usage << "  --backend B           Backend, serial, openmp or cuda (default: serial)\n";
         usage << "  --threads N           OpenMP threads, 0 for the OpenMP default (default: 0)\n";
         usage << "  --variant V           Variant of the backend: for OpenMP\n";
-        usage << "                        "
-                 "SCHEDULE[+simd][+table][+fuse][+phase][+close|+spread],\n";
-        usage << "                        SCHEDULE rows or collapse2; for CUDA\n";
+        usage << "                        LEVEL[+close|+spread], LEVEL v1 to v4; for CUDA\n";
         usage << "                        KERNEL[:BXxBY][+table][+graph][+async], KERNEL\n";
         usage << "                        fused or tiled (default: default)\n";
         usage << "  --output DIR          Directory for the files (default: out)\n";

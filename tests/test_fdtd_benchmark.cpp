@@ -283,7 +283,7 @@ TEST_CASE("Benchmark interleaves the configurations", "[unit][benchmark]")
 {
     auto options = small();
     options.repeat = 3;
-    options.variants = {"default", "collapse2", "tiled"};
+    options.variants = {"default", "v1", "tiled"};
     options.threads = {1, 2};
     std::string groupedCsv;
     const auto grouped = run(options, groupedCsv);
@@ -360,7 +360,7 @@ TEST_CASE("Benchmark runs each CUDA variant", "[unit][benchmark][cuda]")
     options.repeat = 1;
     options.backends = {BackendType::Cuda};
     options.threads = {2, 4};
-    options.variants = {"rows", "collapse2+simd"};
+    options.variants = {"v1", "v2+close"};
     std::string csv;
     auto samples = run(options, csv);
     REQUIRE(samples.size() == 1);
@@ -369,7 +369,7 @@ TEST_CASE("Benchmark runs each CUDA variant", "[unit][benchmark][cuda]")
     CHECK(samples[0].threads == 1);
     CHECK(samples[0].checksum != 0);
 
-    options.variants = {"rows", "tiled:16x16", "fused:7x5"};
+    options.variants = {"v1", "tiled:16x16", "fused:7x5"};
     samples = run(options, csv);
     REQUIRE(samples.size() == 2);
     CHECK(samples[0].variant == "tiled:16x16");
@@ -382,7 +382,7 @@ TEST_CASE("Benchmark splits a mixed variant list by backend", "[unit][benchmark]
 {
     auto options = small();
     options.repeat = 1;
-    options.variants = {"collapse2+simd", "tiled", "rows"};
+    options.variants = {"v2", "tiled", "v1"};
     std::string csv;
     const auto samples = run(options, csv);
     std::vector<std::string> openmp;
@@ -397,7 +397,7 @@ TEST_CASE("Benchmark splits a mixed variant list by backend", "[unit][benchmark]
         }
     }
     if (fdtd::TMz::is_backend_available(BackendType::OpenMP)) {
-        CHECK(openmp == std::vector<std::string>{"collapse2+simd", "rows"});
+        CHECK(openmp == std::vector<std::string>{"v2", "v1"});
     }
     if (fdtd::TMz::is_backend_available(BackendType::Cuda)) {
         CHECK(cuda == std::vector<std::string>{"tiled:32x8"});
@@ -413,16 +413,16 @@ TEST_CASE("Benchmark runs each OpenMP variant", "[unit][benchmark][openmp]")
     auto options = small();
     options.repeat = 1;
     options.backends = {BackendType::Serial, BackendType::OpenMP};
-    options.variants = {"default", "rows+simd", "collapse2+simd"};
+    options.variants = {"default", "v2", "v1+close"};
     options.threads = {2};
     std::string csv;
     const auto samples = run(options, csv);
     REQUIRE(samples.size() == 4);
     CHECK(samples[0].backend == BackendType::Serial);
     CHECK(samples[0].variant == "default");
-    CHECK(samples[1].variant == "rows+simd+table+fuse");
-    CHECK(samples[2].variant == "rows+simd");
-    CHECK(samples[3].variant == "collapse2+simd");
+    CHECK(samples[1].variant == "v4");
+    CHECK(samples[2].variant == "v2");
+    CHECK(samples[3].variant == "v1+close");
     for (const BenchmarkSample &sample : samples) {
         CHECK(sample.checksum == samples[0].checksum);
     }

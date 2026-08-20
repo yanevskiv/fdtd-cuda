@@ -54,9 +54,8 @@ using fdtd::TMz::Grid;
 using fdtd::TMz::Material;
 using fdtd::TMz::Simulation;
 using fdtd::TMz::backends::OmpBind;
+using fdtd::TMz::backends::OmpLevel;
 using fdtd::TMz::backends::OmpOptions;
-using fdtd::TMz::backends::OmpRegion;
-using fdtd::TMz::backends::OmpSchedule;
 
 // Helpers private to this file.
 namespace
@@ -67,8 +66,8 @@ namespace
     // Bound of the difference from serial, in machine epsilons per step, from the build.
     constexpr double TOLERANCE = FDTD_TEST_TOLERANCE;
 
-    // Schedules built so far.
-    constexpr OmpSchedule SCHEDULES[] = {OmpSchedule::Rows, OmpSchedule::Collapse2};
+    // Every level, from the plain one up.
+    constexpr OmpLevel LEVELS[] = {OmpLevel::V1, OmpLevel::V2, OmpLevel::V3, OmpLevel::V4};
 
     // Result of a run: the fields and every probe's record.
     struct Run
@@ -181,49 +180,24 @@ namespace
         return counts;
     }
 
-    // Every combination of schedule, SIMD, table, fusion and region at a thread count.
-    std::vector<OmpOptions> combinations(std::size_t threads)
+    // Every level at a thread count.
+    std::vector<OmpOptions> levels(std::size_t threads)
     {
         std::vector<OmpOptions> all;
-        for (const OmpSchedule schedule : SCHEDULES) {
-            for (const bool simd : {false, true}) {
-                for (const bool table : {false, true}) {
-                    for (const bool fuse : {false, true}) {
-                        for (const OmpRegion region : {OmpRegion::Run, OmpRegion::Phase}) {
-                            const bool run = region == OmpRegion::Run;
-                            if (fuse && (schedule != OmpSchedule::Rows || !run)) {
-                                continue;
-                            }
-                            OmpOptions omp;
-                            omp.schedule = schedule;
-                            omp.simd = simd;
-                            omp.table = table;
-                            omp.fuse = fuse;
-                            omp.region = region;
-                            omp.threads = threads;
-                            all.push_back(omp);
-                        }
-                    }
-                }
-            }
+        for (const OmpLevel level : LEVELS) {
+            OmpOptions omp;
+            omp.level = level;
+            omp.threads = threads;
+            all.push_back(omp);
         }
         return all;
     }
 
-    // Name the settings of a combination for the messages of a failed check.
+    // Name the settings for the messages of a failed check.
     std::string describe(const OmpOptions &omp)
     {
         std::ostringstream text;
-        text << "schedule ";
-        text << int(omp.schedule);
-        text << ", simd ";
-        text << omp.simd;
-        text << ", table ";
-        text << omp.table;
-        text << ", fuse ";
-        text << omp.fuse;
-        text << ", region ";
-        text << int(omp.region);
+        text << omp.name();
         text << ", threads ";
         text << omp.threads;
         return text.str();
@@ -238,7 +212,7 @@ namespace
     }
 }
 
-// Verify that every OpenMP combination matches serial within the tolerance.
+// Verify that every OpenMP level matches serial within the tolerance.
 TEST_CASE("OpenMP matches serial", "[backend][openmp]")
 {
     require_openmp();
@@ -247,7 +221,7 @@ TEST_CASE("OpenMP matches serial", "[backend][openmp]")
     const Run serial = run(BackendType::Serial, Simulation::Options{}, size, boundary);
 
     for (const std::size_t threads : thread_counts()) {
-        for (const OmpOptions &omp : combinations(threads)) {
+        for (const OmpOptions &omp : levels(threads)) {
             INFO(describe(omp));
             const Run openmp = run(omp, size, boundary);
             CHECK(relative_difference(serial.fields, openmp.fields) <= bound());
@@ -256,7 +230,7 @@ TEST_CASE("OpenMP matches serial", "[backend][openmp]")
     }
 }
 
-// Verify that in the exact build every OpenMP combination matches serial bit for bit.
+// Verify that in the exact build every OpenMP level matches serial bit for bit.
 TEST_CASE("OpenMP matches serial bit for bit", "[backend][openmp][exact]")
 {
     require_openmp();
@@ -268,7 +242,7 @@ TEST_CASE("OpenMP matches serial bit for bit", "[backend][openmp][exact]")
     const Run serial = run(BackendType::Serial, Simulation::Options{}, size, boundary);
 
     for (const std::size_t threads : thread_counts()) {
-        for (const OmpOptions &omp : combinations(threads)) {
+        for (const OmpOptions &omp : levels(threads)) {
             INFO(describe(omp));
             const Run openmp = run(omp, size, boundary);
             CHECK(serial.fields == openmp.fields);
@@ -277,12 +251,12 @@ TEST_CASE("OpenMP matches serial bit for bit", "[backend][openmp][exact]")
     }
 }
 
-// Verify that two runs of the same combination give the same bits, which catches data races.
+// Verify that two runs of the same level give the same bits, which catches data races.
 TEST_CASE("OpenMP runs are deterministic", "[backend][openmp]")
 {
     require_openmp();
     const Size size{67, 45};
-    for (const OmpOptions &omp : combinations(thread_counts().back())) {
+    for (const OmpOptions &omp : levels(thread_counts().back())) {
         INFO(describe(omp));
         const Run first = run(omp, size, Boundary::Pml);
         const Run second = run(omp, size, Boundary::Pml);
@@ -291,30 +265,21 @@ TEST_CASE("OpenMP runs are deterministic", "[backend][openmp]")
     }
 }
 
-// Verify that ranges and fused rows handle more threads than cells.
-TEST_CASE("OpenMP handles more threads than cells", "[backend][openmp]")
+// Verify that every level handles more threads than rows.
+TEST_CASE("OpenMP handles more threads than rows", "[backend][openmp]")
 {
     require_openmp();
     const Size size{9, 7};
     const Run serial = run(BackendType::Serial, Simulation::Options{}, size, Boundary::Pec);
-
-    OmpOptions ranges;
-    ranges.schedule = OmpSchedule::Collapse2;
-    ranges.fuse = false;
-    ranges.threads = 80;
-    const Run many = run(ranges, size, Boundary::Pec);
-    CHECK(relative_difference(serial.fields, many.fields) <= bound());
-    CHECK(relative_difference(serial.probes, many.probes) <= bound());
-
-    OmpOptions fused;
-    fused.fuse = true;
-    fused.threads = 12;
-    const Run sweeps = run(fused, size, Boundary::Pec);
-    CHECK(relative_difference(serial.fields, sweeps.fields) <= bound());
-    CHECK(relative_difference(serial.probes, sweeps.probes) <= bound());
+    for (const OmpOptions &omp : levels(12)) {
+        INFO(describe(omp));
+        const Run many = run(omp, size, Boundary::Pec);
+        CHECK(relative_difference(serial.fields, many.fields) <= bound());
+        CHECK(relative_difference(serial.probes, many.probes) <= bound());
+    }
 }
 
-// Verify that the backend has its name and rejects options with no meaning.
+// Verify that the backend has its name and rejects variant names it does not know.
 TEST_CASE("OpenMP backend checks its options", "[unit][backend][openmp]")
 {
     require_openmp();
@@ -324,18 +289,18 @@ TEST_CASE("OpenMP backend checks its options", "[unit][backend][openmp]")
     CHECK(backend->name() == "openmp");
     CHECK(backend->type() == BackendType::OpenMP);
 
-    for (const char *variant : {"rows+fuse+phase", "collapse2+fuse"}) {
+    for (const char *variant : {"rows+simd", "v5", "v4+fuse"}) {
         CAPTURE(variant);
         options.variant = variant;
         CHECK_THROWS_AS(fdtd::TMz::make_backend(BackendType::OpenMP, grid, options),
                         std::invalid_argument);
     }
-    options.variant = "rows+fuse";
+    options.variant = "v1+spread";
     CHECK_NOTHROW(fdtd::TMz::make_backend(BackendType::OpenMP, grid, options));
 }
 
-// Verify that the table and fusion match serial on media, where the core shares no tuple and
-// reads the arrays, and in the exact build bit for bit.
+// Verify that the levels with the table match serial on media, where the core shares no tuple
+// and reads the arrays, and in the exact build bit for bit.
 TEST_CASE("OpenMP table and fusion match serial on media", "[backend][openmp]")
 {
     require_openmp();
@@ -344,10 +309,9 @@ TEST_CASE("OpenMP table and fusion match serial on media", "[backend][openmp]")
     const Run serial =
         run(BackendType::Serial, Simulation::Options{}, size, boundary, Medium::Circle);
     for (const std::size_t threads : thread_counts()) {
-        for (const bool fuse : {false, true}) {
+        for (const OmpLevel level : {OmpLevel::V3, OmpLevel::V4}) {
             OmpOptions omp;
-            omp.table = true;
-            omp.fuse = fuse;
+            omp.level = level;
             omp.threads = threads;
             INFO(describe(omp));
             const Run openmp = run(omp, size, boundary, Medium::Circle);
@@ -361,8 +325,8 @@ TEST_CASE("OpenMP table and fusion match serial on media", "[backend][openmp]")
     }
 }
 
-// Verify the traffic model: the table takes 6 words a core cell on vacuum and none on media, and
-// fusion is the one-pass model.
+// Verify the traffic model: v3's table takes 6 words a core cell off v2's on vacuum and none on
+// media, and v4 is the one-pass model with the table.
 TEST_CASE("OpenMP models the traffic of the table and fusion", "[unit][backend][openmp]")
 {
     require_openmp();
@@ -373,9 +337,9 @@ TEST_CASE("OpenMP models the traffic of the table and fusion", "[unit][backend][
         options.backend = BackendType::OpenMP;
         options.boundary = boundary;
         options.pml_thickness = 2;
-        options.variant = "rows+simd";
+        options.variant = "v2";
         const Simulation arrays(8, 6, options);
-        options.variant = "rows+simd+table";
+        options.variant = "v3";
         const Simulation table(8, 6, options);
         const double core = boundary == Boundary::Pml ? 3 : 15;
         CHECK(table.step_traffic().bytes == arrays.step_traffic().bytes - 6 * core * word);
@@ -387,10 +351,11 @@ TEST_CASE("OpenMP models the traffic of the table and fusion", "[unit][backend][
         media.set_material(material);
         CHECK(media.step_traffic().bytes == arrays.step_traffic().bytes);
 
-        options.variant = "rows+simd+fuse";
+        options.variant = "v4";
         const Simulation fused(8, 6, options);
         fdtd::TMz::TrafficModel model;
         model.one_pass = true;
+        model.table = true;
         const auto expected = fdtd::TMz::two_pass_traffic(
             fused.grid(), boundary == Boundary::Pml ? 2 : 0, boundary, model);
         CHECK(fused.step_traffic().bytes == expected.bytes);
@@ -398,13 +363,13 @@ TEST_CASE("OpenMP models the traffic of the table and fusion", "[unit][backend][
     }
 }
 
-// Verify that binding preserves fields and probes for every execution strategy.
+// Verify that binding preserves fields and probes at every level.
 TEST_CASE("OpenMP binding preserves results bit for bit", "[backend][openmp]")
 {
     require_openmp();
     const auto boundary = GENERATE(Boundary::Pec, Boundary::Pmc, Boundary::Pml);
     for (const std::size_t threads : thread_counts()) {
-        for (OmpOptions options : combinations(threads)) {
+        for (OmpOptions options : levels(threads)) {
             const Run unbound = run(options, {67, 45}, boundary);
             for (const auto bind : {OmpBind::Close, OmpBind::Spread}) {
                 options.bind = bind;
@@ -420,7 +385,7 @@ TEST_CASE("OpenMP binding preserves results bit for bit", "[backend][openmp]")
 #if FDTD_WITH_OPENMP
 
 // Check that a tuple holds a cell's values exactly.
-static void check_tuple(const fdtd::TMz::backends::serial::CoeffTuple &tuple, const Coeffs &coeffs,
+static void check_tuple(const fdtd::TMz::backends::omp::CoeffTuple &tuple, const Coeffs &coeffs,
                         std::size_t k)
 {
     CHECK(tuple.ez_1 == coeffs.coeff_ez_x1()[k]);

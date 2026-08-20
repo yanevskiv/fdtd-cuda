@@ -20,24 +20,20 @@
 // Class declaration.
 #include "fdtd/TMz/backends/fdtd_tmz_backend_omp.h"
 
-// The serial stepper the threads share.
+// The serial stepper the levels share.
 #include "fdtd/TMz/backends/fdtd_tmz_backend_serial.h"
 
 // OpenMP runtime for the default thread count.
 #include <omp.h>
 
-// Standard library for bounds, bit patterns, timing, sizes, views, errors and buffers.
+// Standard library for bounds, timing, sizes, views and buffers.
 #include <algorithm>
-#include <bit>
 #include <chrono>
 #include <cstddef>
-#include <cstdint>
 #include <memory>
 #include <optional>
 #include <span>
-#include <stdexcept>
 #include <string_view>
-#include <type_traits>
 #include <vector>
 
 // Namespace for the 2D TMz backends.
@@ -46,185 +42,34 @@ namespace fdtd::TMz::backends
     // Helpers private to this file.
     namespace
     {
-        // Check the options before anything is built from them.
-        const OmpOptions &checked(const OmpOptions &options)
+        // The tuple the core of an interior with lower bound lo shares, with the core.
+        std::optional<omp::SharedTuple> find_shared(const Coeffs &coeffs, std::size_t lo)
         {
-            if (options.fuse && options.schedule != OmpSchedule::Rows) {
-                throw std::invalid_argument("OmpBackend: fuse is for the Rows schedule only");
+            const std::optional<omp::CoeffTuple> tuple = omp::core_tuple(coeffs, lo);
+            if (!tuple.has_value()) {
+                return std::nullopt;
             }
-            if (options.fuse && options.region == OmpRegion::Phase) {
-                throw std::invalid_argument("OmpBackend: fuse runs in one region per run");
-            }
-            return options;
-        }
-
-        // Unsigned integer as wide as FloatType, for comparing values bit by bit.
-        using Bits = std::conditional_t<sizeof(FloatType) == 8, std::uint64_t, std::uint32_t>;
-
-        // Whether two values hold the same bits.
-        bool same_bits(FloatType a, FloatType b) noexcept
-        {
-            return std::bit_cast<Bits>(a) == std::bit_cast<Bits>(b);
-        }
-
-        // Cut the grid into the parts of the schedule: rows or one range per thread.
-        serial::Partition partition_for(const Grid &grid, const OmpOptions &options,
-                                        std::size_t threads)
-        {
-            if (options.schedule == OmpSchedule::Collapse2) {
-                return serial::Partition::ranges(grid, threads);
-            }
-            return serial::Partition::tiles(grid, grid.nx(), 1);
-        }
-
-        // Run a shared body on a team with the requested affinity policy.
-        template <typename Body> void run_team(int threads, OmpBind bind, const Body &body)
-        {
-            if (bind == OmpBind::Close) {
-#pragma omp parallel num_threads(threads) proc_bind(close)
-                {
-                    body();
-                }
-            } else if (bind == OmpBind::Spread) {
-#pragma omp parallel num_threads(threads) proc_bind(spread)
-                {
-                    body();
-                }
-            } else {
-#pragma omp parallel num_threads(threads)
-                {
-                    body();
-                }
-            }
-        }
-
-        // Run every step as a static omp for over the parts, in one region or one per phase.
-        template <serial::LoopKind Loop, serial::CoeffSource Source, OmpRegion Region>
-        void run_loops(const serial::Stepper &stepper, std::size_t parts, std::size_t nsteps,
-                       int threads, OmpBind bind)
-        {
-            if constexpr (Region == OmpRegion::Run) {
-                run_team(threads, bind, [&] {
-                    for (std::size_t n = 0; n < nsteps; ++n) {
-#pragma omp for schedule(static)
-                        for (std::size_t p = 0; p < parts; ++p) {
-                            stepper.h_phase<Loop, Source>(p, n);
-                        }
-#pragma omp for schedule(static)
-                        for (std::size_t p = 0; p < parts; ++p) {
-                            stepper.e_phase<Loop, Source>(p, n);
-                        }
-                    }
-                });
-            } else {
-                for (std::size_t n = 0; n < nsteps; ++n) {
-                    run_team(threads, bind, [&] {
-#pragma omp for schedule(static)
-                        for (std::size_t p = 0; p < parts; ++p) {
-                            stepper.h_phase<Loop, Source>(p, n);
-                        }
-                    });
-                    run_team(threads, bind, [&] {
-#pragma omp for schedule(static)
-                        for (std::size_t p = 0; p < parts; ++p) {
-                            stepper.e_phase<Loop, Source>(p, n);
-                        }
-                    });
-                }
-            }
-        }
-
-        // Sweep each thread's band of rows once a step, H then E row by row, after the top row's H.
-        template <serial::LoopKind Loop, serial::CoeffSource Source>
-        void run_fused_rows(const serial::Stepper &stepper, std::size_t rows, std::size_t nsteps,
-                            int threads, OmpBind bind)
-        {
-            run_team(threads, bind, [&] {
-                const auto team = static_cast<std::size_t>(omp_get_num_threads());
-                const auto t = static_cast<std::size_t>(omp_get_thread_num());
-                const std::size_t base = rows / team;
-                const std::size_t extra = rows % team;
-                const std::size_t begin = t * base + std::min(t, extra);
-                const std::size_t end = begin + base + (t < extra ? 1 : 0);
-                for (std::size_t n = 0; n < nsteps; ++n) {
-                    if (begin < end) {
-                        stepper.h_phase<Loop, Source>(end - 1, n);
-                    }
-#pragma omp barrier
-                    for (std::size_t j = begin; j < end; ++j) {
-                        if (j + 1 < end) {
-                            stepper.h_phase<Loop, Source>(j, n);
-                        }
-                        stepper.e_phase<Loop, Source>(j, n);
-                    }
-#pragma omp barrier
-                }
-            });
-        }
-
-        // Hand the parts to the threads as the schedule, the fusion and the region say.
-        template <serial::LoopKind Loop, serial::CoeffSource Source>
-        void run_schedule(const serial::Stepper &stepper, const serial::Partition &partition,
-                          std::size_t nsteps, int threads, const OmpOptions &options)
-        {
-            const std::size_t parts = partition.size();
-            if (options.fuse) {
-                run_fused_rows<Loop, Source>(stepper, parts, nsteps, threads, options.bind);
-            } else if (options.region == OmpRegion::Run) {
-                run_loops<Loop, Source, OmpRegion::Run>(stepper, parts, nsteps, threads,
-                                                        options.bind);
-            } else {
-                run_loops<Loop, Source, OmpRegion::Phase>(stepper, parts, nsteps, threads,
-                                                          options.bind);
-            }
+            const Grid &grid = coeffs.grid();
+            return omp::SharedTuple{
+                .tuple = *tuple,
+                .core =
+                    {
+                        .i0 = lo,
+                        .i1 = grid.nx() - lo - 1,
+                        .j0 = lo,
+                        .j1 = grid.ny() - lo - 1,
+                    },
+            };
         }
     }
 
-    // Take the core's first cell, then check that every cell of the core holds its bits.
-    std::optional<serial::CoeffTuple> omp::core_tuple(const Coeffs &coeffs, std::size_t lo)
-    {
-        const Grid &grid = coeffs.grid();
-        if (grid.nx() <= 2 * lo + 1 || grid.ny() <= 2 * lo + 1) {
-            return std::nullopt;
-        }
-        const auto ezX1 = coeffs.coeff_ez_x1();
-        const auto ezX2 = coeffs.coeff_ez_x2();
-        const auto ezY1 = coeffs.coeff_ez_y1();
-        const auto ezY2 = coeffs.coeff_ez_y2();
-        const auto hx1 = coeffs.coeff_hx_1();
-        const auto hx2 = coeffs.coeff_hx_2();
-        const auto hy1 = coeffs.coeff_hy_1();
-        const auto hy2 = coeffs.coeff_hy_2();
-        const std::size_t first = grid.index(lo, lo);
-        const serial::CoeffTuple tuple{
-            .ez_1 = ezX1[first],
-            .ez_2 = ezX2[first],
-            .hx_1 = hx1[first],
-            .hx_2 = hx2[first],
-            .hy_1 = hy1[first],
-            .hy_2 = hy2[first],
-        };
-        for (std::size_t j = lo; j < grid.ny() - lo - 1; ++j) {
-            for (std::size_t i = lo; i < grid.nx() - lo - 1; ++i) {
-                const std::size_t k = grid.index(i, j);
-                if (!same_bits(ezX1[k], tuple.ez_1) || !same_bits(ezY1[k], tuple.ez_1) ||
-                    !same_bits(ezX2[k], tuple.ez_2) || !same_bits(ezY2[k], tuple.ez_2) ||
-                    !same_bits(hx1[k], tuple.hx_1) || !same_bits(hx2[k], tuple.hx_2) ||
-                    !same_bits(hy1[k], tuple.hy_1) || !same_bits(hy2[k], tuple.hy_2)) {
-                    return std::nullopt;
-                }
-            }
-        }
-        return tuple;
-    }
-
-    // Check the options, fix the thread count and cut the grid for the schedule.
+    // Fix the thread count and cut the grid into rows.
     OmpBackend::OmpBackend(const Grid &grid, const OmpOptions &options)
         : SerialBackend(grid)
-        , m_options(checked(options))
+        , m_options(options)
         , m_threads(options.threads > 0 ? options.threads
                                         : static_cast<std::size_t>(omp_get_max_threads()))
-        , m_partition(partition_for(grid, options, m_threads))
+        , m_partition(serial::Partition::tiles(grid, grid.nx(), 1))
     {
         // Empty.
     }
@@ -253,76 +98,61 @@ namespace fdtd::TMz::backends
         return m_threads;
     }
 
-    // Copy the arrays in, then find the core's tuple with the coefficients' PML and with none.
+    // Copy the arrays in, then from v3 find the core's tuple with the coefficients' PML and none.
     void OmpBackend::upload(const Coeffs &coeffs)
     {
         SerialBackend::upload(coeffs);
-        m_uniform_pml.reset();
-        m_uniform_plain.reset();
-        if (m_options.table) {
-            m_uniform_pml =
-                omp::core_tuple(coeffs, std::max<std::size_t>(coeffs.pml_thickness(), 1));
-            m_uniform_plain = omp::core_tuple(coeffs, 1);
+        m_shared_pml.reset();
+        m_shared_plain.reset();
+        if (m_options.level >= OmpLevel::V3) {
+            m_shared_pml = find_shared(coeffs, std::max<std::size_t>(coeffs.pml_thickness(), 1));
+            m_shared_plain = find_shared(coeffs, 1);
         }
     }
 
-    // Model one pass with fusion and two without, the core reading its tuple with the table.
+    // Model one pass at v4 and two below, the core reading its tuple when it shares one.
     StepTraffic OmpBackend::step_traffic() const noexcept
     {
         TrafficModel model;
-        model.one_pass = m_options.fuse;
-        model.table = uniform_tuple().has_value();
+        model.one_pass = m_options.level == OmpLevel::V4;
+        model.table = shared_tuple().has_value();
         return two_pass_traffic(grid(), active_pml(), boundary(), model);
     }
 
     // Pick the core's tuple for the boundary in force.
-    const std::optional<serial::CoeffTuple> &OmpBackend::uniform_tuple() const noexcept
+    const std::optional<omp::SharedTuple> &OmpBackend::shared_tuple() const noexcept
     {
-        return boundary() == Boundary::Pml ? m_uniform_pml : m_uniform_plain;
+        return boundary() == Boundary::Pml ? m_shared_pml : m_shared_plain;
     }
 
-    // View the arrays, with the core's tuple and the core when there is a tuple.
-    serial::CoeffsView OmpBackend::stepper_coeffs() const noexcept
-    {
-        serial::CoeffsView view = coeffs();
-        const std::optional<serial::CoeffTuple> &uniform = uniform_tuple();
-        if (uniform.has_value()) {
-            const std::size_t lo = std::max<std::size_t>(active_pml(), 1);
-            view.uniform = &*uniform;
-            view.core = {
-                .i0 = lo,
-                .i1 = grid().nx() - lo - 1,
-                .j0 = lo,
-                .j1 = grid().ny() - lo - 1,
-            };
-        }
-        return view;
-    }
-
-    // Build the stepper and hand its parts to the threads, with or without SIMD and the table.
+    // Build the stepper over the rows and run the advance at the level of the options.
     void OmpBackend::advance(std::size_t nsteps, std::span<const PointInjection> points,
                              std::span<const FloatType> values)
     {
         require_coeffs();
         FloatType *records = add_records(nsteps);
-        const serial::Stepper stepper(fields(), stepper_coeffs(), active_pml(), boundary(),
-                                      m_partition, points, values, probes(), records);
-        const int threads = static_cast<int>(m_threads);
-        using serial::CoeffSource;
-        using serial::LoopKind;
-        if (m_options.simd && m_options.table) {
-            run_schedule<LoopKind::Simd, CoeffSource::Table>(stepper, m_partition, nsteps, threads,
-                                                             m_options);
-        } else if (m_options.simd) {
-            run_schedule<LoopKind::Simd, CoeffSource::Arrays>(stepper, m_partition, nsteps, threads,
-                                                              m_options);
-        } else if (m_options.table) {
-            run_schedule<LoopKind::Plain, CoeffSource::Table>(stepper, m_partition, nsteps, threads,
-                                                              m_options);
-        } else {
-            run_schedule<LoopKind::Plain, CoeffSource::Arrays>(stepper, m_partition, nsteps,
-                                                               threads, m_options);
+        const serial::Stepper stepper(fields(), coeffs(), active_pml(), boundary(), m_partition,
+                                      points, values, probes(), records);
+        const omp::Advance run{
+            .stepper = stepper,
+            .nsteps = nsteps,
+            .threads = static_cast<int>(m_threads),
+            .bind = m_options.bind,
+        };
+        switch (m_options.level) {
+            case OmpLevel::V1:
+                omp::run_v1(run);
+                return;
+            case OmpLevel::V2:
+                omp::run_v2(run);
+                return;
+            case OmpLevel::V3:
+                omp::run_v3(run, shared_tuple());
+                return;
+            case OmpLevel::V4:
+                break;
         }
+        omp::run_v4(run, shared_tuple());
     }
 
     // Time each pass of the triad and take the median.

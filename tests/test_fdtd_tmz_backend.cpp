@@ -103,9 +103,9 @@ TEST_CASE("Serial backend ignores the thread count", "[unit][backend][serial]")
     const Grid grid(9, 7);
     fdtd::TMz::Simulation::Options options;
     options.threads = 3;
-    fdtd::TMz::Simulation::Options rows = options;
-    rows.variant = "rows";
-    CHECK_THROWS_AS(fdtd::TMz::make_backend(fdtd::TMz::BackendType::Serial, grid, rows),
+    fdtd::TMz::Simulation::Options level = options;
+    level.variant = "v1";
+    CHECK_THROWS_AS(fdtd::TMz::make_backend(fdtd::TMz::BackendType::Serial, grid, level),
                     std::invalid_argument);
     auto plain = make_impulse(grid, 0.9, 4, 3, Boundary::Pmc);
     auto backend = fdtd::TMz::make_backend(fdtd::TMz::BackendType::Serial, grid, options);
@@ -147,7 +147,7 @@ TEST_CASE("Backends model the traffic of a step", "[unit][backend]")
             fdtd::TMz::Simulation::Options options;
             options.backend = type;
             if (type == fdtd::TMz::BackendType::OpenMP) {
-                options.variant = "rows+simd";
+                options.variant = "v2";
             } else if (type == fdtd::TMz::BackendType::Cuda) {
                 options.variant = "fused";
             }
@@ -516,17 +516,17 @@ TEST_CASE("Variant names belong to their backend", "[unit][backend]")
         CHECK(reads_variant(backend, "default"));
         CHECK_FALSE(reads_variant(backend, "fast"));
     }
-    CHECK(reads_variant(BackendType::OpenMP, "collapse2+simd"));
-    CHECK_FALSE(reads_variant(BackendType::Cuda, "collapse2+simd"));
-    CHECK_FALSE(reads_variant(BackendType::Serial, "rows"));
+    CHECK(reads_variant(BackendType::OpenMP, "v2+close"));
+    CHECK_FALSE(reads_variant(BackendType::Cuda, "v2+close"));
+    CHECK_FALSE(reads_variant(BackendType::Serial, "v1"));
     CHECK(reads_variant(BackendType::Cuda, "tiled:16x16"));
     CHECK_FALSE(reads_variant(BackendType::OpenMP, "tiled:16x16"));
     CHECK_FALSE(reads_variant(BackendType::Serial, "fused"));
 
     CHECK(variant_name(BackendType::Serial, "default") == "default");
-    CHECK(variant_name(BackendType::OpenMP, "collapse2") == "collapse2");
-    CHECK(variant_name(BackendType::OpenMP, "default") == "rows+simd+table+fuse");
+    CHECK(variant_name(BackendType::OpenMP, "v1") == "v1");
+    CHECK(variant_name(BackendType::OpenMP, "default") == "v4");
     CHECK(variant_name(BackendType::Cuda, "tiled:8x4") == "tiled:8x4");
-    CHECK_THROWS_AS(variant_name(BackendType::Serial, "rows"), std::invalid_argument);
+    CHECK_THROWS_AS(variant_name(BackendType::Serial, "v1"), std::invalid_argument);
     CHECK_THROWS_AS(variant_name(BackendType::OpenMP, "fused"), std::invalid_argument);
 }

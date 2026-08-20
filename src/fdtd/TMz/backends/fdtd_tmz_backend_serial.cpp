@@ -169,9 +169,8 @@ namespace fdtd::TMz::backends::serial
     }
 
     // Start with no parts.
-    Partition::Partition(const Grid &grid)
-        : m_nx(grid.nx())
-        , m_offsets{0}
+    Partition::Partition()
+        : m_offsets{0}
     {
         // Empty.
     }
@@ -188,7 +187,7 @@ namespace fdtd::TMz::backends::serial
         if (tileX == 0 || tileY == 0) {
             throw std::invalid_argument("Partition: tile sides must be positive");
         }
-        Partition partition(grid);
+        Partition partition;
         partition.m_tile_x = tileX;
         partition.m_tile_y = tileY;
         partition.m_tiles_x = (grid.nx() + tileX - 1) / tileX;
@@ -203,48 +202,6 @@ namespace fdtd::TMz::backends::serial
                 });
                 partition.close_part();
             }
-        }
-        return partition;
-    }
-
-    // Cut the row-major cells into even ranges, each a partial row, whole rows and a partial row.
-    Partition Partition::ranges(const Grid &grid, std::size_t parts)
-    {
-        if (parts == 0) {
-            throw std::invalid_argument("Partition: the part count must be positive");
-        }
-        const std::size_t nx = grid.nx();
-        const std::size_t cells = nx * grid.ny();
-        Partition partition(grid);
-        for (std::size_t p = 0; p < parts; ++p) {
-            const std::size_t begin = p * cells / parts;
-            const std::size_t end = (p + 1) * cells / parts;
-            partition.m_starts.push_back(begin);
-            std::size_t row = begin / nx;
-            const std::size_t col = begin % nx;
-            const std::size_t lastRow = end / nx;
-            const std::size_t lastCol = end % nx;
-            if (begin == end) {
-                partition.close_part();
-                continue;
-            }
-            if (row == lastRow) {
-                partition.m_blocks.push_back({.i0 = col, .i1 = lastCol, .j0 = row, .j1 = row + 1});
-                partition.close_part();
-                continue;
-            }
-            if (col > 0) {
-                partition.m_blocks.push_back({.i0 = col, .i1 = nx, .j0 = row, .j1 = row + 1});
-                ++row;
-            }
-            if (lastRow > row) {
-                partition.m_blocks.push_back({.i0 = 0, .i1 = nx, .j0 = row, .j1 = lastRow});
-            }
-            if (lastCol > 0) {
-                partition.m_blocks.push_back(
-                    {.i0 = 0, .i1 = lastCol, .j0 = lastRow, .j1 = lastRow + 1});
-            }
-            partition.close_part();
         }
         return partition;
     }
@@ -268,15 +225,10 @@ namespace fdtd::TMz::backends::serial
         return std::span(m_blocks).subspan(first, m_offsets[part + 1] - first);
     }
 
-    // Find the tile of the cell, or the last range that starts at or before it.
+    // Find the tile of the cell.
     std::size_t Partition::owner(std::size_t i, std::size_t j) const noexcept
     {
-        if (m_tile_x > 0) {
-            return (j / m_tile_y) * m_tiles_x + i / m_tile_x;
-        }
-        const std::size_t cell = j * m_nx + i;
-        const auto it = std::upper_bound(m_starts.begin(), m_starts.end(), cell);
-        return static_cast<std::size_t>(it - m_starts.begin()) - 1;
+        return (j / m_tile_y) * m_tiles_x + i / m_tile_x;
     }
 
     // Return the tile column count.
@@ -322,6 +274,36 @@ namespace fdtd::TMz::backends::serial
                 field_of(m_fields, point.component)[point.index] += row[k];
             }
         }
+    }
+
+    // Return the fields.
+    Fields &Stepper::fields() const noexcept
+    {
+        return m_fields;
+    }
+
+    // Return the coefficient view.
+    CoeffsView Stepper::coeffs() const noexcept
+    {
+        return m_coeffs;
+    }
+
+    // Return the PML thickness.
+    std::size_t Stepper::pml() const noexcept
+    {
+        return m_pml;
+    }
+
+    // Return the boundary.
+    Boundary Stepper::boundary() const noexcept
+    {
+        return m_boundary;
+    }
+
+    // Return the partition.
+    const Partition &Stepper::partition() const noexcept
+    {
+        return m_partition;
     }
 
     // Copy the part's probe values of step n into the records.

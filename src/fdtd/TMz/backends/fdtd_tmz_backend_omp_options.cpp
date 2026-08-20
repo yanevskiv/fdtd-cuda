@@ -20,10 +20,13 @@
 // Class declarations.
 #include "fdtd/TMz/backends/fdtd_tmz_backend_omp_options.h"
 
-// Standard library for string building and errors.
+// Standard library for sizes, string building, errors and pairs.
+#include <cstddef>
 #include <sstream>
 #include <stdexcept>
 #include <string>
+#include <string_view>
+#include <utility>
 
 // Namespace for the 2D TMz backends.
 namespace fdtd::TMz::backends
@@ -41,86 +44,56 @@ namespace fdtd::TMz::backends
             throw std::invalid_argument(message.str());
         }
 
-        // Name a schedule.
-        std::string_view schedule_name(OmpSchedule schedule) noexcept
-        {
-            switch (schedule) {
-                case OmpSchedule::Rows:
-                    return "rows";
-                case OmpSchedule::Collapse2:
-                    break;
-            }
-            return "collapse2";
-        }
+        // The levels in order, with their names.
+        constexpr std::pair<OmpLevel, std::string_view> LEVELS[] = {
+            {OmpLevel::V1, "v1"},
+            {OmpLevel::V2, "v2"},
+            {OmpLevel::V3, "v3"},
+            {OmpLevel::V4, "v4"},
+        };
     }
 
-    // Split off the suffixes, then read the schedule.
+    // Read the level, then the suffix.
     OmpOptions OmpOptions::parse(std::string_view variant)
     {
         OmpOptions parsed;
         if (variant == "default") {
             return parsed;
         }
-        const std::string_view head = variant.substr(0, variant.find('+'));
-        std::string_view suffixes = variant.substr(head.size());
-        bool simd = false;
-        bool table = false;
-        bool fuse = false;
-        bool phase = false;
-        OmpBind bind = OmpBind::Default;
-        while (!suffixes.empty()) {
-            suffixes.remove_prefix(1);
-            const std::string_view suffix = suffixes.substr(0, suffixes.find('+'));
-            suffixes.remove_prefix(suffix.size());
-            if (suffix == "simd" && !simd) {
-                simd = true;
-            } else if (suffix == "table" && !table) {
-                table = true;
-            } else if (suffix == "fuse" && !fuse) {
-                fuse = true;
-            } else if (suffix == "phase" && !phase) {
-                phase = true;
-            } else if (suffix == "close" && bind == OmpBind::Default) {
-                bind = OmpBind::Close;
-            } else if (suffix == "spread" && bind == OmpBind::Default) {
-                bind = OmpBind::Spread;
-            } else {
-                malformed(variant,
-                          "expected +simd, +table, +fuse, +phase and one of +close or +spread");
+        const std::size_t plus = variant.find('+');
+        const std::string_view head = variant.substr(0, plus);
+        bool known = false;
+        for (const auto &[level, name] : LEVELS) {
+            if (head == name) {
+                parsed.level = level;
+                known = true;
             }
         }
-        parsed.bind = bind;
-        parsed.simd = simd;
-        parsed.table = table;
-        parsed.fuse = fuse;
-        parsed.region = phase ? OmpRegion::Phase : OmpRegion::Run;
-
-        if (head == "rows") {
-            parsed.schedule = OmpSchedule::Rows;
-        } else if (head == "collapse2") {
-            parsed.schedule = OmpSchedule::Collapse2;
+        if (!known) {
+            malformed(variant, "expected v1, v2, v3 or v4");
+        }
+        if (plus == std::string_view::npos) {
+            return parsed;
+        }
+        const std::string_view suffix = variant.substr(plus + 1);
+        if (suffix == "close") {
+            parsed.bind = OmpBind::Close;
+        } else if (suffix == "spread") {
+            parsed.bind = OmpBind::Spread;
         } else {
-            malformed(variant, "expected rows or collapse2");
+            malformed(variant, "expected +close or +spread, once");
         }
         return parsed;
     }
 
-    // Write the schedule, then the suffixes.
+    // Write the level, then the suffix.
     std::string OmpOptions::name() const
     {
         std::ostringstream text;
-        text << schedule_name(schedule);
-        if (simd) {
-            text << "+simd";
-        }
-        if (table) {
-            text << "+table";
-        }
-        if (fuse) {
-            text << "+fuse";
-        }
-        if (region == OmpRegion::Phase) {
-            text << "+phase";
+        for (const auto &[value, name] : LEVELS) {
+            if (value == level) {
+                text << name;
+            }
         }
         if (bind == OmpBind::Close) {
             text << "+close";

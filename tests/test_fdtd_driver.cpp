@@ -119,10 +119,10 @@ TEST_CASE("Driver parses the PML options", "[unit][driver]")
 // Verify the OpenMP thread count and variant.
 TEST_CASE("Driver parses the OpenMP options", "[unit][driver]")
 {
-    const auto options = parse({"--backend", "openmp", "--threads", "3", "--variant=rows+simd"});
+    const auto options = parse({"--backend", "openmp", "--threads", "3", "--variant=v2"});
     CHECK(options.backend == BackendType::OpenMP);
     CHECK(options.threads == 3);
-    CHECK(options.variant == "rows+simd");
+    CHECK(options.variant == "v2");
 }
 
 // Verify a CUDA variant, given before or after the backend.
@@ -153,8 +153,8 @@ TEST_CASE("Driver rejects bad arguments", "[unit][driver]")
     CHECK_THROWS_AS(parse({"--backend", "gpu"}), std::invalid_argument);
     CHECK_THROWS_AS(parse({"--threads", "two"}), std::invalid_argument);
     CHECK_THROWS_AS(parse({"--variant", "fast"}), std::invalid_argument);
-    CHECK_THROWS_AS(parse({"--variant", "rows:4x4"}), std::invalid_argument);
-    CHECK_THROWS_AS(parse({"--variant", "rows"}), std::invalid_argument);
+    CHECK_THROWS_AS(parse({"--variant", "v2:4x4"}), std::invalid_argument);
+    CHECK_THROWS_AS(parse({"--variant", "v1"}), std::invalid_argument);
     CHECK_THROWS_AS(parse({"--variant", "fused", "--backend", "openmp"}), std::invalid_argument);
     CHECK_THROWS_AS(parse({"--backend", "cuda", "--variant", "tiles"}), std::invalid_argument);
     CHECK_THROWS_AS(parse({"--output="}), std::invalid_argument);
@@ -237,11 +237,11 @@ TEST_CASE("Driver smoke run on OpenMP", "[unit][driver][openmp]")
     std::ostringstream log;
     fdtd::run_driver(options, log);
     options = parse({"--nx", "32", "--steps", "20", "--probe", "20,16", "--backend", "openmp",
-                     "--threads", "2", "--variant", "collapse2"});
+                     "--threads", "2", "--variant", "v1"});
     options.output = dir / "openmp";
     fdtd::run_driver(options, log);
 
-    CHECK(log.str().find("on openmp (collapse2, 2 threads)") != std::string::npos);
+    CHECK(log.str().find("on openmp (v1, 2 threads)") != std::string::npos);
     std::ifstream serial(dir / "serial" / "probe_0.csv");
     std::ifstream openmp(dir / "openmp" / "probe_0.csv");
     std::ostringstream a;

@@ -107,7 +107,7 @@ TEST_CASE("Simulation keeps the backend settings", "[unit][simulation]")
     CHECK(sim.options().variant == "default");
     CHECK(sim.options().threads == 2);
 
-    opts.variant = "collapse2";
+    opts.variant = "v1";
     CHECK_THROWS_AS(Simulation(8, 8, opts), std::invalid_argument);
 }
 

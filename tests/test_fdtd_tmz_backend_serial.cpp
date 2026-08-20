@@ -51,7 +51,6 @@ using fdtd::TMz::backends::serial::Block;
 using fdtd::TMz::backends::serial::CoeffsView;
 using fdtd::TMz::backends::serial::interior_block;
 using fdtd::TMz::backends::serial::intersect;
-using fdtd::TMz::backends::serial::LoopKind;
 using fdtd::TMz::backends::serial::Partition;
 using fdtd::TMz::backends::serial::Stepper;
 using fdtd::TMz::backends::serial::update_boundary_block;
@@ -436,17 +435,16 @@ namespace
                std::equal(a.ezy().begin(), a.ezy().end(), b.ezy().begin());
     }
 
-    // Run steps over the whole grid, or block by block, with plain or SIMD loops.
-    template <LoopKind Loop>
+    // Run steps over the whole grid, or block by block.
     void run_blocks(Fields &fields, const Coeffs &coeffs, const std::vector<Block> &blocks,
                     std::size_t pml, Boundary boundary, int nsteps)
     {
         for (int n = 0; n < nsteps; ++n) {
             for (const Block &block : blocks) {
-                update_h_block<Loop>(fields, coeffs, block);
+                update_h_block(fields, coeffs, block);
             }
             for (const Block &block : blocks) {
-                update_e_block<Loop>(fields, coeffs, block, pml, boundary);
+                update_e_block(fields, coeffs, block, pml, boundary);
             }
         }
     }
@@ -503,15 +501,11 @@ TEST_CASE("Block updates match the whole-grid update", "[unit][block]")
     fill_bounded(whole);
     Fields blocked(grid);
     fill_bounded(blocked);
-    Fields simd(grid);
-    fill_bounded(simd);
 
-    run_blocks<LoopKind::Plain>(whole, coeffs, {whole_block(grid)}, pml, boundary, 4);
-    run_blocks<LoopKind::Plain>(blocked, coeffs, cut(grid, w, h), pml, boundary, 4);
-    run_blocks<LoopKind::Simd>(simd, coeffs, cut(grid, w, h), pml, boundary, 4);
+    run_blocks(whole, coeffs, {whole_block(grid)}, pml, boundary, 4);
+    run_blocks(blocked, coeffs, cut(grid, w, h), pml, boundary, 4);
 
     CHECK(same_fields(whole, blocked));
-    CHECK(same_fields(whole, simd));
 }
 
 // Verify that the edge update changes only the edge cells of its block.
@@ -544,8 +538,8 @@ TEST_CASE("Block updates on degenerate grids", "[unit][block]")
     Fields blocked(grid);
     fill_bounded(blocked);
 
-    run_blocks<LoopKind::Plain>(whole, coeffs, {whole_block(grid)}, 0, Boundary::Pmc, 3);
-    run_blocks<LoopKind::Plain>(blocked, coeffs, cut(grid, 1, 1), 0, Boundary::Pmc, 3);
+    run_blocks(whole, coeffs, {whole_block(grid)}, 0, Boundary::Pmc, 3);
+    run_blocks(blocked, coeffs, cut(grid, 1, 1), 0, Boundary::Pmc, 3);
 
     CHECK(same_fields(whole, blocked));
 }
@@ -606,37 +600,12 @@ TEST_CASE("Tiles cover the grid", "[unit][partition]")
     check_cover(partition, grid);
 }
 
-// Verify that ranges cover the grid in order with at most three blocks and even sizes.
-TEST_CASE("Ranges cover the grid", "[unit][partition]")
-{
-    const auto parts =
-        GENERATE(std::size_t(1), std::size_t(3), std::size_t(7), std::size_t(16), std::size_t(200));
-    const Grid grid(13, 11);
-    const Partition partition = Partition::ranges(grid, parts);
-    REQUIRE(partition.size() == parts);
-    CHECK(partition.tiles_x() == 0);
-    std::size_t next = 0;
-    for (std::size_t p = 0; p < parts; ++p) {
-        CHECK(partition.blocks(p).size() <= 3);
-        std::size_t cells = 0;
-        for (const Block &block : partition.blocks(p)) {
-            CHECK(block.j0 * 13 + block.i0 == next + cells);
-            cells += (block.i1 - block.i0) * (block.j1 - block.j0);
-        }
-        CHECK(cells == (p + 1) * 143 / parts - p * 143 / parts);
-        next += cells;
-    }
-    CHECK(next == 143);
-    check_cover(partition, grid);
-}
-
-// Verify that empty tiles and no parts are rejected.
+// Verify that empty tiles are rejected.
 TEST_CASE("Partitions reject empty pieces", "[unit][partition]")
 {
     const Grid grid(4, 4);
     CHECK_THROWS_AS(Partition::tiles(grid, 0, 2), std::invalid_argument);
     CHECK_THROWS_AS(Partition::tiles(grid, 2, 0), std::invalid_argument);
-    CHECK_THROWS_AS(Partition::ranges(grid, 0), std::invalid_argument);
 }
 
 // Helpers private to this file.
@@ -708,7 +677,7 @@ TEST_CASE("Stepper over parts matches the whole grid", "[unit][stepper]")
 
     CHECK(same_run(whole, run_parts(grid, Partition::tiles(grid, grid.nx(), 1), boundary)));
     CHECK(same_run(whole, run_parts(grid, Partition::tiles(grid, 5, 4), boundary)));
-    CHECK(same_run(whole, run_parts(grid, Partition::ranges(grid, 6), boundary)));
+    CHECK(same_run(whole, run_parts(grid, Partition::tiles(grid, 1, 1), boundary)));
 }
 
 // Verify that the records are step-major, a repeated probe twice, and the sources land.

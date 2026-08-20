@@ -53,7 +53,12 @@ target_compile_definitions(fdtd PUBLIC
     FDTD_EXACT=$<BOOL:${FDTD_EXACT}>)
 target_link_libraries(fdtd PRIVATE $<BUILD_INTERFACE:fdtd_warnings>)
 if(FDTD_WITH_OPENMP)
-    target_sources(fdtd PRIVATE src/fdtd/TMz/backends/fdtd_tmz_backend_omp.cpp)
+    target_sources(fdtd PRIVATE
+        src/fdtd/TMz/backends/fdtd_tmz_backend_omp.cpp
+        src/fdtd/TMz/backends/omp/fdtd_tmz_backend_omp_v1.cpp
+        src/fdtd/TMz/backends/omp/fdtd_tmz_backend_omp_v2.cpp
+        src/fdtd/TMz/backends/omp/fdtd_tmz_backend_omp_v3.cpp
+        src/fdtd/TMz/backends/omp/fdtd_tmz_backend_omp_v4.cpp)
     target_link_libraries(fdtd PRIVATE OpenMP::OpenMP_CXX)
 endif()
 if(FDTD_WITH_CUDA)

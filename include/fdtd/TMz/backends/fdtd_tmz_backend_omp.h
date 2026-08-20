@@ -22,6 +22,7 @@
 
 #include "fdtd/TMz/backends/fdtd_tmz_backend_omp_options.h"
 #include "fdtd/TMz/backends/fdtd_tmz_backend_serial.h"
+#include "fdtd/TMz/backends/omp/fdtd_tmz_backend_omp_levels.h"
 #include "fdtd/TMz/fdtd_tmz_backend.h"
 #include "fdtd/TMz/fdtd_tmz_coeffs.h"
 
@@ -39,32 +40,12 @@ namespace fdtd
         /** Namespace for the 2D TMz backends. */
         namespace backends
         {
-            /** Namespace for what the 2D TMz OpenMP backend keeps on its own. */
-            namespace omp
-            {
-                /**
-                 * The one tuple every cell of the core of an interior holds, compared bit by bit.
-                 *
-                 * The core is the interior less its last column and row, where Hy and Hx sit half a
-                 * cell into the PML and take its grading.
-                 *
-                 * @param coeffs Coefficients to read.
-                 * @param lo Lower bound of the interior along both axes: the core holds the cells
-                 *        with lo <= i < nx - lo - 1 and lo <= j < ny - lo - 1.
-                 * @return The tuple, or none when the core is empty, or two of its cells differ, or
-                 *         a cell's Ez pairs along x and y differ.
-                 */
-                std::optional<serial::CoeffTuple> core_tuple(const Coeffs &coeffs, std::size_t lo);
-            }
-
             /**
-             * Multi-threaded CPU backend: the serial stencil, its parts shared among threads.
+             * Multi-threaded CPU backend: the serial algorithm with its rows shared among threads.
              *
-             * The schedule of the options picks the partition and how its parts reach the
-             * threads: static loops over rows or ranges, or, with fuse, one sweep of
-             * each thread's band of rows per step. The region, SIMD and table settings are compiled
-             * in as template instances and picked when the run starts. The arithmetic per cell is
-             * the serial backend's.
+             * The level of the options picks the code that runs an advance, one file each in
+             * `backends/omp/`; see the omp namespace. Every level matches serial within the
+             * tolerance, and bit for bit in the exact build.
              */
             class OmpBackend final : public SerialBackend
             {
@@ -74,8 +55,6 @@ namespace fdtd
                  *
                  * @param grid Grid the backend works on.
                  * @param options Settings of the backend.
-                 * @throws std::invalid_argument When fuse is set with a
-                 * schedule other than Rows or a region per phase.
                  */
                 OmpBackend(const Grid &grid, const OmpOptions &options);
 
@@ -83,8 +62,8 @@ namespace fdtd
                 using SerialBackend::upload;
 
                 /**
-                 * Copy update coefficients into the backend, and with table find the tuple
-                 * the core cells share, with the PML of the coefficients in force and with none.
+                 * Copy update coefficients into the backend, and from level v3 find the tuple the
+                 * core cells share, with the PML of the coefficients in force and with none.
                  *
                  * @param coeffs Coefficients on the backend's grid.
                  */
@@ -119,17 +98,17 @@ namespace fdtd
                 std::size_t threads() const noexcept;
 
                 /**
-                 * Modelled traffic of one step: one pass with fuse, two otherwise, and the
-                 * core reading no arrays when table finds a tuple it shares.
+                 * Modelled traffic of one step: one pass at v4, two below, and the core reading
+                 * no arrays from v3 when it shares a tuple.
                  *
                  * @return two_pass_traffic() of the grid, the active PML, the boundary and the
-                 *         model of the options.
+                 *         model of the level.
                  */
                 StepTraffic step_traffic() const noexcept override;
 
             protected:
                 /**
-                 * Advance the fields and add the sources, part by part on the threads.
+                 * Advance the fields and add the sources at the level of the options.
                  *
                  * @param nsteps Number of time steps.
                  * @param points Distinct cells inside the grid.
@@ -140,20 +119,12 @@ namespace fdtd
 
             private:
                 /**
-                 * Tuple the core cells share under the boundary in force, with table.
+                 * Tuple the core cells share under the boundary in force, from level v3.
                  *
-                 * @return The tuple, or empty when the core does not share one or the option is
-                 *         off.
+                 * @return The tuple and its core, or none when the core shares no tuple or the
+                 *         level is below v3.
                  */
-                const std::optional<serial::CoeffTuple> &uniform_tuple() const noexcept;
-
-                /**
-                 * View of the coefficient arrays, with the uniform tuple and its core when there
-                 * is one.
-                 *
-                 * @return The view the stepper reads.
-                 */
-                serial::CoeffsView stepper_coeffs() const noexcept;
+                const std::optional<omp::SharedTuple> &shared_tuple() const noexcept;
 
                 /** Settings of the backend. */
                 OmpOptions m_options;
@@ -161,14 +132,14 @@ namespace fdtd
                 /** Thread count of the runs. */
                 std::size_t m_threads;
 
-                /** Parts the threads share. */
+                /** The rows of the grid, one part each. */
                 serial::Partition m_partition;
 
                 /** Tuple the core cells share with the PML of the coefficients in force. */
-                std::optional<serial::CoeffTuple> m_uniform_pml;
+                std::optional<omp::SharedTuple> m_shared_pml;
 
                 /** Tuple the core cells share with no PML in force. */
-                std::optional<serial::CoeffTuple> m_uniform_plain;
+                std::optional<omp::SharedTuple> m_shared_plain;
             };
 
             /** Result of the STREAM triad. */

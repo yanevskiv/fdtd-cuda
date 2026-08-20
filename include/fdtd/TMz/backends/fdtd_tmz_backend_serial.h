@@ -46,25 +46,6 @@ namespace fdtd
             /** Namespace for the serial FDTD algorithm, which the OpenMP backend runs in parts. */
             namespace serial
             {
-                /** How the inner loops of the stencil run. */
-                enum class LoopKind {
-                    /** Plain loops. */
-                    Plain,
-
-                    /** Loops that carry `omp simd` when OpenMP is enabled. */
-                    Simd
-                };
-
-                /** Where the core cells read their coefficients. */
-                enum class CoeffSource {
-                    /** The per-cell arrays. */
-                    Arrays,
-
-                    /** The view's uniform tuple when it has one, the arrays otherwise; the
-                     * values are the same. */
-                    Table
-                };
-
                 /** Fields a set of sources adds to. */
                 enum class SourceField {
                     /** Ez. */
@@ -101,37 +82,10 @@ namespace fdtd
                 };
 
                 /**
-                 * The update coefficients of a cell whose Ez takes the same pair along x and y, as
-                 * every cell outside the PML does: the pairs of Ez, Hx and Hy.
-                 */
-                struct CoeffTuple
-                {
-                    /** Ez decay factor, along x and y alike. */
-                    FloatType ez_1;
-
-                    /** Ez curl factor, along x and y alike, before 1/dx or 1/dy. */
-                    FloatType ez_2;
-
-                    /** Hx decay factor. */
-                    FloatType hx_1;
-
-                    /** Hx curl factor, before 1/dy. */
-                    FloatType hx_2;
-
-                    /** Hy decay factor. */
-                    FloatType hy_1;
-
-                    /** Hy curl factor, before 1/dx. */
-                    FloatType hy_2;
-                };
-
-                /**
-                 * Pointers to the eight coefficient arrays the update kernels read, and the tuple
-                 * that stands in for them on the core cells when the kernels are told to use it.
+                 * Pointers to the eight coefficient arrays the update kernels read.
                  *
                  * The kernels take these rather than a Coeffs so a backend can keep its own
-                 * arrays, as a GPU backend keeps device arrays. A Coeffs converts implicitly,
-                 * with no tuple.
+                 * arrays. A Coeffs converts implicitly.
                  */
                 struct CoeffsView
                 {
@@ -182,14 +136,6 @@ namespace fdtd
 
                     /** Hy curl factors, before 1/dx. */
                     const FloatType *coeff_hy_2;
-
-                    /** Tuple every cell of core holds in the arrays, which the kernels built with
-                     * Table read there instead; null for none. */
-                    const CoeffTuple *uniform = nullptr;
-
-                    /** Cells that read uniform: the core of the interior, the interior less its
-                     * last column and row, where Hy and Hx sit half a cell into the PML. */
-                    Block core = {};
                 };
 
                 /**
@@ -226,77 +172,6 @@ namespace fdtd
                 }
 
                 /**
-                 * Call a body for every index of a range, as one `omp simd` loop with
-                 * LoopKind::Simd when OpenMP is enabled.
-                 *
-                 * @tparam Loop How the loop runs.
-                 * @tparam Body Callable taking the index.
-                 * @param begin First index.
-                 * @param end One past the last index.
-                 * @param body Body of the loop, free of dependences between indices.
-                 */
-                template <LoopKind Loop, typename Body>
-                inline void for_range(std::size_t begin, std::size_t end, Body body) noexcept
-                {
-                    if constexpr (Loop == LoopKind::Simd) {
-#ifdef _OPENMP
-#pragma omp simd
-#endif
-                        for (std::size_t i = begin; i < end; ++i) {
-                            body(i);
-                        }
-                    } else {
-                        for (std::size_t i = begin; i < end; ++i) {
-                            body(i);
-                        }
-                    }
-                }
-
-                /**
-                 * Call one of two bodies for every index of a row: the tuple body on the cells of
-                 * the view's core when it has a uniform tuple and Source is CoeffSource::Table, the
-                 * arrays body on the others.
-                 *
-                 * @tparam Loop How the loops run.
-                 * @tparam Source Whether the core takes the tuple body, with CoeffSource::Table.
-                 * @tparam Arrays Callable taking the index, reading the arrays.
-                 * @tparam Tuple Callable taking the index, reading the uniform tuple.
-                 * @param coeffs Coefficients, with the uniform tuple and its core.
-                 * @param j Row of the indices.
-                 * @param begin First index.
-                 * @param end One past the last index.
-                 * @param arrays Body for the cells that read the arrays.
-                 * @param tuple Body for the cells that read the tuple.
-                 */
-                template <LoopKind Loop, CoeffSource Source, typename Arrays, typename Tuple>
-                inline void for_row(const CoeffsView &coeffs, std::size_t j, std::size_t begin,
-                                    std::size_t end, Arrays arrays, Tuple tuple) noexcept
-                {
-                    const Block &core = coeffs.core;
-                    if (Source == CoeffSource::Table && coeffs.uniform != nullptr && j >= core.j0 &&
-                        j < core.j1) {
-                        const std::size_t first = std::min(std::max(core.i0, begin), end);
-                        const std::size_t last = std::min(std::max(core.i1, first), end);
-                        for_range<Loop>(begin, first, arrays);
-                        for_range<Loop>(first, last, tuple);
-                        for_range<Loop>(last, end, arrays);
-                        return;
-                    }
-                    for_range<Loop>(begin, end, arrays);
-                }
-
-                /**
-                 * The uniform tuple of a view, or zeros when it has none.
-                 *
-                 * @param coeffs Coefficients to read.
-                 * @return A copy of the tuple.
-                 */
-                inline CoeffTuple uniform_or_zero(const CoeffsView &coeffs) noexcept
-                {
-                    return coeffs.uniform != nullptr ? *coeffs.uniform : CoeffTuple{};
-                }
-
-                /**
                  * Advance Hx and Hy over a block by one step from the differences of Ez.
                  *
                  * With Hx(i, j) at (i, j + 1/2) and Hy(i, j) at (i + 1/2, j):
@@ -307,13 +182,10 @@ namespace fdtd
                  * with the coefficients of cell (i, j). Hx on the last row and Hy on the last
                  * column lie outside the domain and are left untouched. Inner loop along x.
                  *
-                 * @tparam Loop How the inner loops run.
-                 * @tparam Source Where the core cells read their coefficients.
                  * @param fields Fields to update.
                  * @param coeffs Coefficient arrays on the same grid as the fields.
                  * @param block Cells to update, inside the grid.
                  */
-                template <LoopKind Loop = LoopKind::Plain, CoeffSource Source = CoeffSource::Arrays>
                 inline void update_h_block(Fields &fields, CoeffsView coeffs,
                                            const Block &block) noexcept
                 {
@@ -331,36 +203,21 @@ namespace fdtd
                     const FloatType *__restrict Chx2 = coeffs.coeff_hx_2;
                     const FloatType *__restrict Chy1 = coeffs.coeff_hy_1;
                     const FloatType *__restrict Chy2 = coeffs.coeff_hy_2;
-                    const CoeffTuple tuple = uniform_or_zero(coeffs);
 
                     for (std::size_t j = block.j0; j < hxEnd; ++j) {
                         const std::size_t row = j * pitch;
-                        for_row<Loop, Source>(
-                            coeffs, j, block.i0, block.i1,
-                            [=](std::size_t i) {
-                                const std::size_t k = row + i;
-                                Hx[k] = Chx1[k] * Hx[k] - Chx2[k] * invDy * (Ez[k + pitch] - Ez[k]);
-                            },
-                            [=](std::size_t i) {
-                                const std::size_t k = row + i;
-                                Hx[k] = tuple.hx_1 * Hx[k] -
-                                        tuple.hx_2 * invDy * (Ez[k + pitch] - Ez[k]);
-                            });
+                        for (std::size_t i = block.i0; i < block.i1; ++i) {
+                            const std::size_t k = row + i;
+                            Hx[k] = Chx1[k] * Hx[k] - Chx2[k] * invDy * (Ez[k + pitch] - Ez[k]);
+                        }
                     }
 
                     for (std::size_t j = block.j0; j < block.j1; ++j) {
                         const std::size_t row = j * pitch;
-                        for_row<Loop, Source>(
-                            coeffs, j, block.i0, hyEnd,
-                            [=](std::size_t i) {
-                                const std::size_t k = row + i;
-                                Hy[k] = Chy1[k] * Hy[k] + Chy2[k] * invDx * (Ez[k + 1] - Ez[k]);
-                            },
-                            [=](std::size_t i) {
-                                const std::size_t k = row + i;
-                                Hy[k] =
-                                    tuple.hy_1 * Hy[k] + tuple.hy_2 * invDx * (Ez[k + 1] - Ez[k]);
-                            });
+                        for (std::size_t i = block.i0; i < hyEnd; ++i) {
+                            const std::size_t k = row + i;
+                            Hy[k] = Chy1[k] * Hy[k] + Chy2[k] * invDx * (Ez[k + 1] - Ez[k]);
+                        }
                     }
                 }
 
@@ -394,14 +251,11 @@ namespace fdtd
                  * equal the y ones there. With no PML that is the whole interior. The PML is left
                  * to update_pml_block, the edge Ez to update_boundary_block. Inner loop along x.
                  *
-                 * @tparam Loop How the inner loop runs.
-                 * @tparam Source Where the core cells read their coefficients.
                  * @param fields Fields to update.
                  * @param coeffs Coefficient arrays on the same grid as the fields.
                  * @param block Cells to update, inside the grid.
                  * @param pml PML thickness in cells, zero for none.
                  */
-                template <LoopKind Loop = LoopKind::Plain, CoeffSource Source = CoeffSource::Arrays>
                 inline void update_e_interior_block(Fields &fields, CoeffsView coeffs,
                                                     const Block &block, std::size_t pml) noexcept
                 {
@@ -419,36 +273,25 @@ namespace fdtd
                     const FloatType *__restrict Hy = fields.hy().data();
                     const FloatType *__restrict Cex1 = coeffs.coeff_ez_x1;
                     const FloatType *__restrict Cex2 = coeffs.coeff_ez_x2;
-                    const CoeffTuple tuple = uniform_or_zero(coeffs);
 
                     for (std::size_t j = cells.j0; j < cells.j1; ++j) {
                         const std::size_t row = j * pitch;
-                        for_row<Loop, Source>(
-                            coeffs, j, cells.i0, cells.i1,
-                            [=](std::size_t i) {
-                                const std::size_t k = row + i;
-                                const FloatType curl =
-                                    (Hy[k] - Hy[k - 1]) * invDx - (Hx[k] - Hx[k - pitch]) * invDy;
-                                Ez[k] = Cex1[k] * Ez[k] + Cex2[k] * curl;
-                            },
-                            [=](std::size_t i) {
-                                const std::size_t k = row + i;
-                                const FloatType curl =
-                                    (Hy[k] - Hy[k - 1]) * invDx - (Hx[k] - Hx[k - pitch]) * invDy;
-                                Ez[k] = tuple.ez_1 * Ez[k] + tuple.ez_2 * curl;
-                            });
+                        for (std::size_t i = cells.i0; i < cells.i1; ++i) {
+                            const std::size_t k = row + i;
+                            const FloatType curl =
+                                (Hy[k] - Hy[k - 1]) * invDx - (Hx[k] - Hx[k - pitch]) * invDy;
+                            Ez[k] = Cex1[k] * Ez[k] + Cex2[k] * curl;
+                        }
                     }
                 }
 
                 /**
                  * Advance Ezx and Ezy over a rectangle of non-edge cells, and Ez as their sum.
                  *
-                 * @tparam Loop How the inner loop runs.
                  * @param fields Fields to update.
                  * @param coeffs Coefficient arrays on the same grid as the fields.
                  * @param cells Cells to update, off the edge.
                  */
-                template <LoopKind Loop = LoopKind::Plain>
                 inline void update_split_rect(Fields &fields, CoeffsView coeffs,
                                               const Block &cells) noexcept
                 {
@@ -472,12 +315,12 @@ namespace fdtd
 
                     for (std::size_t j = cells.j0; j < cells.j1; ++j) {
                         const std::size_t row = j * pitch;
-                        for_range<Loop>(cells.i0, cells.i1, [=](std::size_t i) {
+                        for (std::size_t i = cells.i0; i < cells.i1; ++i) {
                             const std::size_t k = row + i;
                             Ezx[k] = Cex1[k] * Ezx[k] + Cex2[k] * invDx * (Hy[k] - Hy[k - 1]);
                             Ezy[k] = Cey1[k] * Ezy[k] - Cey2[k] * invDy * (Hx[k] - Hx[k - pitch]);
                             Ez[k] = Ezx[k] + Ezy[k];
-                        });
+                        }
                     }
                 }
 
@@ -495,13 +338,11 @@ namespace fdtd
                  * rebuilt from its parts each step, so fields put in by hand keep Ez = Ezx + Ezy
                  * inside the PML. Inner loop along x.
                  *
-                 * @tparam Loop How the inner loops run.
                  * @param fields Fields to update.
                  * @param coeffs Coefficient arrays on the same grid as the fields.
                  * @param block Cells to update, inside the grid.
                  * @param pml PML thickness in cells, with 2 pml below nx and ny; zero for none.
                  */
-                template <LoopKind Loop = LoopKind::Plain>
                 inline void update_pml_block(Fields &fields, CoeffsView coeffs, const Block &block,
                                              std::size_t pml) noexcept
                 {
@@ -514,10 +355,10 @@ namespace fdtd
                     const Block top{.i0 = 1, .i1 = nx - 1, .j0 = ny - pml, .j1 = ny - 1};
                     const Block left{.i0 = 1, .i1 = pml, .j0 = pml, .j1 = ny - pml};
                     const Block right{.i0 = nx - pml, .i1 = nx - 1, .j0 = pml, .j1 = ny - pml};
-                    update_split_rect<Loop>(fields, coeffs, intersect(block, bottom));
-                    update_split_rect<Loop>(fields, coeffs, intersect(block, top));
-                    update_split_rect<Loop>(fields, coeffs, intersect(block, left));
-                    update_split_rect<Loop>(fields, coeffs, intersect(block, right));
+                    update_split_rect(fields, coeffs, intersect(block, bottom));
+                    update_split_rect(fields, coeffs, intersect(block, top));
+                    update_split_rect(fields, coeffs, intersect(block, left));
+                    update_split_rect(fields, coeffs, intersect(block, right));
                 }
 
                 /**
@@ -540,20 +381,17 @@ namespace fdtd
                 /**
                  * Advance every Ez of a block by one step: the interior, the PML and the edge.
                  *
-                 * @tparam Loop How the inner loops run.
-                 * @tparam Source Where the core cells read their coefficients.
                  * @param fields Fields to update.
                  * @param coeffs Coefficient arrays on the same grid as the fields.
                  * @param block Cells to update, inside the grid.
                  * @param pml PML thickness in cells, zero for none.
                  * @param boundary Outer boundary condition.
                  */
-                template <LoopKind Loop = LoopKind::Plain, CoeffSource Source = CoeffSource::Arrays>
                 inline void update_e_block(Fields &fields, CoeffsView coeffs, const Block &block,
                                            std::size_t pml, Boundary boundary) noexcept
                 {
-                    update_e_interior_block<Loop, Source>(fields, coeffs, block, pml);
-                    update_pml_block<Loop>(fields, coeffs, block, pml);
+                    update_e_interior_block(fields, coeffs, block, pml);
+                    update_pml_block(fields, coeffs, block, pml);
                     update_boundary_block(fields, coeffs, block, boundary);
                 }
 
@@ -562,9 +400,7 @@ namespace fdtd
                  * part.
                  *
                  * A part is the unit of work a backend hands to a thread or a task. Tiles are a
-                 * regular cut, rows being tiles of nx by 1, and know their neighbours; ranges are
-                 * contiguous runs of cells in row-major order, a partial row, whole rows and a
-                 * partial row.
+                 * regular cut, rows being tiles of nx by 1, and know their neighbours.
                  */
                 class Partition
                 {
@@ -588,18 +424,6 @@ namespace fdtd
                      * @throws std::invalid_argument When a tile side is zero.
                      */
                     static Partition tiles(const Grid &grid, std::size_t tileX, std::size_t tileY);
-
-                    /**
-                     * Cut a grid into parts contiguous ranges of cells in row-major order, part p
-                     * holding cells p N / parts up to (p + 1) N / parts of the N = nx ny. A range
-                     * may be empty when there are more parts than cells.
-                     *
-                     * @param grid Grid to cut.
-                     * @param parts Number of parts, positive.
-                     * @return The partition.
-                     * @throws std::invalid_argument When parts is zero.
-                     */
-                    static Partition ranges(const Grid &grid, std::size_t parts);
 
                     /**
                      * Number of parts.
@@ -628,47 +452,37 @@ namespace fdtd
                     /**
                      * Tiles along x, part p sitting at column p % tiles_x() of the tiles.
                      *
-                     * @return The tile column count, zero for ranges.
+                     * @return The tile column count.
                      */
                     std::size_t tiles_x() const noexcept;
 
                     /**
                      * Tiles along y.
                      *
-                     * @return The tile row count, zero for ranges.
+                     * @return The tile row count.
                      */
                     std::size_t tiles_y() const noexcept;
 
                 private:
-                    /**
-                     * Create an empty partition of a grid.
-                     *
-                     * @param grid Grid to cut.
-                     */
-                    explicit Partition(const Grid &grid);
+                    /** Create a partition with no parts. */
+                    Partition();
 
                     /**
                      * Close the part made of the blocks added since the last one.
                      */
                     void close_part();
 
-                    /** Cells along x of the grid. */
-                    std::size_t m_nx;
-
-                    /** Tile width, zero for ranges. */
+                    /** Tile width. */
                     std::size_t m_tile_x = 0;
 
-                    /** Tile height, zero for ranges. */
+                    /** Tile height. */
                     std::size_t m_tile_y = 0;
 
-                    /** Tile columns, zero for ranges. */
+                    /** Tile columns. */
                     std::size_t m_tiles_x = 0;
 
-                    /** Tile rows, zero for ranges. */
+                    /** Tile rows. */
                     std::size_t m_tiles_y = 0;
-
-                    /** First row-major cell of each range, empty for tiles. */
-                    std::vector<std::size_t> m_starts;
 
                     /** Blocks of every part, part by part. */
                     std::vector<Block> m_blocks;
@@ -687,7 +501,9 @@ namespace fdtd
                  * Whoever runs a phase owns the part's cells for that phase, so sources and probes
                  * need no lock: a backend only has to finish the H phase of a part's neighbours
                  * before its E phase, and the E phase of the neighbours before the next H phase.
-                 * The serial backend runs the one part of Partition::whole.
+                 * The serial backend runs the one part of Partition::whole. A backend with kernels
+                 * of its own runs them over the part's blocks and calls add_sources() and
+                 * record_probes() as the phases do.
                  */
                 class Stepper
                 {
@@ -714,17 +530,13 @@ namespace fdtd
                     /**
                      * Run the H phase of a part in step n: its H, then the H sources on its cells.
                      *
-                     * @tparam Loop How the inner loops run.
-                     * @tparam Source Where the core cells read their coefficients.
                      * @param part Part below the partition's size.
                      * @param n Step of this advance, from zero.
                      */
-                    template <LoopKind Loop = LoopKind::Plain,
-                              CoeffSource Source = CoeffSource::Arrays>
                     inline void h_phase(std::size_t part, std::size_t n) const noexcept
                     {
                         for (const Block &block : m_partition.blocks(part)) {
-                            update_h_block<Loop, Source>(m_fields, m_coeffs, block);
+                            update_h_block(m_fields, m_coeffs, block);
                         }
                         add_sources(part, n, SourceField::Magnetic);
                     }
@@ -733,24 +545,18 @@ namespace fdtd
                      * Run the E phase of a part in step n: its Ez, the Ez sources on its cells,
                      * then the probes on its cells.
                      *
-                     * @tparam Loop How the inner loops run.
-                     * @tparam Source Where the core cells read their coefficients.
                      * @param part Part below the partition's size.
                      * @param n Step of this advance, from zero.
                      */
-                    template <LoopKind Loop = LoopKind::Plain,
-                              CoeffSource Source = CoeffSource::Arrays>
                     inline void e_phase(std::size_t part, std::size_t n) const noexcept
                     {
                         for (const Block &block : m_partition.blocks(part)) {
-                            update_e_block<Loop, Source>(m_fields, m_coeffs, block, m_pml,
-                                                         m_boundary);
+                            update_e_block(m_fields, m_coeffs, block, m_pml, m_boundary);
                         }
                         add_sources(part, n, SourceField::Electric);
                         record_probes(part, n);
                     }
 
-                private:
                     /**
                      * Add step n's values to the sources of a part, the H ones or the Ez ones.
                      *
@@ -769,6 +575,42 @@ namespace fdtd
                      */
                     void record_probes(std::size_t part, std::size_t n) const noexcept;
 
+                    /**
+                     * Fields being advanced.
+                     *
+                     * @return The fields.
+                     */
+                    Fields &fields() const noexcept;
+
+                    /**
+                     * Coefficient arrays.
+                     *
+                     * @return The view.
+                     */
+                    CoeffsView coeffs() const noexcept;
+
+                    /**
+                     * PML thickness in cells.
+                     *
+                     * @return The thickness, zero for none.
+                     */
+                    std::size_t pml() const noexcept;
+
+                    /**
+                     * Outer boundary condition.
+                     *
+                     * @return The boundary.
+                     */
+                    Boundary boundary() const noexcept;
+
+                    /**
+                     * Parts of the grid.
+                     *
+                     * @return The partition.
+                     */
+                    const Partition &partition() const noexcept;
+
+                private:
                     /** Fields being advanced. */
                     Fields &m_fields;
 

@@ -403,7 +403,7 @@ namespace fdtd
          * a backend's default settings.
          *
          * @param type Backend type.
-         * @param variant Variant name, as `rows+simd` for OpenMP.
+         * @param variant Variant name, as `v2` for OpenMP.
          * @return The canonical name: `default` for serial, every setting written for the others.
          * @throws std::invalid_argument When the backend does not read the name, with the reason
          *         and the name in the message.
