@@ -99,7 +99,7 @@ namespace fdtd::TMz::backends
         }
 
         // Run every step as a static omp for over the parts, in one region or one per phase.
-        template <bool Simd, bool Table, OmpRegion Region>
+        template <serial::LoopKind Loop, serial::CoeffSource Source, OmpRegion Region>
         void run_loops(const serial::Stepper &stepper, std::size_t parts, std::size_t nsteps,
                        int threads, OmpBind bind)
         {
@@ -108,11 +108,11 @@ namespace fdtd::TMz::backends
                     for (std::size_t n = 0; n < nsteps; ++n) {
 #pragma omp for schedule(static)
                         for (std::size_t p = 0; p < parts; ++p) {
-                            stepper.h_phase<Simd, Table>(p, n);
+                            stepper.h_phase<Loop, Source>(p, n);
                         }
 #pragma omp for schedule(static)
                         for (std::size_t p = 0; p < parts; ++p) {
-                            stepper.e_phase<Simd, Table>(p, n);
+                            stepper.e_phase<Loop, Source>(p, n);
                         }
                     }
                 });
@@ -121,13 +121,13 @@ namespace fdtd::TMz::backends
                     run_team(threads, bind, [&] {
 #pragma omp for schedule(static)
                         for (std::size_t p = 0; p < parts; ++p) {
-                            stepper.h_phase<Simd, Table>(p, n);
+                            stepper.h_phase<Loop, Source>(p, n);
                         }
                     });
                     run_team(threads, bind, [&] {
 #pragma omp for schedule(static)
                         for (std::size_t p = 0; p < parts; ++p) {
-                            stepper.e_phase<Simd, Table>(p, n);
+                            stepper.e_phase<Loop, Source>(p, n);
                         }
                     });
                 }
@@ -135,7 +135,7 @@ namespace fdtd::TMz::backends
         }
 
         // Sweep each thread's band of rows once a step, H then E row by row, after the top row's H.
-        template <bool Simd, bool Table>
+        template <serial::LoopKind Loop, serial::CoeffSource Source>
         void run_fused_rows(const serial::Stepper &stepper, std::size_t rows, std::size_t nsteps,
                             int threads, OmpBind bind)
         {
@@ -148,14 +148,14 @@ namespace fdtd::TMz::backends
                 const std::size_t end = begin + base + (t < extra ? 1 : 0);
                 for (std::size_t n = 0; n < nsteps; ++n) {
                     if (begin < end) {
-                        stepper.h_phase<Simd, Table>(end - 1, n);
+                        stepper.h_phase<Loop, Source>(end - 1, n);
                     }
 #pragma omp barrier
                     for (std::size_t j = begin; j < end; ++j) {
                         if (j + 1 < end) {
-                            stepper.h_phase<Simd, Table>(j, n);
+                            stepper.h_phase<Loop, Source>(j, n);
                         }
-                        stepper.e_phase<Simd, Table>(j, n);
+                        stepper.e_phase<Loop, Source>(j, n);
                     }
 #pragma omp barrier
                 }
@@ -163,19 +163,19 @@ namespace fdtd::TMz::backends
         }
 
         // Hand the parts to the threads as the schedule, the fusion and the region say.
-        template <bool Simd, bool Table>
+        template <serial::LoopKind Loop, serial::CoeffSource Source>
         void run_schedule(const serial::Stepper &stepper, const serial::Partition &partition,
                           std::size_t nsteps, int threads, const OmpOptions &options)
         {
             const std::size_t parts = partition.size();
             if (options.fuse) {
-                run_fused_rows<Simd, Table>(stepper, parts, nsteps, threads, options.bind);
+                run_fused_rows<Loop, Source>(stepper, parts, nsteps, threads, options.bind);
             } else if (options.region == OmpRegion::Run) {
-                run_loops<Simd, Table, OmpRegion::Run>(stepper, parts, nsteps, threads,
-                                                       options.bind);
+                run_loops<Loop, Source, OmpRegion::Run>(stepper, parts, nsteps, threads,
+                                                        options.bind);
             } else {
-                run_loops<Simd, Table, OmpRegion::Phase>(stepper, parts, nsteps, threads,
-                                                         options.bind);
+                run_loops<Loop, Source, OmpRegion::Phase>(stepper, parts, nsteps, threads,
+                                                          options.bind);
             }
         }
     }
@@ -308,14 +308,20 @@ namespace fdtd::TMz::backends
         const serial::Stepper stepper(fields(), stepper_coeffs(), active_pml(), boundary(),
                                       m_partition, points, values, probes(), records);
         const int threads = static_cast<int>(m_threads);
+        using serial::CoeffSource;
+        using serial::LoopKind;
         if (m_options.simd && m_options.table) {
-            run_schedule<true, true>(stepper, m_partition, nsteps, threads, m_options);
+            run_schedule<LoopKind::Simd, CoeffSource::Table>(stepper, m_partition, nsteps, threads,
+                                                             m_options);
         } else if (m_options.simd) {
-            run_schedule<true, false>(stepper, m_partition, nsteps, threads, m_options);
+            run_schedule<LoopKind::Simd, CoeffSource::Arrays>(stepper, m_partition, nsteps, threads,
+                                                              m_options);
         } else if (m_options.table) {
-            run_schedule<false, true>(stepper, m_partition, nsteps, threads, m_options);
+            run_schedule<LoopKind::Plain, CoeffSource::Table>(stepper, m_partition, nsteps, threads,
+                                                              m_options);
         } else {
-            run_schedule<false, false>(stepper, m_partition, nsteps, threads, m_options);
+            run_schedule<LoopKind::Plain, CoeffSource::Arrays>(stepper, m_partition, nsteps,
+                                                               threads, m_options);
         }
     }
 

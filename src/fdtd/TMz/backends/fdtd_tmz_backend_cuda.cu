@@ -582,7 +582,7 @@ namespace fdtd::TMz::backends
             if (m_graph.empty() || !(key == m_graph_key)) {
                 m_graph.capture(m_stream, [&] {
                     for (std::size_t s = 0; s < GRAPH_STEPS; ++s) {
-                        launch_step(coeffs, 0, magnetic, electric, true);
+                        launch_step(coeffs, 0, magnetic, electric, Launch::Replay);
                     }
                 });
                 m_graph_key = key;
@@ -595,7 +595,7 @@ namespace fdtd::TMz::backends
             }
         }
         for (; n < to; ++n) {
-            launch_step(coeffs, n, magnetic, electric, false);
+            launch_step(coeffs, n, magnetic, electric, Launch::Plain);
         }
     }
 
@@ -737,8 +737,9 @@ namespace fdtd::TMz::backends
 
     // Queue the kernels of step n, or of the step on the device, which is then counted.
     void CudaBackend::launch_step(const gpu::DeviceCoeffs &coeffs, std::size_t n,
-                                  std::size_t magnetic, std::size_t electric, bool replay)
+                                  std::size_t magnetic, std::size_t electric, Launch launch)
     {
+        const bool replay = launch == Launch::Replay;
         const gpu::DeviceFields fields = device_fields();
         cudaStream_t stream = m_stream.handle();
         const auto bx = static_cast<unsigned>(m_options.block_x);

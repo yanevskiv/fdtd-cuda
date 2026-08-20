@@ -376,6 +376,16 @@ namespace fdtd
                  */
                 static void deliver(const SnapshotSlot &slot, const SnapshotHandler &handler);
 
+                /** How the kernels of a step learn which step they run. */
+                enum class Launch {
+                    /** They are given the step. */
+                    Plain,
+
+                    /** They read the step from the device counter and count it, so a graph can
+                     * replay them. */
+                    Replay
+                };
+
                 /**
                  * Run one step's kernels on the stream, on the device fields as they are then.
                  *
@@ -384,14 +394,13 @@ namespace fdtd
                  * are swapped with those it wrote.
                  *
                  * @param coeffs View of the device coefficients.
-                 * @param n Step of this advance, from zero; unused when replay is set.
+                 * @param n Step of this advance, from zero; unused with Launch::Replay.
                  * @param magnetic Sources that add to Hx or Hy, first in the device sources.
                  * @param electric Sources that add to Ez, after the magnetic ones.
-                 * @param replay Whether the kernels read the step from the device counter and
-                 *        count it, so a graph can replay them, instead of being given n.
+                 * @param launch How the kernels learn the step.
                  */
                 void launch_step(const gpu::DeviceCoeffs &coeffs, std::size_t n,
-                                 std::size_t magnetic, std::size_t electric, bool replay);
+                                 std::size_t magnetic, std::size_t electric, Launch launch);
 
                 /** What a captured graph depends on besides the backend's fixed arrays. */
                 struct GraphKey

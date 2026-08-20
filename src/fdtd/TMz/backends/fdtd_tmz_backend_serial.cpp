@@ -311,13 +311,14 @@ namespace fdtd::TMz::backends::serial
     }
 
     // Add the part's values of step n to its H or Ez sources.
-    void Stepper::add_sources(std::size_t part, std::size_t n, bool magnetic) const noexcept
+    void Stepper::add_sources(std::size_t part, std::size_t n, SourceField field) const noexcept
     {
         const FloatType *row = m_values.data() + n * m_sources.size();
         for (std::size_t s = m_source_offsets[part]; s < m_source_offsets[part + 1]; ++s) {
             const std::size_t k = m_source_order[s];
             const PointInjection &point = m_sources[k];
-            if ((point.component != Component::Ez) == magnetic) {
+            const bool magnetic = point.component != Component::Ez;
+            if (magnetic == (field == SourceField::Magnetic)) {
                 field_of(m_fields, point.component)[point.index] += row[k];
             }
         }

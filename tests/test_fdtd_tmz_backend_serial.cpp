@@ -51,6 +51,7 @@ using fdtd::TMz::backends::serial::Block;
 using fdtd::TMz::backends::serial::CoeffsView;
 using fdtd::TMz::backends::serial::interior_block;
 using fdtd::TMz::backends::serial::intersect;
+using fdtd::TMz::backends::serial::LoopKind;
 using fdtd::TMz::backends::serial::Partition;
 using fdtd::TMz::backends::serial::Stepper;
 using fdtd::TMz::backends::serial::update_boundary_block;
@@ -435,17 +436,17 @@ namespace
                std::equal(a.ezy().begin(), a.ezy().end(), b.ezy().begin());
     }
 
-    // Run steps over the whole grid, or block by block, with or without SIMD.
-    template <bool Simd>
+    // Run steps over the whole grid, or block by block, with plain or SIMD loops.
+    template <LoopKind Loop>
     void run_blocks(Fields &fields, const Coeffs &coeffs, const std::vector<Block> &blocks,
                     std::size_t pml, Boundary boundary, int nsteps)
     {
         for (int n = 0; n < nsteps; ++n) {
             for (const Block &block : blocks) {
-                update_h_block<Simd>(fields, coeffs, block);
+                update_h_block<Loop>(fields, coeffs, block);
             }
             for (const Block &block : blocks) {
-                update_e_block<Simd>(fields, coeffs, block, pml, boundary);
+                update_e_block<Loop>(fields, coeffs, block, pml, boundary);
             }
         }
     }
@@ -505,9 +506,9 @@ TEST_CASE("Block updates match the whole-grid update", "[unit][block]")
     Fields simd(grid);
     fill_bounded(simd);
 
-    run_blocks<false>(whole, coeffs, {whole_block(grid)}, pml, boundary, 4);
-    run_blocks<false>(blocked, coeffs, cut(grid, w, h), pml, boundary, 4);
-    run_blocks<true>(simd, coeffs, cut(grid, w, h), pml, boundary, 4);
+    run_blocks<LoopKind::Plain>(whole, coeffs, {whole_block(grid)}, pml, boundary, 4);
+    run_blocks<LoopKind::Plain>(blocked, coeffs, cut(grid, w, h), pml, boundary, 4);
+    run_blocks<LoopKind::Simd>(simd, coeffs, cut(grid, w, h), pml, boundary, 4);
 
     CHECK(same_fields(whole, blocked));
     CHECK(same_fields(whole, simd));
@@ -543,8 +544,8 @@ TEST_CASE("Block updates on degenerate grids", "[unit][block]")
     Fields blocked(grid);
     fill_bounded(blocked);
 
-    run_blocks<false>(whole, coeffs, {whole_block(grid)}, 0, Boundary::Pmc, 3);
-    run_blocks<false>(blocked, coeffs, cut(grid, 1, 1), 0, Boundary::Pmc, 3);
+    run_blocks<LoopKind::Plain>(whole, coeffs, {whole_block(grid)}, 0, Boundary::Pmc, 3);
+    run_blocks<LoopKind::Plain>(blocked, coeffs, cut(grid, 1, 1), 0, Boundary::Pmc, 3);
 
     CHECK(same_fields(whole, blocked));
 }

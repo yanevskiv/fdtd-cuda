@@ -96,15 +96,24 @@ namespace
         out.insert(out.end(), values.begin(), values.end());
     }
 
+    // What a run fills the grid with.
+    enum class Medium {
+        // Vacuum, whose core shares one tuple.
+        Vacuum,
+
+        // A lossy dielectric circle in the middle, so the core shares no tuple.
+        Circle
+    };
+
     // Run a pulse with an H source and probes on a backend, and collect the fields and records.
     Run run(BackendType backend, Simulation::Options opts, Size size, Boundary boundary,
-            bool media = false)
+            Medium medium = Medium::Vacuum)
     {
         opts.backend = backend;
         opts.boundary = boundary;
         opts.pml_thickness = 6;
         Simulation sim(size.nx, size.ny, opts);
-        if (media) {
+        if (medium == Medium::Circle) {
             fdtd::TMz::Material material = sim.material();
             material.fill_circle(double(size.nx) / 2, double(size.ny) / 2, 6,
                                  {.eps_r = 3, .sigma_e = FloatType(0.2)});
@@ -135,12 +144,12 @@ namespace
     }
 
     // Run the same on the OpenMP backend, its settings given by their variant name.
-    Run run(const OmpOptions &omp, Size size, Boundary boundary, bool media = false)
+    Run run(const OmpOptions &omp, Size size, Boundary boundary, Medium medium = Medium::Vacuum)
     {
         Simulation::Options opts;
         opts.variant = omp.name();
         opts.threads = omp.threads;
-        return run(BackendType::OpenMP, opts, size, boundary, media);
+        return run(BackendType::OpenMP, opts, size, boundary, medium);
     }
 
     // Relative max-norm difference of two arrays, against the max-norm of the first.
@@ -332,7 +341,8 @@ TEST_CASE("OpenMP table and fusion match serial on media", "[backend][openmp]")
     require_openmp();
     const auto boundary = GENERATE(Boundary::Pec, Boundary::Pmc, Boundary::Pml);
     const Size size{67, 45};
-    const Run serial = run(BackendType::Serial, Simulation::Options{}, size, boundary, true);
+    const Run serial =
+        run(BackendType::Serial, Simulation::Options{}, size, boundary, Medium::Circle);
     for (const std::size_t threads : thread_counts()) {
         for (const bool fuse : {false, true}) {
             OmpOptions omp;
@@ -340,7 +350,7 @@ TEST_CASE("OpenMP table and fusion match serial on media", "[backend][openmp]")
             omp.fuse = fuse;
             omp.threads = threads;
             INFO(describe(omp));
-            const Run openmp = run(omp, size, boundary, true);
+            const Run openmp = run(omp, size, boundary, Medium::Circle);
             CHECK(relative_difference(serial.fields, openmp.fields) <= bound());
             CHECK(relative_difference(serial.probes, openmp.probes) <= bound());
             if (FDTD_EXACT) {

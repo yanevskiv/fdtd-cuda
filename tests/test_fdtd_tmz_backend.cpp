@@ -291,11 +291,24 @@ TEST_CASE("Serial backend holds the edge Ez at zero under PEC", "[unit][backend]
     }
 }
 
+// Helpers private to this file.
+namespace
+{
+    // Symmetries an impulse keeps.
+    enum class Symmetry {
+        // The mirrors along x and y.
+        Mirrors,
+
+        // The mirrors and the diagonal.
+        Diagonal
+    };
+}
+
 // Verify that a centred impulse keeps its mirror symmetries, and the diagonal one on square cells.
 TEST_CASE("Serial backend keeps a centred impulse symmetric", "[unit][backend][serial]")
 {
     const Boundary boundary = GENERATE(Boundary::Pec, Boundary::Pmc);
-    const auto symmetric = [](const Grid &grid, bool diagonal, Boundary b) {
+    const auto symmetric = [](const Grid &grid, Symmetry symmetry, Boundary b) {
         const std::size_t mx = grid.nx() - 1;
         const std::size_t my = grid.ny() - 1;
         auto backend = make_impulse(grid, 0.8, mx / 2, my / 2, b);
@@ -310,15 +323,15 @@ TEST_CASE("Serial backend keeps a centred impulse symmetric", "[unit][backend][s
                 CHECK_THAT(ez(mx - i, j), WithinAbs(v, 1e-6));
                 CHECK_THAT(ez(i, my - j), WithinAbs(v, 1e-6));
                 CHECK_THAT(ez(mx - i, my - j), WithinAbs(v, 1e-6));
-                if (diagonal) {
+                if (symmetry == Symmetry::Diagonal) {
                     CHECK_THAT(ez(j, i), WithinAbs(v, 1e-6));
                 }
             }
         }
     };
 
-    symmetric(Grid(13, 9, 1e-3F, 2e-3F), false, boundary);
-    symmetric(Grid(11, 11, 1e-3F, 1e-3F), true, boundary);
+    symmetric(Grid(13, 9, 1e-3F, 2e-3F), Symmetry::Mirrors, boundary);
+    symmetric(Grid(11, 11, 1e-3F, 1e-3F), Symmetry::Diagonal, boundary);
 }
 
 // Verify that step(a) then step(b) matches step(a + b) bit for bit.
