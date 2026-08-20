@@ -57,6 +57,7 @@ namespace fdtd::TMz::backends::omp
                 }
 
                 #pragma omp barrier
+
                 for (std::size_t j = begin; j < end; ++j) {
                     if (j + 1 < end) {
                         v3::h_phase(stepper, tuple, j, n);
