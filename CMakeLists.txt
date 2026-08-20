@@ -71,7 +71,12 @@ if(FDTD_WITH_CUDA)
         src/fdtd/TMz/backends/gpu/fdtd_tmz_backend_gpu_event.cu
         src/fdtd/TMz/backends/gpu/fdtd_tmz_backend_gpu_graph.cu
         src/fdtd/TMz/backends/gpu/fdtd_tmz_backend_gpu_pinned.cu
-        src/fdtd/TMz/backends/gpu/fdtd_tmz_backend_gpu_stream.cu)
+        src/fdtd/TMz/backends/gpu/fdtd_tmz_backend_gpu_points.cu
+        src/fdtd/TMz/backends/gpu/fdtd_tmz_backend_gpu_stream.cu
+        src/fdtd/TMz/backends/gpu/fdtd_tmz_backend_gpu_v1.cu
+        src/fdtd/TMz/backends/gpu/fdtd_tmz_backend_gpu_v2.cu
+        src/fdtd/TMz/backends/gpu/fdtd_tmz_backend_gpu_v3.cu
+        src/fdtd/TMz/backends/gpu/fdtd_tmz_backend_gpu_v4.cu)
     target_link_libraries(fdtd PRIVATE CUDA::cudart)
 endif()
 

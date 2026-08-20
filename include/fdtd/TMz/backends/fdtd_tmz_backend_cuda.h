@@ -59,8 +59,13 @@ namespace fdtd
              * Rows on the device are padded to 128 bytes; the host grid keeps its pitch, and
              * the copies and the cells of sources and probes go from one to the other. A step
              * is H, the Hx and Hy sources, E, the Ez sources and the probes, in that order on
-             * one stream; with the Tiled kernel H, its sources and E are one kernel. Each
-             * advance ends with a wait for the stream, so the work is done when step() returns.
+             * one stream. Each advance ends with a wait for the stream, so the work is done when
+             * step() returns.
+             *
+             * The level of the options adds one change at a time, each in its own file in
+             * `backends/gpu/`: v1 the two kernels (`fdtd_tmz_backend_gpu_v1.cu`), v2 the graph
+             * (`_v2.cu`), v3 the coefficient table (`_v3.cu`), v4 the tiled kernel (`_v4.cu`).
+             * This file and `fdtd_tmz_backend_cuda.cu` hold what every level shares.
              */
             class CudaBackend final : public Backend
             {
@@ -161,8 +166,8 @@ namespace fdtd
                  * Modelled traffic of one step of the kernel and coefficients in use.
                  *
                  * @return two_pass_traffic() of the grid, the active PML and the boundary, one
-                 *         pass for Tiled, with the table of CudaCoeffs::Table and its index when
-                 *         the interior's core does not share one tuple.
+                 *         pass at v4, with the table from v3 and its index when the interior's
+                 *         core does not share one tuple.
                  */
                 StepTraffic step_traffic() const noexcept override;
 
@@ -223,6 +228,9 @@ namespace fdtd
                                        const SnapshotHandler &handler) override;
 
             private:
+                /** Steps a CUDA graph holds, from v2. */
+                static constexpr std::size_t GRAPH_STEPS = 16;
+
                 /**
                  * Check that coefficients were uploaded, before a step.
                  *
@@ -248,13 +256,12 @@ namespace fdtd
                 /**
                  * View of the device coefficients for the kernels.
                  *
-                 * @return The view, with the source of the options and the boundary in force.
+                 * @return The view, with the table from v3 and the boundary in force.
                  */
                 gpu::DeviceCoeffs device_coeffs() const noexcept;
 
                 /**
-                 * Tuple every interior cell shares under the boundary in force, under
-                 * CudaCoeffs::Table.
+                 * Tuple every interior cell shares under the boundary in force, from v3.
                  *
                  * @return The tuple, or none when the interior's cells differ.
                  */
@@ -337,9 +344,8 @@ namespace fdtd
                 /**
                  * Queue the steps from one step of the advance to another.
                  *
-                 * With graph, whole runs of GRAPH_STEPS steps replay one captured graph,
-                 * captured again when its key changes; the steps left over are launched one by
-                 * one.
+                 * From v2, whole runs of the graph's steps replay it (queue_graph()); the steps
+                 * left over are launched one by one.
                  *
                  * @param coeffs View of the device coefficients.
                  * @param from First step, from zero.
@@ -386,12 +392,34 @@ namespace fdtd
                     Replay
                 };
 
+                /** The sources, values and records of one step, as the kernels take them. */
+                struct StepPoints
+                {
+                    /** Source cells on the device, the magnetic ones first. */
+                    const gpu::DevicePoint *sources;
+
+                    /** Sources that add to Hx or Hy. */
+                    int magnetic;
+
+                    /** Sources that add to Ez, after the magnetic ones. */
+                    int electric;
+
+                    /** Source values, pointed at the step's row unless step is set. */
+                    const FloatType *values;
+
+                    /** Probe records, pointed at the step's row unless step is set. */
+                    FloatType *records;
+
+                    /** Step counted on the device, for a graph to replay, or null. */
+                    const int *step;
+                };
+
                 /**
                  * Run one step's kernels on the stream, on the device fields as they are then.
                  *
-                 * H, the magnetic sources, E, the Ez sources and the probes, in that order. The
-                 * tiled kernel does H, its sources and E in one pass, then the arrays it read
-                 * are swapped with those it wrote.
+                 * H, the magnetic sources, E, the Ez sources and the probes, in that order: the
+                 * level's update (launch_two_kernels() or launch_tiled()), then the Ez sources
+                 * and the probes.
                  *
                  * @param coeffs View of the device coefficients.
                  * @param n Step of this advance, from zero; unused with Launch::Replay.
@@ -401,6 +429,61 @@ namespace fdtd
                  */
                 void launch_step(const gpu::DeviceCoeffs &coeffs, std::size_t n,
                                  std::size_t magnetic, std::size_t electric, Launch launch);
+
+                /**
+                 * Level v1: queue an H kernel, the magnetic sources and an E kernel, one thread
+                 * per cell.
+                 *
+                 * @param coeffs View of the device coefficients.
+                 * @param points The step's sources, values and records.
+                 * @return The device fields after the step.
+                 */
+                gpu::DeviceFields launch_two_kernels(const gpu::DeviceCoeffs &coeffs,
+                                                     const StepPoints &points);
+
+                /**
+                 * Level v2: queue whole runs of GRAPH_STEPS steps as replays of one captured
+                 * graph, captured again when its key changes.
+                 *
+                 * @param coeffs View of the device coefficients.
+                 * @param from First step, from zero.
+                 * @param to Step to stop before.
+                 * @param magnetic Sources that add to Hx or Hy.
+                 * @param electric Sources that add to Ez.
+                 * @return The first step not queued, from plus a multiple of GRAPH_STEPS; from
+                 *         itself when the run is shorter than a graph.
+                 */
+                std::size_t queue_graph(const gpu::DeviceCoeffs &coeffs, std::size_t from,
+                                        std::size_t to, std::size_t magnetic, std::size_t electric);
+
+                /**
+                 * Level v3: build the coefficient table on the host, copy it and the index to
+                 * the device, and find the tuples the interior shares.
+                 *
+                 * @param coeffs Coefficients on the backend's grid.
+                 */
+                void upload_table(const Coeffs &coeffs);
+
+                /**
+                 * Level v3: a view of the arrays with the table added: the interior's tuple when
+                 * it shares one under the boundary in force, the table and index otherwise.
+                 *
+                 * @param arrays View of the eight arrays.
+                 * @return The view.
+                 */
+                gpu::DeviceCoeffs table_coeffs(gpu::DeviceCoeffs arrays) const noexcept;
+
+                /**
+                 * Level v4: queue one kernel that updates H, adds the magnetic sources and
+                 * updates E, each block keeping its tile's H in shared memory and writing the
+                 * second set of arrays, which are then swapped with the first.
+                 *
+                 * @param coeffs View of the device coefficients.
+                 * @param points The step's sources, values and records.
+                 * @return The device fields after the step.
+                 */
+                gpu::DeviceFields launch_tiled(const gpu::DeviceCoeffs &coeffs,
+                                               const StepPoints &points);
 
                 /** What a captured graph depends on besides the backend's fixed arrays. */
                 struct GraphKey
@@ -470,7 +553,8 @@ namespace fdtd
                 /** Device Ezy. */
                 gpu::DeviceBuffer<FloatType> m_ezy;
 
-                /** Device Ez the tiled kernel writes a step to, swapped with m_ez after it. */
+                /** Device Ez the tiled kernel of v4 writes a step to, swapped with m_ez after it.
+                 */
                 gpu::DeviceBuffer<FloatType> m_ez_next;
 
                 /** Device Hx the tiled kernel writes a step to, swapped with m_hx after it. */
@@ -533,11 +617,10 @@ namespace fdtd
                 /** Probe records of the current advance on the device, step-major. */
                 gpu::DeviceBuffer<FloatType> m_device_records;
 
-                /** Table entries on the device, under CudaCoeffs::Table. */
+                /** Table entries on the device, from v3. */
                 gpu::DeviceBuffer<gpu::CoeffTuple> m_table_entries;
 
-                /** Entry of each cell on the device, laid out as the fields, under
-                 * CudaCoeffs::Table. */
+                /** Entry of each cell on the device, laid out as the fields, from v3. */
                 gpu::DeviceBuffer<std::uint8_t> m_table_index;
 
                 /** Tuple every interior cell shares with the PML in force, if one is shared. */
@@ -546,7 +629,8 @@ namespace fdtd
                 /** Tuple every interior cell shares with no PML in force, if one is shared. */
                 std::optional<gpu::CoeffTuple> m_uniform_plain;
 
-                /** Graph of GRAPH_STEPS steps, captured by the first advance that needs it. */
+                /** Graph of GRAPH_STEPS steps, captured by the first advance that needs it, from
+                 * v2. */
                 gpu::Graph m_graph;
 
                 /** What m_graph was captured with, captured again when this changes. */

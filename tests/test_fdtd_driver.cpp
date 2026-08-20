@@ -128,10 +128,10 @@ TEST_CASE("Driver parses the OpenMP options", "[unit][driver]")
 // Verify a CUDA variant, given before or after the backend.
 TEST_CASE("Driver parses a CUDA variant", "[unit][driver]")
 {
-    CHECK(parse({"--backend", "cuda", "--variant", "tiled:16x16"}).variant == "tiled:16x16");
-    const auto options = parse({"--variant=fused", "--backend=cuda"});
+    CHECK(parse({"--backend", "cuda", "--variant", "v4:16x16"}).variant == "v4:16x16");
+    const auto options = parse({"--variant=v1+async", "--backend=cuda"});
     CHECK(options.backend == BackendType::Cuda);
-    CHECK(options.variant == "fused");
+    CHECK(options.variant == "v1+async");
 }
 
 // Verify that bad arguments throw.
@@ -155,7 +155,7 @@ TEST_CASE("Driver rejects bad arguments", "[unit][driver]")
     CHECK_THROWS_AS(parse({"--variant", "fast"}), std::invalid_argument);
     CHECK_THROWS_AS(parse({"--variant", "v2:4x4"}), std::invalid_argument);
     CHECK_THROWS_AS(parse({"--variant", "v1"}), std::invalid_argument);
-    CHECK_THROWS_AS(parse({"--variant", "fused", "--backend", "openmp"}), std::invalid_argument);
+    CHECK_THROWS_AS(parse({"--variant", "v1:32x8", "--backend", "openmp"}), std::invalid_argument);
     CHECK_THROWS_AS(parse({"--backend", "cuda", "--variant", "tiles"}), std::invalid_argument);
     CHECK_THROWS_AS(parse({"--output="}), std::invalid_argument);
     CHECK_THROWS_AS(parse({"--frobnicate", "1"}), std::invalid_argument);
@@ -265,11 +265,11 @@ TEST_CASE("Driver smoke run on CUDA", "[unit][driver][cuda]")
     std::ostringstream log;
     fdtd::run_driver(options, log);
     options = parse({"--nx", "32", "--steps", "20", "--probe", "20,16", "--backend", "cuda",
-                     "--variant", "tiled:16x16"});
+                     "--variant", "v4:16x16"});
     options.output = dir / "cuda";
     fdtd::run_driver(options, log);
 
-    CHECK(log.str().find("on cuda (tiled:16x16)") != std::string::npos);
+    CHECK(log.str().find("on cuda (v4:16x16)") != std::string::npos);
     std::ifstream serial(dir / "serial" / "probe_0.csv");
     std::ifstream cuda(dir / "cuda" / "probe_0.csv");
     std::string line;

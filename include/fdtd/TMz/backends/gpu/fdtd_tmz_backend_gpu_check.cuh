@@ -59,6 +59,16 @@ namespace fdtd
                     message << cudaGetErrorString(status);
                     throw CudaError(static_cast<int>(status), message.str());
                 }
+
+                /**
+                 * Throw a CudaError when a kernel launch queued since the last check failed.
+                 *
+                 * @throws CudaError When cudaGetLastError() reports an error.
+                 */
+                inline void check_launch()
+                {
+                    check(cudaGetLastError(), "kernel launch");
+                }
             }
         }
     }

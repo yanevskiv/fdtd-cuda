@@ -22,10 +22,13 @@
 
 // Standard library for parsing, string building and errors.
 #include <charconv>
+#include <cstddef>
 #include <sstream>
 #include <stdexcept>
 #include <string>
+#include <string_view>
 #include <system_error>
+#include <utility>
 
 // Namespace for the 2D TMz backends.
 namespace fdtd::TMz::backends
@@ -43,17 +46,13 @@ namespace fdtd::TMz::backends
             throw std::invalid_argument(message.str());
         }
 
-        // Name a kernel layout.
-        std::string_view kernel_name(CudaKernel kernel) noexcept
-        {
-            switch (kernel) {
-                case CudaKernel::Fused:
-                    return "fused";
-                case CudaKernel::Tiled:
-                    break;
-            }
-            return "tiled";
-        }
+        // The levels in order, with their names.
+        constexpr std::pair<CudaLevel, std::string_view> LEVELS[] = {
+            {CudaLevel::V1, "v1"},
+            {CudaLevel::V2, "v2"},
+            {CudaLevel::V3, "v3"},
+            {CudaLevel::V4, "v4"},
+        };
 
         // Read a positive decimal side of the block, the whole field.
         std::size_t parse_side(std::string_view variant, std::string_view side)
@@ -69,44 +68,33 @@ namespace fdtd::TMz::backends
         }
     }
 
-    // Split off the suffixes, then read the kernel and the block when there is one.
+    // Split off the suffix, then read the level and the block when there is one.
     CudaOptions CudaOptions::parse(std::string_view variant)
     {
         CudaOptions parsed;
         if (variant == "default") {
             return parsed;
         }
-        const std::string_view head = variant.substr(0, variant.find('+'));
-        std::string_view suffixes = variant.substr(head.size());
-        bool table = false;
-        bool graph = false;
-        bool async = false;
-        while (!suffixes.empty()) {
-            suffixes.remove_prefix(1);
-            const std::string_view suffix = suffixes.substr(0, suffixes.find('+'));
-            suffixes.remove_prefix(suffix.size());
-            if (suffix == "table" && !table) {
-                table = true;
-            } else if (suffix == "graph" && !graph) {
-                graph = true;
-            } else if (suffix == "async" && !async) {
-                async = true;
-            } else {
-                malformed(variant, "expected +table, +graph or +async, each once");
+        const std::size_t plus = variant.find('+');
+        const std::string_view head = variant.substr(0, plus);
+        if (plus != std::string_view::npos) {
+            if (variant.substr(plus + 1) != "async") {
+                malformed(variant, "expected +async, once");
             }
+            parsed.async_snapshots = true;
         }
-        parsed.coeffs = table ? CudaCoeffs::Table : CudaCoeffs::Arrays;
-        parsed.graph = graph;
-        parsed.async_snapshots = async;
 
         const std::size_t colon = head.find(':');
-        const std::string_view kernel = head.substr(0, colon);
-        if (kernel == "fused") {
-            parsed.kernel = CudaKernel::Fused;
-        } else if (kernel == "tiled") {
-            parsed.kernel = CudaKernel::Tiled;
-        } else {
-            malformed(variant, "expected fused or tiled");
+        const std::string_view level = head.substr(0, colon);
+        bool known = false;
+        for (const auto &[value, name] : LEVELS) {
+            if (level == name) {
+                parsed.level = value;
+                known = true;
+            }
+        }
+        if (!known) {
+            malformed(variant, "expected v1, v2, v3 or v4");
         }
         if (colon != std::string_view::npos) {
             const std::string_view size = head.substr(colon + 1);
@@ -120,21 +108,19 @@ namespace fdtd::TMz::backends
         return parsed;
     }
 
-    // Write the kernel and the block, then the suffixes.
+    // Write the level and the block, then the suffix.
     std::string CudaOptions::name() const
     {
         std::ostringstream text;
-        text << kernel_name(kernel);
+        for (const auto &[value, name] : LEVELS) {
+            if (value == level) {
+                text << name;
+            }
+        }
         text << ':';
         text << block_x;
         text << 'x';
         text << block_y;
-        if (coeffs == CudaCoeffs::Table) {
-            text << "+table";
-        }
-        if (graph) {
-            text << "+graph";
-        }
         if (async_snapshots) {
             text << "+async";
         }

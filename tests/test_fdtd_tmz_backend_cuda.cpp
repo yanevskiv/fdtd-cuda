@@ -53,8 +53,7 @@ using fdtd::TMz::Material;
 using fdtd::TMz::PointInjection;
 using fdtd::TMz::PointProbe;
 using fdtd::TMz::Simulation;
-using fdtd::TMz::backends::CudaCoeffs;
-using fdtd::TMz::backends::CudaKernel;
+using fdtd::TMz::backends::CudaLevel;
 using fdtd::TMz::backends::CudaOptions;
 
 // Helpers private to this file.
@@ -66,8 +65,8 @@ namespace
     // Bound of the difference from serial, in machine epsilons per step, from the build.
     constexpr double TOLERANCE = FDTD_TEST_CUDA_TOLERANCE;
 
-    // Kernel layouts built so far.
-    constexpr CudaKernel KERNELS[] = {CudaKernel::Fused, CudaKernel::Tiled};
+    // Every level, from the plain one up.
+    constexpr CudaLevel LEVELS[] = {CudaLevel::V1, CudaLevel::V2, CudaLevel::V3, CudaLevel::V4};
 
     // Result of a run: the fields and every probe's record.
     struct Run
@@ -128,13 +127,11 @@ namespace
         }
     }
 
-    // Settings of a CUDA run with a kernel and a block, reading the arrays and launching plainly.
-    CudaOptions cuda_options(CudaKernel kernel, Block block)
+    // Settings of a CUDA run at a level with a block.
+    CudaOptions cuda_options(CudaLevel level, Block block)
     {
         CudaOptions options;
-        options.kernel = kernel;
-        options.coeffs = CudaCoeffs::Arrays;
-        options.graph = false;
+        options.level = level;
         options.block_x = block.x;
         options.block_y = block.y;
         return options;
@@ -305,7 +302,7 @@ namespace
     }
 }
 
-// Verify that every kernel and block size matches serial within the tolerance.
+// Verify that every level and block size matches serial within the tolerance.
 TEST_CASE("CUDA matches serial", "[backend][cuda]")
 {
     require_cuda();
@@ -313,12 +310,12 @@ TEST_CASE("CUDA matches serial", "[backend][cuda]")
     const auto boundary = GENERATE(Boundary::Pec, Boundary::Pmc, Boundary::Pml);
     const Run serial = run(BackendType::Serial, {}, size, boundary);
 
-    for (const CudaKernel kernel : KERNELS) {
+    for (const CudaLevel level : LEVELS) {
         for (const Block block : {Block{32, 8}, Block{16, 16}, Block{128, 1}, Block{7, 5}}) {
             INFO("size " << size.nx << "x" << size.ny << ", boundary " << int(boundary)
-                         << ", kernel " << int(kernel) << ", block " << block.x << "x" << block.y);
+                         << ", level " << int(level) << ", block " << block.x << "x" << block.y);
             const Run cuda =
-                run(BackendType::Cuda, settings(cuda_options(kernel, block)), size, boundary);
+                run(BackendType::Cuda, settings(cuda_options(level, block)), size, boundary);
             CHECK(relative_difference(serial.fields, cuda.fields) <= bound());
             CHECK(relative_difference(serial.probes, cuda.probes) <= bound());
         }
@@ -335,11 +332,11 @@ TEST_CASE("CUDA matches serial on small grids", "[backend][cuda]")
     const std::size_t pml = boundary == Boundary::Pml && size.nx > 8 && size.ny > 6 ? 3 : 0;
     const Run serial = run_backend(BackendType::Serial, {}, grid, boundary, pml);
 
-    for (const CudaKernel kernel : KERNELS) {
+    for (const CudaLevel level : LEVELS) {
         for (const Block block : {Block{32, 8}, Block{7, 5}, Block{1, 1}}) {
             INFO("size " << size.nx << "x" << size.ny << ", boundary " << int(boundary)
-                         << ", kernel " << int(kernel) << ", block " << block.x << "x" << block.y);
-            const Run cuda = run_backend(BackendType::Cuda, settings(cuda_options(kernel, block)),
+                         << ", level " << int(level) << ", block " << block.x << "x" << block.y);
+            const Run cuda = run_backend(BackendType::Cuda, settings(cuda_options(level, block)),
                                          grid, boundary, pml);
             CHECK(relative_difference(serial.fields, cuda.fields) <= bound());
             CHECK(relative_difference(serial.probes, cuda.probes) <= bound());
@@ -347,7 +344,7 @@ TEST_CASE("CUDA matches serial on small grids", "[backend][cuda]")
     }
 }
 
-// Verify that in the exact build every kernel matches serial bit for bit.
+// Verify that in the exact build every level matches serial bit for bit.
 TEST_CASE("CUDA matches serial bit for bit", "[backend][cuda][exact]")
 {
     require_cuda();
@@ -359,10 +356,10 @@ TEST_CASE("CUDA matches serial bit for bit", "[backend][cuda][exact]")
     const Run serial = run(BackendType::Serial, {}, size, boundary);
     const Run small = run_backend(BackendType::Serial, {}, Grid(9, 7), boundary, 0);
 
-    for (const CudaKernel kernel : KERNELS) {
+    for (const CudaLevel level : LEVELS) {
         for (const Block block : {Block{32, 8}, Block{7, 5}}) {
-            INFO("kernel " << int(kernel) << ", block " << block.x << "x" << block.y);
-            const Simulation::Options options = settings(cuda_options(kernel, block));
+            INFO("level " << int(level) << ", block " << block.x << "x" << block.y);
+            const Simulation::Options options = settings(cuda_options(level, block));
             const Run cuda = run(BackendType::Cuda, options, size, boundary);
             CHECK(serial.fields == cuda.fields);
             CHECK(serial.probes == cuda.probes);
@@ -373,13 +370,13 @@ TEST_CASE("CUDA matches serial bit for bit", "[backend][cuda][exact]")
     }
 }
 
-// Verify that two runs of the same kernel give the same bits.
+// Verify that two runs of the same level give the same bits.
 TEST_CASE("CUDA runs are deterministic", "[backend][cuda]")
 {
     require_cuda();
-    for (const CudaKernel kernel : KERNELS) {
-        INFO("kernel " << int(kernel));
-        const Simulation::Options options = settings(cuda_options(kernel, {32, 8}));
+    for (const CudaLevel level : LEVELS) {
+        INFO("level " << int(level));
+        const Simulation::Options options = settings(cuda_options(level, {32, 8}));
         const Run first = run(BackendType::Cuda, options, {67, 45}, Boundary::Pml);
         const Run second = run(BackendType::Cuda, options, {67, 45}, Boundary::Pml);
         CHECK(first.fields == second.fields);
@@ -490,7 +487,7 @@ TEST_CASE("CUDA probes over several advances", "[backend][cuda]")
     CHECK(backend->fetch_probes().size() == 4);
 }
 
-// Verify that replaying captured steps as a graph gives the plain launches' results bit for bit:
+// Verify that replaying captured steps as a graph, v2, gives the plain launches of v1 bit for bit:
 // advances shorter than a graph, as long as one and longer, the sources and probes changing
 // between them so the graph is captured again, and the remainder steps launched plainly.
 TEST_CASE("CUDA graphs match plain launches bit for bit", "[backend][cuda]")
@@ -499,19 +496,16 @@ TEST_CASE("CUDA graphs match plain launches bit for bit", "[backend][cuda]")
     const auto boundary = GENERATE(Boundary::Pec, Boundary::Pmc, Boundary::Pml);
     const Grid grid(45, 37, FloatType(1e-3), FloatType(2e-3));
     const std::vector<std::size_t> lengths{5, 16, 37, 0, 33};
-    for (const CudaKernel kernel : KERNELS) {
-        INFO("kernel " << static_cast<int>(kernel));
-        auto options = cuda_options(kernel, {32, 8});
-        const Run plain = run_advances(settings(options), grid, boundary, lengths);
-        options.graph = true;
-        const Run graph = run_advances(settings(options), grid, boundary, lengths);
-        CHECK(graph.fields == plain.fields);
-        CHECK(graph.probes == plain.probes);
-        CHECK(plain.probes.size() == 2 * (5 + 16 + 37) + 33);
-    }
+    const Run plain =
+        run_advances(settings(cuda_options(CudaLevel::V1, {32, 8})), grid, boundary, lengths);
+    const Run graph =
+        run_advances(settings(cuda_options(CudaLevel::V2, {32, 8})), grid, boundary, lengths);
+    CHECK(graph.fields == plain.fields);
+    CHECK(graph.probes == plain.probes);
+    CHECK(plain.probes.size() == 2 * (5 + 16 + 37) + 33);
 }
 
-// Verify that reading the coefficients from the table gives the arrays' results bit for bit, on
+// Verify that reading the coefficients from the table, v3, gives the arrays of v2 bit for bit, on
 // vacuum with a PML (one tuple for the interior), on a slab and a lossy circle (a byte per cell),
 // and past the table's capacity (cells that read the arrays among cells that read the table).
 TEST_CASE("CUDA coefficient table matches the arrays bit for bit", "[backend][cuda]")
@@ -532,40 +526,20 @@ TEST_CASE("CUDA coefficient table matches the arrays bit for bit", "[backend][cu
     }
     const auto boundary = GENERATE(Boundary::Pec, Boundary::Pmc, Boundary::Pml);
     for (const Material *material : {&vacuum, &media, &crowded}) {
-        for (const CudaKernel kernel : KERNELS) {
-            for (const Block block : {Block{32, 8}, Block{7, 5}}) {
-                INFO("material " << (material == &vacuum  ? "vacuum"
-                                     : material == &media ? "media"
-                                                          : "crowded")
-                                 << ", kernel " << static_cast<int>(kernel) << ", block " << block.x
-                                 << "x" << block.y);
-                auto options = cuda_options(kernel, block);
-                const Run arrays =
-                    run_material(BackendType::Cuda, settings(options), *material, boundary);
-                options.coeffs = CudaCoeffs::Table;
-                const Run table =
-                    run_material(BackendType::Cuda, settings(options), *material, boundary);
-                CHECK(table.fields == arrays.fields);
-                CHECK(table.probes == arrays.probes);
-            }
+        for (const Block block : {Block{32, 8}, Block{7, 5}}) {
+            INFO("material " << (material == &vacuum  ? "vacuum"
+                                 : material == &media ? "media"
+                                                      : "crowded")
+                             << ", block " << block.x << "x" << block.y);
+            const Run arrays =
+                run_material(BackendType::Cuda, settings(cuda_options(CudaLevel::V2, block)),
+                             *material, boundary);
+            const Run table =
+                run_material(BackendType::Cuda, settings(cuda_options(CudaLevel::V3, block)),
+                             *material, boundary);
+            CHECK(table.fields == arrays.fields);
+            CHECK(table.probes == arrays.probes);
         }
-    }
-}
-
-// Verify that the table matches serial within the bound, with graphs too.
-TEST_CASE("CUDA coefficient table matches serial", "[backend][cuda]")
-{
-    require_cuda();
-    const auto size = GENERATE(Size{64, 64}, Size{67, 45});
-    const auto boundary = GENERATE(Boundary::Pec, Boundary::Pmc, Boundary::Pml);
-    const Run serial = run(BackendType::Serial, {}, size, boundary);
-    for (const CudaKernel kernel : KERNELS) {
-        auto options = cuda_options(kernel, {32, 8});
-        options.coeffs = CudaCoeffs::Table;
-        options.graph = true;
-        const Run cuda = run(BackendType::Cuda, settings(options), size, boundary);
-        CHECK(relative_difference(serial.fields, cuda.fields) <= bound());
-        CHECK(relative_difference(serial.probes, cuda.probes) <= bound());
     }
 }
 
@@ -581,9 +555,9 @@ TEST_CASE("CUDA models the traffic of the coefficient table", "[unit][backend][c
         options.backend = BackendType::Cuda;
         options.boundary = boundary;
         options.pml_thickness = 2;
-        options.variant = "tiled+graph";
+        options.variant = "v2";
         const Simulation arrays(8, 6, options);
-        options.variant = "tiled+table+graph";
+        options.variant = "v3";
         const Simulation table(8, 6, options);
         const double core = boundary == Boundary::Pml ? 3 : 15;
         CHECK(table.step_traffic().bytes ==
@@ -592,10 +566,10 @@ TEST_CASE("CUDA models the traffic of the coefficient table", "[unit][backend][c
     }
 }
 
-// Verify that the tiled kernel gives the fused kernel's results bit for bit: H sources on the
+// Verify that the tiled kernel of v4 gives the two kernels of v3 bit for bit: H sources on the
 // column and row a tile takes from its neighbours, every step count from 1 to 5 so the arrays
 // end swapped and not, and probes on both H components.
-TEST_CASE("CUDA tiled kernel matches the fused kernel bit for bit", "[backend][cuda]")
+TEST_CASE("CUDA tiled kernel matches the two kernels bit for bit", "[backend][cuda]")
 {
     require_cuda();
     const auto boundary = GENERATE(Boundary::Pec, Boundary::Pmc, Boundary::Pml);
@@ -612,40 +586,35 @@ TEST_CASE("CUDA tiled kernel matches the fused kernel bit for bit", "[backend][c
     const std::vector<PointProbe> probes{{Component::Hy, grid.index(31, 20)},
                                          {Component::Hx, grid.index(20, 8)},
                                          {Component::Ez, grid.index(32, 16)}};
-    for (const bool table : {false, true}) {
-        for (std::size_t steps = 1; steps <= 5; ++steps) {
-            INFO("table " << table << ", steps " << steps);
-            Run runs[2];
-            for (const CudaKernel kernel : {CudaKernel::Fused, CudaKernel::Tiled}) {
-                auto options = cuda_options(kernel, {32, 8});
-                if (table) {
-                    options.coeffs = CudaCoeffs::Table;
-                }
-                Fields fields(grid);
-                fill_distinct(fields);
-                const auto backend =
-                    fdtd::TMz::make_backend(BackendType::Cuda, grid, settings(options));
-                backend->upload(fields);
-                backend->upload(coeffs);
-                backend->set_boundary(boundary);
-                backend->set_probes(probes);
-                std::vector<FloatType> values(steps * points.size());
-                for (std::size_t k = 0; k < values.size(); ++k) {
-                    values[k] = FloatType(1 + k % 4) / FloatType(4);
-                }
-                backend->step(steps, std::span(points), std::span(values));
-                backend->download(fields);
-                Run &run = runs[kernel == CudaKernel::Tiled ? 1 : 0];
-                append_fields(run.fields, fields);
-                run.probes = backend->fetch_probes();
+    for (std::size_t steps = 1; steps <= 5; ++steps) {
+        INFO("steps " << steps);
+        Run runs[2];
+        for (const CudaLevel level : {CudaLevel::V3, CudaLevel::V4}) {
+            Fields fields(grid);
+            fill_distinct(fields);
+            const auto backend = fdtd::TMz::make_backend(BackendType::Cuda, grid,
+                                                         settings(cuda_options(level, {32, 8})));
+            backend->upload(fields);
+            backend->upload(coeffs);
+            backend->set_boundary(boundary);
+            backend->set_probes(probes);
+            std::vector<FloatType> values(steps * points.size());
+            for (std::size_t k = 0; k < values.size(); ++k) {
+                values[k] = FloatType(1 + k % 4) / FloatType(4);
             }
-            CHECK(runs[1].fields == runs[0].fields);
-            CHECK(runs[1].probes == runs[0].probes);
+            backend->step(steps, std::span(points), std::span(values));
+            backend->download(fields);
+            Run &run = runs[level == CudaLevel::V4 ? 1 : 0];
+            append_fields(run.fields, fields);
+            run.probes = backend->fetch_probes();
         }
+        CHECK(runs[1].fields == runs[0].fields);
+        CHECK(runs[1].probes == runs[0].probes);
     }
 }
 
-// Verify the traffic model of the tiled kernel: one pass reads and writes each field once.
+// Verify the traffic model of the tiled kernel: one pass reads and writes each field once, and the
+// core shares the table's tuple as in v3.
 TEST_CASE("CUDA models the traffic of the tiled kernel", "[unit][backend][cuda]")
 {
     require_cuda();
@@ -653,19 +622,16 @@ TEST_CASE("CUDA models the traffic of the tiled kernel", "[unit][backend][cuda]"
     options.backend = BackendType::Cuda;
     options.boundary = Boundary::Pml;
     options.pml_thickness = 2;
-    options.variant = "tiled";
+    options.variant = "v4";
     const Simulation tiled(8, 6, options);
     const double word = sizeof(FloatType);
-    CHECK(tiled.step_traffic().bytes == (6 * 48 + 2 * 82 + 2 * 8 + 8 * 16 + 2 * 24) * word);
+    CHECK(tiled.step_traffic().bytes == (6 * 48 + 2 * 82 + 2 * 8 + 8 * 16 + 2 * 24 - 6 * 3) * word);
     CHECK(tiled.step_traffic().flops == 5 * 82 + 8 * 8 + 16 * 11);
-    options.variant = "tiled+table";
-    const Simulation table(8, 6, options);
-    CHECK(table.step_traffic().bytes == tiled.step_traffic().bytes - 6 * 3 * word);
 }
 
 // Verify that snapshots copied out while the steps go on equal those of a run that stops for
-// each, bit for bit: every kernel, with and without graphs, snapshots on consecutive steps (the
-// two slots taking turns), across a graph's span and on the last step, over two runs.
+// each, bit for bit: every level, with plain launches and graphs, snapshots on consecutive steps
+// (the two slots taking turns), across a graph's span and on the last step, over two runs.
 TEST_CASE("CUDA async snapshots match the stopping ones bit for bit", "[backend][cuda]")
 {
     require_cuda();
@@ -676,42 +642,38 @@ TEST_CASE("CUDA async snapshots match the stopping ones bit for bit", "[backend]
         std::vector<FloatType> probes;
     };
     const auto boundary = GENERATE(Boundary::Pmc, Boundary::Pml);
-    for (const CudaKernel kernel : KERNELS) {
-        for (const bool graph : {false, true}) {
-            INFO("kernel " << static_cast<int>(kernel) << ", graph " << graph);
-            Taken taken[2];
-            for (const bool async : {false, true}) {
-                CudaOptions cuda = cuda_options(kernel, {32, 8});
-                cuda.graph = graph;
-                cuda.async_snapshots = async;
-                Simulation::Options options = settings(cuda);
-                options.backend = BackendType::Cuda;
-                options.boundary = boundary;
-                options.pml_thickness = 6;
-                Simulation sim(53, 41, options);
-                sim.add_source(20, 20, Component::Ez, fdtd::TMz::Gaussian::from_steps(sim.dt(), 6));
-                sim.add_source(30, 12, Component::Hy, fdtd::TMz::Gaussian::from_steps(sim.dt(), 6));
-                sim.add_probe(25, 25, Component::Ez);
-                for (const std::size_t step :
-                     std::vector<std::size_t>{1, 2, 3, 20, 37, 40, 41, 60}) {
-                    sim.add_snapshot(step);
-                }
-                Taken &into = taken[async ? 1 : 0];
-                const auto keep = [&](std::size_t step, const Fields &fields) {
-                    into.steps.push_back(step);
-                    append_fields(into.fields, fields);
-                };
-                sim.run(40, keep);
-                sim.run(20, keep);
-                sim.download();
-                append_fields(into.fields, sim.fields());
-                append(into.probes, sim.probe_data(0));
+    for (const CudaLevel level : LEVELS) {
+        INFO("level " << static_cast<int>(level));
+        Taken taken[2];
+        for (const bool async : {false, true}) {
+            CudaOptions cuda = cuda_options(level, {32, 8});
+            cuda.async_snapshots = async;
+            Simulation::Options options = settings(cuda);
+            options.backend = BackendType::Cuda;
+            options.boundary = boundary;
+            options.pml_thickness = 6;
+            Simulation sim(53, 41, options);
+            sim.add_source(20, 20, Component::Ez, fdtd::TMz::Gaussian::from_steps(sim.dt(), 6));
+            sim.add_source(30, 12, Component::Hy, fdtd::TMz::Gaussian::from_steps(sim.dt(), 6));
+            sim.add_probe(25, 25, Component::Ez);
+            for (const std::size_t step : std::vector<std::size_t>{1, 2, 3, 20, 37, 40, 41, 60}) {
+                sim.add_snapshot(step);
             }
-            CHECK(taken[0].steps == std::vector<std::size_t>{1, 2, 3, 20, 37, 40, 41, 60});
-            CHECK(taken[1].steps == taken[0].steps);
-            CHECK(taken[1].fields == taken[0].fields);
-            CHECK(taken[1].probes == taken[0].probes);
+            Taken &into = taken[async ? 1 : 0];
+            const auto keep = [&](std::size_t step, const Fields &fields) {
+                into.steps.push_back(step);
+                append_fields(into.fields, fields);
+            };
+            sim.run(40, keep);
+            sim.run(20, keep);
+            sim.download();
+            append_fields(into.fields, sim.fields());
+            append(into.probes, sim.probe_data(0));
         }
+        CHECK(taken[0].steps == std::vector<std::size_t>{1, 2, 3, 20, 37, 40, 41, 60});
+        CHECK(taken[1].steps == taken[0].steps);
+        CHECK(taken[1].fields == taken[0].fields);
+        CHECK(taken[1].probes == taken[0].probes);
     }
 }
 

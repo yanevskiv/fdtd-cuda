@@ -149,7 +149,7 @@ TEST_CASE("Backends model the traffic of a step", "[unit][backend]")
             if (type == fdtd::TMz::BackendType::OpenMP) {
                 options.variant = "v2";
             } else if (type == fdtd::TMz::BackendType::Cuda) {
-                options.variant = "fused";
+                options.variant = "v1";
             }
             options.boundary = c.boundary;
             options.pml_thickness = 2;
@@ -519,14 +519,17 @@ TEST_CASE("Variant names belong to their backend", "[unit][backend]")
     CHECK(reads_variant(BackendType::OpenMP, "v2+close"));
     CHECK_FALSE(reads_variant(BackendType::Cuda, "v2+close"));
     CHECK_FALSE(reads_variant(BackendType::Serial, "v1"));
-    CHECK(reads_variant(BackendType::Cuda, "tiled:16x16"));
-    CHECK_FALSE(reads_variant(BackendType::OpenMP, "tiled:16x16"));
-    CHECK_FALSE(reads_variant(BackendType::Serial, "fused"));
+    CHECK(reads_variant(BackendType::Cuda, "v4:16x16"));
+    CHECK_FALSE(reads_variant(BackendType::OpenMP, "v4:16x16"));
+    CHECK(reads_variant(BackendType::Cuda, "v1"));
+    CHECK(reads_variant(BackendType::OpenMP, "v1"));
+    CHECK_FALSE(reads_variant(BackendType::Serial, "v1:32x8"));
 
     CHECK(variant_name(BackendType::Serial, "default") == "default");
     CHECK(variant_name(BackendType::OpenMP, "v1") == "v1");
     CHECK(variant_name(BackendType::OpenMP, "default") == "v4");
-    CHECK(variant_name(BackendType::Cuda, "tiled:8x4") == "tiled:8x4");
+    CHECK(variant_name(BackendType::Cuda, "v3:8x4") == "v3:8x4");
+    CHECK(variant_name(BackendType::Cuda, "default") == "v4:32x8");
     CHECK_THROWS_AS(variant_name(BackendType::Serial, "v1"), std::invalid_argument);
-    CHECK_THROWS_AS(variant_name(BackendType::OpenMP, "fused"), std::invalid_argument);
+    CHECK_THROWS_AS(variant_name(BackendType::OpenMP, "v2+async"), std::invalid_argument);
 }

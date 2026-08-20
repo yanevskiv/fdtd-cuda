@@ -345,6 +345,21 @@ namespace fdtd
                     download_rows(target, target.size(), source, target.size(), target.size(), 1,
                                   stream);
                 }
+
+                /**
+                 * Grow a device buffer to hold at least a number of elements, dropping its
+                 * contents when it grows.
+                 *
+                 * @tparam T Element type.
+                 * @param buffer Buffer to grow.
+                 * @param size Elements it must hold.
+                 */
+                template <typename T> inline void reserve(DeviceBuffer<T> &buffer, std::size_t size)
+                {
+                    if (buffer.size() < size) {
+                        buffer = DeviceBuffer<T>(size);
+                    }
+                }
             }
         }
     }

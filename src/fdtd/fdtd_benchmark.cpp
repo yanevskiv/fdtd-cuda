@@ -394,10 +394,9 @@ namespace fdtd
         usage << "                        sample, timed with it; 0 for none (default: 0)\n";
         usage << "  --backend B           Backend, serial, openmp, cuda or all; repeatable\n";
         usage << "                        (default: all)\n";
-        usage << "  --variant V           OpenMP variant LEVEL[+close|+spread], LEVEL v1 to\n";
-        usage << "                        v4; CUDA variant\n";
-        usage << "                        KERNEL[:BXxBY][+table][+graph][+async], KERNEL\n";
-        usage << "                        fused or tiled; or default.\n";
+        usage << "  --variant V           Variant, LEVEL v1 to v4: for OpenMP\n";
+        usage << "                        LEVEL[+close|+spread], for CUDA\n";
+        usage << "                        LEVEL[:BXxBY][+async]; or default.\n";
         usage << "                        Repeatable; a backend runs the names it reads, or\n";
         usage << "                        default (default: default)\n";
         usage << "  --threads N           Thread count, for OpenMP only; repeatable\n";
