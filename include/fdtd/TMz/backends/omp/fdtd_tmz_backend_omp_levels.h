@@ -42,21 +42,18 @@ namespace fdtd
              *
              * Each level is the one before it with one optimization:
              *
-             * - v1, rows: the serial kernels, a static `omp for` over the rows in one parallel
-             *   region per advance.
+             * - v1, rows: the serial kernels, a static `omp for` over the rows in one parallel region per advance.
              * - v2, simd: v1 with kernels of its own whose inner loops carry `omp simd`.
-             * - v3, table: v2 with the core cells reading the one tuple of coefficients they
-             *   share instead of six arrays.
+             * - v3, table: v2 with the core cells reading the one tuple of coefficients they share instead of six arrays.
              * - v4, fused: v3 with H and E in one sweep of each thread's band of rows per step.
              *
-             * The headers of the kernels hold OpenMP pragmas and are included by the levels'
-             * sources alone; this one holds none.
+             * The headers of the kernels hold OpenMP pragmas and are included by the levels' sources alone; this one holds none.
              */
             namespace omp
             {
                 /**
-                 * The update coefficients of a cell whose Ez takes the same pair along x and y, as
-                 * every cell outside the PML does: the pairs of Ez, Hx and Hy.
+                 * The update coefficients of a cell whose Ez takes the same pair along x and y, as every cell outside the PML does: the
+                 * pairs of Ez, Hx and Hy.
                  */
                 struct CoeffTuple
                 {
@@ -85,22 +82,20 @@ namespace fdtd
                     /** The tuple. */
                     CoeffTuple tuple;
 
-                    /** The core of the interior: the interior less its last column and row,
-                     * where Hy and Hx sit half a cell into the PML. */
+                    /** The core of the interior: the interior less its last column and row, where Hy and Hx sit half a cell into the
+                     * PML. */
                     serial::Block core;
                 };
 
                 /**
                  * The one tuple every cell of the core of an interior holds, compared bit by bit.
                  *
-                 * The core is the interior less its last column and row, where Hy and Hx sit half a
-                 * cell into the PML and take its grading.
+                 * The core is the interior less its last column and row, where Hy and Hx sit half a cell into the PML and take its grading.
                  *
                  * @param coeffs Coefficients to read.
-                 * @param lo Lower bound of the interior along both axes: the core holds the cells
-                 *        with lo <= i < nx - lo - 1 and lo <= j < ny - lo - 1.
-                 * @return The tuple, or none when the core is empty, or two of its cells differ, or
-                 *         a cell's Ez pairs along x and y differ.
+                 * @param lo Lower bound of the interior along both axes: the core holds the cells with lo <= i < nx - lo - 1 and lo <= j <
+                 *        ny - lo - 1.
+                 * @return The tuple, or none when the core is empty, or two of its cells differ, or a cell's Ez pairs along x and y differ.
                  */
                 std::optional<CoeffTuple> core_tuple(const Coeffs &coeffs, std::size_t lo);
 
@@ -121,8 +116,8 @@ namespace fdtd
                 };
 
                 /**
-                 * Run an advance at level v1: each step an `omp for` over the rows for the H
-                 * phase, then one for the E phase, with the serial kernels.
+                 * Run an advance at level v1: each step an `omp for` over the rows for the H phase, then one for the E phase, with the
+                 * serial kernels.
                  *
                  * @param advance The advance.
                  */
@@ -144,8 +139,8 @@ namespace fdtd
                 void run_v3(const Advance &advance, const std::optional<SharedTuple> &shared);
 
                 /**
-                 * Run an advance at level v4: v3 with each thread sweeping its band of rows once a
-                 * step, H then E row by row, after the H of the band's last row.
+                 * Run an advance at level v4: v3 with each thread sweeping its band of rows once a step, H then E row by row, after the H
+                 * of the band's last row.
                  *
                  * @param advance The advance.
                  * @param shared The tuple the core shares, or none to read the arrays everywhere.

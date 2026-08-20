@@ -36,13 +36,12 @@ namespace fdtd
         /**
          * Per-cell material parameters over a grid, vacuum by default.
          *
-         * Each array has grid().size() elements, indexed with Grid::index. Permittivity
-         * and permeability are relative; the conductivities are in SI units.
+         * Each array has grid().size() elements, indexed with Grid::index. Permittivity and permeability are relative; the conductivities
+         * are in SI units.
          *
-         * Besides the isotropic media, the material holds the directional conductivities of
-         * a split-field PML along the edges, zero until set_pml() grades them. They are the
-         * vacuum profiles: the coefficients scale them by eps_r and mu_r, so the media and
-         * the PML can be set in any order, and the fill functions leave them alone.
+         * Besides the isotropic media, the material holds the directional conductivities of a split-field PML along the edges, zero until
+         * set_pml() grades them. They are the vacuum profiles: the coefficients scale them by eps_r and mu_r, so the media and the PML can
+         * be set in any order, and the fill functions leave them alone.
          */
         class Material
         {
@@ -105,21 +104,18 @@ namespace fdtd
              * @param medium Medium to fill with.
              * @throws std::invalid_argument When the medium is not physical.
              */
-            void fill_rect(std::size_t i0, std::size_t j0, std::size_t i1, std::size_t j1,
-                           const Medium &medium);
+            void fill_rect(std::size_t i0, std::size_t j0, std::size_t i1, std::size_t j1, const Medium &medium);
 
             /**
              * Set the cells whose indices lie within a circle to a medium, clipped to the grid.
              *
-             * Cell (i, j) is inside when (i - ci)^2 + (j - cj)^2 <= radius^2, so the center
-             * may lie off the grid.
+             * Cell (i, j) is inside when (i - ci)^2 + (j - cj)^2 <= radius^2, so the center may lie off the grid.
              *
              * @param ci Center along x in cells.
              * @param cj Center along y in cells.
              * @param radius Radius in cells, non-negative.
              * @param medium Medium to fill with.
-             * @throws std::invalid_argument When the medium is not physical or the circle
-             *         is not finite and non-negative.
+             * @throws std::invalid_argument When the medium is not physical or the circle is not finite and non-negative.
              */
             void fill_circle(double ci, double cj, double radius, const Medium &medium);
 
@@ -154,23 +150,20 @@ namespace fdtd
             /**
              * Grade the PML conductivities along the edges, or clear them.
              *
-             * The axis along x has nx Ez nodes 0 .. nx - 1, with the PML walls behind nodes
-             * 0 and nx - 1; the layers end at nodes thickness and nx - 1 - thickness. At a
-             * depth d into a layer, in cells,
+             * The axis along x has nx Ez nodes 0 .. nx - 1, with the PML walls behind nodes 0 and nx - 1; the layers end at nodes thickness
+             * and nx - 1 - thickness. At a depth d into a layer, in cells,
              *
              *     sigma(d) = sigma_max (d / thickness)^order,
              *     sigma_max = -(order + 1) ln reflection / (2 eta0 thickness dx),
              *
-             * so a wave crossing the layer and back at normal incidence is damped to the
-             * reflection. The magnetic profiles are matched, sigma* = sigma mu0 / eps0, and
-             * sampled half a cell further, where Hy and Hx sit. Likewise along y, with dy.
+             * so a wave crossing the layer and back at normal incidence is damped to the reflection. The magnetic profiles are matched,
+             * sigma* = sigma mu0 / eps0, and sampled half a cell further, where Hy and Hx sit. Likewise along y, with dy.
              *
-             * @param thickness Layer thickness in cells, with 2 * thickness < nx and ny;
-             *        zero clears the profiles and ignores order and reflection.
+             * @param thickness Layer thickness in cells, with 2 * thickness < nx and ny; zero clears the profiles and ignores order and
+             *        reflection.
              * @param order Grading exponent, positive and finite.
              * @param reflection Target reflection at normal incidence, in (0, 1).
-             * @throws std::invalid_argument When a setting is out of range; the material is
-             *         then unchanged.
+             * @throws std::invalid_argument When a setting is out of range; the material is then unchanged.
              */
             void set_pml(std::size_t thickness, double order, double reflection);
 

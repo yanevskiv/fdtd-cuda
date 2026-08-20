@@ -36,8 +36,7 @@ namespace fdtd::TMz::backends::serial
     namespace
     {
         // Visit each edge cell of a block once: the first and last rows, then the row ends between.
-        template <typename Visit>
-        void for_each_edge(const Grid &grid, const Block &block, Visit visit)
+        template <typename Visit> void for_each_edge(const Grid &grid, const Block &block, Visit visit)
         {
             const std::size_t nx = grid.nx();
             const std::size_t ny = grid.ny();
@@ -66,8 +65,8 @@ namespace fdtd::TMz::backends::serial
 
         // Sort point indices by the part of their cell, stable, as offsets and an order.
         template <typename Point>
-        void bucket(const Partition &partition, const Grid &grid, std::span<const Point> points,
-                    std::vector<std::size_t> &offsets, std::vector<std::size_t> &order)
+        void bucket(const Partition &partition, const Grid &grid, std::span<const Point> points, std::vector<std::size_t> &offsets,
+                    std::vector<std::size_t> &order)
         {
             const std::size_t pitch = grid.pitch();
             std::vector<std::size_t> owners(points.size());
@@ -104,18 +103,15 @@ namespace fdtd::TMz::backends::serial
 
     // Take the arrays of a coefficient set.
     CoeffsView::CoeffsView(const Coeffs &coeffs) noexcept
-        : CoeffsView(coeffs.coeff_ez_x1().data(), coeffs.coeff_ez_x2().data(),
-                     coeffs.coeff_ez_y1().data(), coeffs.coeff_ez_y2().data(),
-                     coeffs.coeff_hx_1().data(), coeffs.coeff_hx_2().data(),
-                     coeffs.coeff_hy_1().data(), coeffs.coeff_hy_2().data())
+        : CoeffsView(coeffs.coeff_ez_x1().data(), coeffs.coeff_ez_x2().data(), coeffs.coeff_ez_y1().data(), coeffs.coeff_ez_y2().data(),
+                     coeffs.coeff_hx_1().data(), coeffs.coeff_hx_2().data(), coeffs.coeff_hy_1().data(), coeffs.coeff_hy_2().data())
     {
         // Empty.
     }
 
     // Take eight arrays.
-    CoeffsView::CoeffsView(const FloatType *ezX1, const FloatType *ezX2, const FloatType *ezY1,
-                           const FloatType *ezY2, const FloatType *hx1, const FloatType *hx2,
-                           const FloatType *hy1, const FloatType *hy2) noexcept
+    CoeffsView::CoeffsView(const FloatType *ezX1, const FloatType *ezX2, const FloatType *ezY1, const FloatType *ezY2, const FloatType *hx1,
+                           const FloatType *hx2, const FloatType *hy1, const FloatType *hy2) noexcept
         : coeff_ez_x1(ezX1)
         , coeff_ez_x2(ezX2)
         , coeff_ez_y1(ezY1)
@@ -129,8 +125,7 @@ namespace fdtd::TMz::backends::serial
     }
 
     // Zero the block's edge Ez and its parts, or update it reading H outside the domain as zero.
-    void update_boundary_block(Fields &fields, CoeffsView coeffs, const Block &block,
-                               Boundary boundary) noexcept
+    void update_boundary_block(Fields &fields, CoeffsView coeffs, const Block &block, Boundary boundary) noexcept
     {
         const Grid &grid = fields.grid();
         FloatType *__restrict Ez = fields.ez().data();
@@ -244,9 +239,8 @@ namespace fdtd::TMz::backends::serial
     }
 
     // Keep the advance and sort its sources and probes by part.
-    Stepper::Stepper(Fields &fields, CoeffsView coeffs, std::size_t pml, Boundary boundary,
-                     const Partition &partition, std::span<const PointInjection> sources,
-                     std::span<const FloatType> values, std::span<const PointProbe> probes,
+    Stepper::Stepper(Fields &fields, CoeffsView coeffs, std::size_t pml, Boundary boundary, const Partition &partition,
+                     std::span<const PointInjection> sources, std::span<const FloatType> values, std::span<const PointProbe> probes,
                      FloatType *records)
         : m_fields(fields)
         , m_coeffs(coeffs)
@@ -327,9 +321,8 @@ namespace fdtd::TMz::backends
         // Check that two grids hold the same geometry.
         void require_same_grid(std::string_view backend, const Grid &expected, const Grid &actual)
         {
-            if (expected.nx() != actual.nx() || expected.ny() != actual.ny() ||
-                expected.pitch() != actual.pitch() || expected.dx() != actual.dx() ||
-                expected.dy() != actual.dy()) {
+            if (expected.nx() != actual.nx() || expected.ny() != actual.ny() || expected.pitch() != actual.pitch() ||
+                expected.dx() != actual.dx() || expected.dy() != actual.dy()) {
                 std::ostringstream message;
                 message << backend;
                 message << " backend: the data is on a different grid";
@@ -446,14 +439,12 @@ namespace fdtd::TMz::backends
     }
 
     // Step the whole grid as one part, the H phase then the E phase of every step.
-    void SerialBackend::advance(std::size_t nsteps, std::span<const PointInjection> points,
-                                std::span<const FloatType> values)
+    void SerialBackend::advance(std::size_t nsteps, std::span<const PointInjection> points, std::span<const FloatType> values)
     {
         require_coeffs();
         FloatType *records = add_records(nsteps);
         const serial::Partition partition = serial::Partition::whole(grid());
-        const serial::Stepper stepper(fields(), coeffs(), active_pml(), boundary(), partition,
-                                      points, values, probes(), records);
+        const serial::Stepper stepper(fields(), coeffs(), active_pml(), boundary(), partition, points, values, probes(), records);
         for (std::size_t n = 0; n < nsteps; ++n) {
             stepper.h_phase(0, n);
             stepper.e_phase(0, n);
@@ -493,9 +484,8 @@ namespace fdtd::TMz::backends
     // View the coefficient arrays.
     serial::CoeffsView SerialBackend::coeffs() const noexcept
     {
-        return {m_coeff_ez_x1.data(), m_coeff_ez_x2.data(), m_coeff_ez_y1.data(),
-                m_coeff_ez_y2.data(), m_coeff_hx_1.data(),  m_coeff_hx_2.data(),
-                m_coeff_hy_1.data(),  m_coeff_hy_2.data()};
+        return {m_coeff_ez_x1.data(), m_coeff_ez_x2.data(), m_coeff_ez_y1.data(), m_coeff_ez_y2.data(),
+                m_coeff_hx_1.data(),  m_coeff_hx_2.data(),  m_coeff_hy_1.data(),  m_coeff_hy_2.data()};
     }
 
     // Return the PML thickness under Boundary::Pml, zero otherwise.

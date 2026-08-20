@@ -77,8 +77,7 @@ namespace fdtd::TMz
     }
 
     // Take one sample per step at (firstStep + n + offset) * dt.
-    std::vector<FloatType> sample_waveform(const Waveform &waveform, double dt,
-                                           std::size_t firstStep, std::size_t nsteps, double offset)
+    std::vector<FloatType> sample_waveform(const Waveform &waveform, double dt, std::size_t firstStep, std::size_t nsteps, double offset)
     {
         if (!waveform) {
             throw std::invalid_argument("sample_waveform: empty waveform");

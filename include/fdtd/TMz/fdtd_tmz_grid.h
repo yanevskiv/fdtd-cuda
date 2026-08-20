@@ -33,8 +33,7 @@ namespace fdtd
         /**
          * Geometry of a 2D Yee grid: cell counts, cell sizes and row-major indexing.
          *
-         * Cell (i, j) is at index j * pitch + i, with x fastest. The pitch equals nx
-         * on the CPU; a GPU backend may pad it for coalescing.
+         * Cell (i, j) is at index j * pitch + i, with x fastest. The pitch equals nx on the CPU; a GPU backend may pad it for coalescing.
          */
         class Grid
         {
@@ -46,8 +45,7 @@ namespace fdtd
              * @param ny Cells along y, at least 1.
              * @param dx Cell size along x in meters, positive.
              * @param dy Cell size along y in meters, positive.
-             * @throws std::invalid_argument On a zero count, a non-positive size or an
-             *         index range that does not fit std::size_t.
+             * @throws std::invalid_argument On a zero count, a non-positive size or an index range that does not fit std::size_t.
              */
             Grid(std::size_t nx, std::size_t ny, FloatType dx = 1, FloatType dy = 1);
 
@@ -125,8 +123,8 @@ namespace fdtd
         /**
          * Time step for a Courant number on a grid in vacuum.
          *
-         * The 2D stability limit is dt <= 1 / (c0 * sqrt(1/dx^2 + 1/dy^2)); the result is
-         * that limit scaled by the Courant number. Computed in double.
+         * The 2D stability limit is dt <= 1 / (c0 * sqrt(1/dx^2 + 1/dy^2)); the result is that limit scaled by the Courant number. Computed
+         * in double.
          *
          * @param grid Grid whose cell sizes set the limit.
          * @param courant Courant number S, with 0 < S <= 1.

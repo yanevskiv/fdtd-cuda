@@ -105,8 +105,7 @@ namespace
     };
 
     // Run a pulse with an H source and probes on a backend, and collect the fields and records.
-    Run run(BackendType backend, Simulation::Options opts, Size size, Boundary boundary,
-            Medium medium = Medium::Vacuum)
+    Run run(BackendType backend, Simulation::Options opts, Size size, Boundary boundary, Medium medium = Medium::Vacuum)
     {
         opts.backend = backend;
         opts.boundary = boundary;
@@ -114,8 +113,7 @@ namespace
         Simulation sim(size.nx, size.ny, opts);
         if (medium == Medium::Circle) {
             fdtd::TMz::Material material = sim.material();
-            material.fill_circle(double(size.nx) / 2, double(size.ny) / 2, 6,
-                                 {.eps_r = 3, .sigma_e = FloatType(0.2)});
+            material.fill_circle(double(size.nx) / 2, double(size.ny) / 2, 6, {.eps_r = 3, .sigma_e = FloatType(0.2)});
             material.fill_rect(8, 8, 14, size.ny - 8, {.eps_r = 2});
             sim.set_material(material);
         }
@@ -292,22 +290,20 @@ TEST_CASE("OpenMP backend checks its options", "[unit][backend][openmp]")
     for (const char *variant : {"rows+simd", "v5", "v4+fuse"}) {
         CAPTURE(variant);
         options.variant = variant;
-        CHECK_THROWS_AS(fdtd::TMz::make_backend(BackendType::OpenMP, grid, options),
-                        std::invalid_argument);
+        CHECK_THROWS_AS(fdtd::TMz::make_backend(BackendType::OpenMP, grid, options), std::invalid_argument);
     }
     options.variant = "v1+spread";
     CHECK_NOTHROW(fdtd::TMz::make_backend(BackendType::OpenMP, grid, options));
 }
 
-// Verify that the levels with the table match serial on media, where the core shares no tuple
-// and reads the arrays, and in the exact build bit for bit.
+// Verify that the levels with the table match serial on media, where the core shares no tuple and reads the arrays, and in the exact build
+// bit for bit.
 TEST_CASE("OpenMP table and fusion match serial on media", "[backend][openmp]")
 {
     require_openmp();
     const auto boundary = GENERATE(Boundary::Pec, Boundary::Pmc, Boundary::Pml);
     const Size size{67, 45};
-    const Run serial =
-        run(BackendType::Serial, Simulation::Options{}, size, boundary, Medium::Circle);
+    const Run serial = run(BackendType::Serial, Simulation::Options{}, size, boundary, Medium::Circle);
     for (const std::size_t threads : thread_counts()) {
         for (const OmpLevel level : {OmpLevel::V3, OmpLevel::V4}) {
             OmpOptions omp;
@@ -325,8 +321,8 @@ TEST_CASE("OpenMP table and fusion match serial on media", "[backend][openmp]")
     }
 }
 
-// Verify the traffic model: v3's table takes 6 words a core cell off v2's on vacuum and none on
-// media, and v4 is the one-pass model with the table.
+// Verify the traffic model: v3's table takes 6 words a core cell off v2's on vacuum and none on media, and v4 is the one-pass model with
+// the table.
 TEST_CASE("OpenMP models the traffic of the table and fusion", "[unit][backend][openmp]")
 {
     require_openmp();
@@ -356,8 +352,7 @@ TEST_CASE("OpenMP models the traffic of the table and fusion", "[unit][backend][
         fdtd::TMz::TrafficModel model;
         model.one_pass = true;
         model.table = true;
-        const auto expected = fdtd::TMz::two_pass_traffic(
-            fused.grid(), boundary == Boundary::Pml ? 2 : 0, boundary, model);
+        const auto expected = fdtd::TMz::two_pass_traffic(fused.grid(), boundary == Boundary::Pml ? 2 : 0, boundary, model);
         CHECK(fused.step_traffic().bytes == expected.bytes);
         CHECK(fused.step_traffic().flops == expected.flops);
     }
@@ -385,8 +380,7 @@ TEST_CASE("OpenMP binding preserves results bit for bit", "[backend][openmp]")
 #if FDTD_WITH_OPENMP
 
 // Check that a tuple holds a cell's values exactly.
-static void check_tuple(const fdtd::TMz::backends::omp::CoeffTuple &tuple, const Coeffs &coeffs,
-                        std::size_t k)
+static void check_tuple(const fdtd::TMz::backends::omp::CoeffTuple &tuple, const Coeffs &coeffs, std::size_t k)
 {
     CHECK(tuple.ez_1 == coeffs.coeff_ez_x1()[k]);
     CHECK(tuple.ez_2 == coeffs.coeff_ez_x2()[k]);

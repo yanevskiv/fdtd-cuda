@@ -64,8 +64,7 @@ namespace fdtd
         constexpr std::size_t PEAK_REPEATS = 10;
 
         // Write one '# key: value unit' line, the value with the given decimals.
-        void peak_line(std::ostream &out, std::string_view key, double value, int decimals,
-                       std::string_view unit)
+        void peak_line(std::ostream &out, std::string_view key, double value, int decimals, std::string_view unit)
         {
             std::ostringstream line;
             line << "# ";
@@ -189,8 +188,7 @@ namespace fdtd
         }
 
         // Check the settings the parser leaves to the library.
-        void check(const BenchmarkOptions &options, std::span<const TMz::BackendType> backends,
-                   std::span<const std::string> variants)
+        void check(const BenchmarkOptions &options, std::span<const TMz::BackendType> backends, std::span<const std::string> variants)
         {
             if (options.steps == 0) {
                 throw std::invalid_argument("run_benchmark: steps must be positive");
@@ -207,8 +205,7 @@ namespace fdtd
                 }
             }
             for (const std::string &variant : variants) {
-                if (!TMz::reads_variant(TMz::BackendType::OpenMP, variant) &&
-                    !TMz::reads_variant(TMz::BackendType::Cuda, variant)) {
+                if (!TMz::reads_variant(TMz::BackendType::OpenMP, variant) && !TMz::reads_variant(TMz::BackendType::Cuda, variant)) {
                     std::ostringstream message;
                     message << "run_benchmark: no backend reads the variant ";
                     message << variant;
@@ -218,8 +215,7 @@ namespace fdtd
         }
 
         // Build the workload, time its run, and sum Ez once the fields are back.
-        BenchmarkSample measure(const BenchmarkOptions &options, std::size_t ny,
-                                TMz::BackendType backend, const std::string &variant,
+        BenchmarkSample measure(const BenchmarkOptions &options, std::size_t ny, TMz::BackendType backend, const std::string &variant,
                                 std::size_t threads, std::size_t repeat)
         {
             TMz::Simulation::Options simOptions;
@@ -228,8 +224,7 @@ namespace fdtd
             simOptions.variant = variant;
             simOptions.threads = threads;
             TMz::Simulation sim(options.nx, ny, simOptions);
-            sim.add_source(options.nx / 2, ny / 2, TMz::Component::Ez,
-                           TMz::Gaussian::from_steps(sim.dt(), PULSE_WIDTH_STEPS));
+            sim.add_source(options.nx / 2, ny / 2, TMz::Component::Ez, TMz::Gaussian::from_steps(sim.dt(), PULSE_WIDTH_STEPS));
             const std::size_t every = options.snapshot_every;
             for (std::size_t step = every; every > 0 && step <= options.steps; step += every) {
                 sim.add_snapshot(step);
@@ -268,8 +263,8 @@ namespace fdtd
         }
 
         // Run the workload untimed until the warm-up time has passed.
-        void warm_up(const BenchmarkOptions &options, std::size_t ny, TMz::BackendType backend,
-                     const std::string &variant, std::size_t threads)
+        void warm_up(const BenchmarkOptions &options, std::size_t ny, TMz::BackendType backend, const std::string &variant,
+                     std::size_t threads)
         {
             if (!(options.warmup > 0)) {
                 return;
@@ -281,8 +276,7 @@ namespace fdtd
         }
 
         // Keep the names a backend reads, or default when it reads none of them.
-        std::vector<std::string> variants_of(TMz::BackendType backend,
-                                             std::span<const std::string> variants)
+        std::vector<std::string> variants_of(TMz::BackendType backend, std::span<const std::string> variants)
         {
             std::vector<std::string> names;
             for (const std::string &variant : variants) {
@@ -314,8 +308,7 @@ namespace fdtd
         {
             const BenchmarkSample &first = samples.front();
             const double median = median_seconds(samples);
-            const double cells = static_cast<double>(first.nx) * static_cast<double>(first.ny) *
-                                 static_cast<double>(first.nsteps);
+            const double cells = static_cast<double>(first.nx) * static_cast<double>(first.ny) * static_cast<double>(first.nsteps);
             std::ostringstream line;
             line << TMz::backend_name(first.backend);
             line << ' ';
@@ -347,8 +340,7 @@ namespace fdtd
     // Split the arguments, then set the flags and apply each option with its value.
     BenchmarkOptions parse_benchmark_options(std::span<const std::string_view> args)
     {
-        static constexpr std::string_view FLAGS[] = {
-            "-h", "--help", "-v", "--version", "--header-only", "--no-header", "--peaks"};
+        static constexpr std::string_view FLAGS[] = {"-h", "--help", "-v", "--version", "--header-only", "--no-header", "--peaks"};
         BenchmarkOptions options;
         for (const Argument &arg : split_arguments(args, FLAGS)) {
             if (arg.name == "-h" || arg.name == "--help") {
@@ -473,16 +465,13 @@ namespace fdtd
             const double bandwidth = 2 * info.memory_clock * static_cast<double>(info.bus_bits) / 8;
             peak_line(out, "gpu_sm_count", sms, 0, "");
             peak_line(out, "gpu_clock", info.clock / 1e6, 0, "MHz");
-            peak_line(out, "gpu_l2_cache", static_cast<double>(info.l2_bytes) / (1 << 20), 1,
-                      "MiB");
+            peak_line(out, "gpu_l2_cache", static_cast<double>(info.l2_bytes) / (1 << 20), 1, "MiB");
             peak_line(out, "gpu_peak_bandwidth", bandwidth / 1e9, 1, "GB/s");
             const double copy = gpu::copy_bandwidth(2 * PEAK_BYTES, PEAK_REPEATS);
             peak_line(out, "gpu_copy_bandwidth", copy / 1e9, 1, "GB/s");
             if (fp32 > 0) {
-                peak_line(out, "gpu_peak_flops_float", 2 * fp32 * sms * info.clock / 1e9, 0,
-                          "GFLOPS");
-                peak_line(out, "gpu_peak_flops_double", 2 * fp64 * sms * info.clock / 1e9, 0,
-                          "GFLOPS");
+                peak_line(out, "gpu_peak_flops_float", 2 * fp32 * sms * info.clock / 1e9, 0, "GFLOPS");
+                peak_line(out, "gpu_peak_flops_double", 2 * fp64 * sms * info.clock / 1e9, 0, "GFLOPS");
             }
         }
 #endif
@@ -495,15 +484,11 @@ namespace fdtd
     }
 
     // Resolve the defaults, then measure each configuration and write its rows.
-    std::vector<BenchmarkSample> run_benchmark(const BenchmarkOptions &options, std::ostream &out,
-                                               std::ostream &log)
+    std::vector<BenchmarkSample> run_benchmark(const BenchmarkOptions &options, std::ostream &out, std::ostream &log)
     {
-        const std::vector<TMz::BackendType> backends =
-            options.backends.empty() ? TMz::available_backends() : options.backends;
-        const std::vector<std::string> variants =
-            options.variants.empty() ? std::vector<std::string>{"default"} : options.variants;
-        const std::vector<std::size_t> threadCounts =
-            options.threads.empty() ? std::vector<std::size_t>{1} : options.threads;
+        const std::vector<TMz::BackendType> backends = options.backends.empty() ? TMz::available_backends() : options.backends;
+        const std::vector<std::string> variants = options.variants.empty() ? std::vector<std::string>{"default"} : options.variants;
+        const std::vector<std::size_t> threadCounts = options.threads.empty() ? std::vector<std::size_t>{1} : options.threads;
         const std::vector<std::size_t> oneThread{1};
         const std::size_t ny = options.ny > 0 ? options.ny : options.nx;
         if (!options.header_only) {
@@ -536,8 +521,7 @@ namespace fdtd
         }
         std::vector<Configuration> configurations;
         for (const auto backend : backends) {
-            const std::vector<std::size_t> &counts =
-                backend == TMz::BackendType::OpenMP ? threadCounts : oneThread;
+            const std::vector<std::size_t> &counts = backend == TMz::BackendType::OpenMP ? threadCounts : oneThread;
             for (const std::string &variant : variants_of(backend, variants)) {
                 for (const std::size_t threads : counts) {
                     configurations.push_back({backend, variant, threads});

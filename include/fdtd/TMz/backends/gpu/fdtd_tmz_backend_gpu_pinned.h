@@ -35,11 +35,11 @@ namespace fdtd
             namespace gpu
             {
                 /**
-                 * Host memory that another owner allocated, page-locked while this lives, so a
-                 * copy to or from it runs on the device's copy engine while the host goes on.
+                 * Host memory that another owner allocated, page-locked while this lives, so a copy to or from it runs on the device's copy
+                 * engine while the host goes on.
                  *
-                 * A copy to pageable memory goes through a staging buffer and holds the host
-                 * until it is done; one to page-locked memory does not.
+                 * A copy to pageable memory goes through a staging buffer and holds the host until it is done; one to page-locked memory
+                 * does not.
                  */
                 class HostPin
                 {

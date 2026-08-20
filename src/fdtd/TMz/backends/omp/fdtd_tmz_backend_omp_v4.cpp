@@ -35,9 +35,8 @@
 // Namespace for the levels of the 2D TMz OpenMP backend.
 namespace fdtd::TMz::backends::omp
 {
-    // Give each thread a band of rows. Row j's Ez reads the H of rows j - 1 and j, and the next
-    // band's first Ez reads this band's last H, so each thread runs that H first, before a
-    // barrier, while every Ez it reads is still the old one. Then it runs each row's H and Ez in
+    // Give each thread a band of rows. Row j's Ez reads the H of rows j - 1 and j, and the next band's first Ez reads this band's last H,
+    // so each thread runs that H first, before a barrier, while every Ez it reads is still the old one. Then it runs each row's H and Ez in
     // turn, the row below's H done by then. A barrier ends each step.
     void run_v4(const Advance &advance, const std::optional<SharedTuple> &shared)
     {

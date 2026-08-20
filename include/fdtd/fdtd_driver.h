@@ -121,13 +121,12 @@ namespace fdtd
     /**
      * Parse the command-line arguments, without the program name.
      *
-     * Each option takes its value as the next argument or after '='. The variant is checked
-     * against the backend once every option is read, so the two may come in either order.
+     * Each option takes its value as the next argument or after '='. The variant is checked against the backend once every option is read,
+     * so the two may come in either order.
      *
      * @param args Arguments in order.
      * @return The settings.
-     * @throws std::invalid_argument On an unknown option, a missing value, a bad value, or a
-     *         variant the backend does not read.
+     * @throws std::invalid_argument On an unknown option, a missing value, a bad value, or a variant the backend does not read.
      */
     DriverOptions parse_driver_options(std::span<const std::string_view> args);
 
@@ -142,8 +141,8 @@ namespace fdtd
     /**
      * Run a simulation and write its probe CSV files and snapshots.
      *
-     * Writes probe_<k>.csv per probe and, with snapshot_every, snapshot_<step>.bin at
-     * step zero, every snapshot_every steps and the last step.
+     * Writes probe_<k>.csv per probe and, with snapshot_every, snapshot_<step>.bin at step zero, every snapshot_every steps and the last
+     * step.
      *
      * @param options Settings of the run.
      * @param log Stream for progress lines.

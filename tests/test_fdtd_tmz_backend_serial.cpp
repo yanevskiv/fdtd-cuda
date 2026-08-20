@@ -144,8 +144,7 @@ TEST_CASE("Serial update reads the coefficients by field", "[unit][serial_update
     const std::vector<FloatType> ezY(grid.size(), FloatType(8));
     const std::vector<FloatType> hx(grid.size(), FloatType(0.25));
     const std::vector<FloatType> hy(grid.size(), FloatType(0.125));
-    const CoeffsView coeffs(ezX.data(), zero.data(), ezY.data(), zero.data(), hx.data(),
-                            zero.data(), hy.data(), zero.data());
+    const CoeffsView coeffs(ezX.data(), zero.data(), ezY.data(), zero.data(), hx.data(), zero.data(), hy.data(), zero.data());
     Fields fields(grid);
     for (std::size_t k = 0; k < grid.size(); ++k) {
         fields.ez()[k] = 1;
@@ -428,16 +427,13 @@ namespace
     // Check that two sets of fields hold the same bits.
     bool same_fields(const Fields &a, const Fields &b)
     {
-        return std::equal(a.ez().begin(), a.ez().end(), b.ez().begin()) &&
-               std::equal(a.hx().begin(), a.hx().end(), b.hx().begin()) &&
-               std::equal(a.hy().begin(), a.hy().end(), b.hy().begin()) &&
-               std::equal(a.ezx().begin(), a.ezx().end(), b.ezx().begin()) &&
+        return std::equal(a.ez().begin(), a.ez().end(), b.ez().begin()) && std::equal(a.hx().begin(), a.hx().end(), b.hx().begin()) &&
+               std::equal(a.hy().begin(), a.hy().end(), b.hy().begin()) && std::equal(a.ezx().begin(), a.ezx().end(), b.ezx().begin()) &&
                std::equal(a.ezy().begin(), a.ezy().end(), b.ezy().begin());
     }
 
     // Run steps over the whole grid, or block by block.
-    void run_blocks(Fields &fields, const Coeffs &coeffs, const std::vector<Block> &blocks,
-                    std::size_t pml, Boundary boundary, int nsteps)
+    void run_blocks(Fields &fields, const Coeffs &coeffs, const std::vector<Block> &blocks, std::size_t pml, Boundary boundary, int nsteps)
     {
         for (int n = 0; n < nsteps; ++n) {
             for (const Block &block : blocks) {
@@ -631,9 +627,8 @@ namespace
         Material material(grid);
         material.set_pml(pml, 3, 1e-6);
         const Coeffs coeffs(material, fdtd::TMz::courant_dt(grid, 0.9));
-        const std::vector<PointInjection> sources{{Component::Ez, grid.index(9, 8)},
-                                                  {Component::Hx, grid.index(12, 6)},
-                                                  {Component::Hy, grid.index(6, 11)}};
+        const std::vector<PointInjection> sources{
+            {Component::Ez, grid.index(9, 8)}, {Component::Hx, grid.index(12, 6)}, {Component::Hy, grid.index(6, 11)}};
         std::vector<FloatType> values(STEPS * sources.size());
         for (std::size_t k = 0; k < values.size(); ++k) {
             values[k] = FloatType(1 + k % 5);
@@ -643,8 +638,7 @@ namespace
                                              {Component::Ez, grid.index(10, 9)},
                                              {Component::Hx, grid.index(18, 13)}};
         Run result{Fields(grid), std::vector<FloatType>(STEPS * probes.size())};
-        const Stepper stepper(result.fields, coeffs, pml, boundary, partition, sources, values,
-                              probes, result.records.data());
+        const Stepper stepper(result.fields, coeffs, pml, boundary, partition, sources, values, probes, result.records.data());
         for (std::size_t n = 0; n < STEPS; ++n) {
             for (std::size_t p = 0; p < partition.size(); ++p) {
                 stepper.h_phase(p, n);
@@ -663,8 +657,7 @@ namespace
                std::equal(a.fields.hx().begin(), a.fields.hx().end(), b.fields.hx().begin()) &&
                std::equal(a.fields.hy().begin(), a.fields.hy().end(), b.fields.hy().begin()) &&
                std::equal(a.fields.ezx().begin(), a.fields.ezx().end(), b.fields.ezx().begin()) &&
-               std::equal(a.fields.ezy().begin(), a.fields.ezy().end(), b.fields.ezy().begin()) &&
-               a.records == b.records;
+               std::equal(a.fields.ezy().begin(), a.fields.ezy().end(), b.fields.ezy().begin()) && a.records == b.records;
     }
 }
 

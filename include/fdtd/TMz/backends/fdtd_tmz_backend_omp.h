@@ -43,9 +43,8 @@ namespace fdtd
             /**
              * Multi-threaded CPU backend: the serial algorithm with its rows shared among threads.
              *
-             * The level of the options picks the code that runs an advance, one file each in
-             * `backends/omp/`; see the omp namespace. Every level matches serial within the
-             * tolerance, and bit for bit in the exact build.
+             * The level of the options picks the code that runs an advance, one file each in `backends/omp/`; see the omp namespace. Every
+             * level matches serial within the tolerance, and bit for bit in the exact build.
              */
             class OmpBackend final : public SerialBackend
             {
@@ -62,8 +61,8 @@ namespace fdtd
                 using SerialBackend::upload;
 
                 /**
-                 * Copy update coefficients into the backend, and from level v3 find the tuple the
-                 * core cells share, with the PML of the coefficients in force and with none.
+                 * Copy update coefficients into the backend, and from level v3 find the tuple the core cells share, with the PML of the
+                 * coefficients in force and with none.
                  *
                  * @param coeffs Coefficients on the backend's grid.
                  */
@@ -98,11 +97,9 @@ namespace fdtd
                 std::size_t threads() const noexcept;
 
                 /**
-                 * Modelled traffic of one step: one pass at v4, two below, and the core reading
-                 * no arrays from v3 when it shares a tuple.
+                 * Modelled traffic of one step: one pass at v4, two below, and the core reading no arrays from v3 when it shares a tuple.
                  *
-                 * @return two_pass_traffic() of the grid, the active PML, the boundary and the
-                 *         model of the level.
+                 * @return two_pass_traffic() of the grid, the active PML, the boundary and the model of the level.
                  */
                 StepTraffic step_traffic() const noexcept override;
 
@@ -114,15 +111,13 @@ namespace fdtd
                  * @param points Distinct cells inside the grid.
                  * @param values One value per point per step, step-major.
                  */
-                void advance(std::size_t nsteps, std::span<const PointInjection> points,
-                             std::span<const FloatType> values) override;
+                void advance(std::size_t nsteps, std::span<const PointInjection> points, std::span<const FloatType> values) override;
 
             private:
                 /**
                  * Tuple the core cells share under the boundary in force, from level v3.
                  *
-                 * @return The tuple and its core, or none when the core shares no tuple or the
-                 *         level is below v3.
+                 * @return The tuple and its core, or none when the core shares no tuple or the level is below v3.
                  */
                 const std::optional<omp::SharedTuple> &shared_tuple() const noexcept;
 
@@ -153,25 +148,21 @@ namespace fdtd
             };
 
             /**
-             * Measure the memory bandwidth of the CPU with the STREAM triad, a = b + s c, on a
-             * given number of threads.
+             * Measure the memory bandwidth of the CPU with the STREAM triad, a = b + s c, on a given number of threads.
              *
-             * Each thread first touches the parts of the arrays it later updates. The bytes of a
-             * pass are those of the three arrays, as STREAM counts them, so the read a store
-             * makes before it writes is left out.
+             * Each thread first touches the parts of the arrays it later updates. The bytes of a pass are those of the three arrays, as
+             * STREAM counts them, so the read a store makes before it writes is left out.
              *
              * @param bytes Size of each array, rounded down to a double.
              * @param repeats Timed passes after one untimed, at least one.
              * @param threads Threads of the parallel regions, 0 for the OpenMP default.
              * @return The median bandwidth and the thread count.
              */
-            TriadResult triad_bandwidth(std::size_t bytes, std::size_t repeats,
-                                        std::size_t threads);
+            TriadResult triad_bandwidth(std::size_t bytes, std::size_t repeats, std::size_t threads);
 
             /**
-             * Measure the triad on 1, 2, 4 and so on up to every thread OpenMP gives a parallel
-             * region, and keep the fastest; on a machine shared with other processes, every
-             * thread can be slower than fewer.
+             * Measure the triad on 1, 2, 4 and so on up to every thread OpenMP gives a parallel region, and keep the fastest; on a machine
+             * shared with other processes, every thread can be slower than fewer.
              *
              * @param bytes Size of each array, rounded down to a double.
              * @param repeats Timed passes per thread count after one untimed, at least one.

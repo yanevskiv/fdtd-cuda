@@ -35,8 +35,8 @@ namespace fdtd
             Pmc,
 
             /**
-             * Split-field PML in front of a PEC wall, set by the pml_* options of Simulation.
-             * With a thickness of zero it is the same as Pec.
+             * Split-field PML in front of a PEC wall, set by the pml_* options of Simulation. With a thickness of zero it is the same as
+             * Pec.
              */
             Pml
         };

@@ -38,9 +38,8 @@ namespace fdtd
                 /**
                  * A CUDA stream that does not wait for the legacy default stream.
                  *
-                 * Its header holds no CUDA type but the stream's opaque pointer, so host code can
-                 * keep one. Work queued on it runs in order; synchronize() waits for it and reports
-                 * the first error.
+                 * Its header holds no CUDA type but the stream's opaque pointer, so host code can keep one. Work queued on it runs in
+                 * order; synchronize() waits for it and reports the first error.
                  */
                 class Stream
                 {

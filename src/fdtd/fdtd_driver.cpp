@@ -153,8 +153,7 @@ namespace fdtd
         }
 
         // Write the snapshot of a step and log it.
-        void write_fields(const std::filesystem::path &dir, std::size_t step,
-                          const TMz::Fields &fields, double dt, std::ostream &log)
+        void write_fields(const std::filesystem::path &dir, std::size_t step, const TMz::Fields &fields, double dt, std::ostream &log)
         {
             const auto path = dir / snapshot_name(step);
             TMz::write_snapshot(path, fields, step, dt);
@@ -252,12 +251,10 @@ namespace fdtd
         TMz::Simulation sim(options.nx, ny, simOptions);
 
         if (options.pulses.empty()) {
-            sim.add_source(options.nx / 2, ny / 2, TMz::Component::Ez,
-                           TMz::Gaussian::from_steps(sim.dt(), 30));
+            sim.add_source(options.nx / 2, ny / 2, TMz::Component::Ez, TMz::Gaussian::from_steps(sim.dt(), 30));
         }
         for (const DriverPulseSpec &pulse : options.pulses) {
-            sim.add_source(pulse.i, pulse.j, TMz::Component::Ez,
-                           TMz::Gaussian::from_steps(sim.dt(), pulse.width));
+            sim.add_source(pulse.i, pulse.j, TMz::Component::Ez, TMz::Gaussian::from_steps(sim.dt(), pulse.width));
         }
         for (const DriverProbeSpec &probe : options.probes) {
             sim.add_probe(probe.i, probe.j, TMz::Component::Ez);

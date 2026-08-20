@@ -54,9 +54,8 @@ TEST_CASE("Coeffs in vacuum", "[unit][coeffs]")
     REQUIRE(coeffs.grid().ny() == 4);
     CHECK(coeffs.dt() == dt);
     CHECK(coeffs.pml_thickness() == 0);
-    for (const auto array :
-         {coeffs.coeff_ez_x1(), coeffs.coeff_ez_x2(), coeffs.coeff_ez_y1(), coeffs.coeff_ez_y2(),
-          coeffs.coeff_hx_1(), coeffs.coeff_hx_2(), coeffs.coeff_hy_1(), coeffs.coeff_hy_2()}) {
+    for (const auto array : {coeffs.coeff_ez_x1(), coeffs.coeff_ez_x2(), coeffs.coeff_ez_y1(), coeffs.coeff_ez_y2(), coeffs.coeff_hx_1(),
+                             coeffs.coeff_hx_2(), coeffs.coeff_hy_1(), coeffs.coeff_hy_2()}) {
         REQUIRE(array.size() == grid.size());
     }
 
@@ -188,22 +187,14 @@ TEST_CASE("Coeffs scales the PML by the medium", "[unit][coeffs][pml]")
     const Coeffs inMedium(medium, dt);
 
     for (const std::size_t k : {grid.index(0, 8), grid.index(10, 0), grid.index(1, 1)}) {
-        CHECK_THAT(double(inMedium.coeff_ez_x1()[k]),
-                   WithinRel(double(inVacuum.coeff_ez_x1()[k]), TOL));
-        CHECK_THAT(double(inMedium.coeff_ez_y1()[k]),
-                   WithinRel(double(inVacuum.coeff_ez_y1()[k]), TOL));
-        CHECK_THAT(double(inMedium.coeff_hx_1()[k]),
-                   WithinRel(double(inVacuum.coeff_hx_1()[k]), TOL));
-        CHECK_THAT(double(inMedium.coeff_hy_1()[k]),
-                   WithinRel(double(inVacuum.coeff_hy_1()[k]), TOL));
-        CHECK_THAT(double(inMedium.coeff_ez_x2()[k]),
-                   WithinRel(double(inVacuum.coeff_ez_x2()[k]) / 4, TOL));
-        CHECK_THAT(double(inMedium.coeff_ez_y2()[k]),
-                   WithinRel(double(inVacuum.coeff_ez_y2()[k]) / 4, TOL));
-        CHECK_THAT(double(inMedium.coeff_hx_2()[k]),
-                   WithinRel(double(inVacuum.coeff_hx_2()[k]) / 2, TOL));
-        CHECK_THAT(double(inMedium.coeff_hy_2()[k]),
-                   WithinRel(double(inVacuum.coeff_hy_2()[k]) / 2, TOL));
+        CHECK_THAT(double(inMedium.coeff_ez_x1()[k]), WithinRel(double(inVacuum.coeff_ez_x1()[k]), TOL));
+        CHECK_THAT(double(inMedium.coeff_ez_y1()[k]), WithinRel(double(inVacuum.coeff_ez_y1()[k]), TOL));
+        CHECK_THAT(double(inMedium.coeff_hx_1()[k]), WithinRel(double(inVacuum.coeff_hx_1()[k]), TOL));
+        CHECK_THAT(double(inMedium.coeff_hy_1()[k]), WithinRel(double(inVacuum.coeff_hy_1()[k]), TOL));
+        CHECK_THAT(double(inMedium.coeff_ez_x2()[k]), WithinRel(double(inVacuum.coeff_ez_x2()[k]) / 4, TOL));
+        CHECK_THAT(double(inMedium.coeff_ez_y2()[k]), WithinRel(double(inVacuum.coeff_ez_y2()[k]) / 4, TOL));
+        CHECK_THAT(double(inMedium.coeff_hx_2()[k]), WithinRel(double(inVacuum.coeff_hx_2()[k]) / 2, TOL));
+        CHECK_THAT(double(inMedium.coeff_hy_2()[k]), WithinRel(double(inVacuum.coeff_hy_2()[k]) / 2, TOL));
     }
 }
 
@@ -226,8 +217,6 @@ TEST_CASE("Coeffs rejects invalid time steps", "[unit][coeffs]")
 
     CHECK_THROWS_AS(Coeffs(material, 0.0), std::invalid_argument);
     CHECK_THROWS_AS(Coeffs(material, -1e-12), std::invalid_argument);
-    CHECK_THROWS_AS(Coeffs(material, std::numeric_limits<double>::infinity()),
-                    std::invalid_argument);
-    CHECK_THROWS_AS(Coeffs(material, std::numeric_limits<double>::quiet_NaN()),
-                    std::invalid_argument);
+    CHECK_THROWS_AS(Coeffs(material, std::numeric_limits<double>::infinity()), std::invalid_argument);
+    CHECK_THROWS_AS(Coeffs(material, std::numeric_limits<double>::quiet_NaN()), std::invalid_argument);
 }

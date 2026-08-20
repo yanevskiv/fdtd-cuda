@@ -56,8 +56,7 @@ namespace
         CHECK(tuple.hy_2 == coeffs.coeff_hy_2()[k]);
     }
 
-    // Check every cell: an entry holds its values, and a cell reads the arrays only when its Ez
-    // pairs differ or the table is full.
+    // Check every cell: an entry holds its values, and a cell reads the arrays only when its Ez pairs differ or the table is full.
     void check_cells(const CoeffTable &table, const Coeffs &coeffs)
     {
         const auto index = table.index();
@@ -65,8 +64,7 @@ namespace
         REQUIRE(table.entries().size() <= CoeffTable::CAPACITY);
         for (std::size_t k = 0; k < index.size(); ++k) {
             INFO("cell " << k);
-            const bool same = coeffs.coeff_ez_x1()[k] == coeffs.coeff_ez_y1()[k] &&
-                              coeffs.coeff_ez_x2()[k] == coeffs.coeff_ez_y2()[k];
+            const bool same = coeffs.coeff_ez_x1()[k] == coeffs.coeff_ez_y1()[k] && coeffs.coeff_ez_x2()[k] == coeffs.coeff_ez_y2()[k];
             if (index[k] == CoeffTable::ARRAYS) {
                 CHECK((!same || table.entries().size() == CoeffTable::CAPACITY));
             } else {
@@ -97,8 +95,8 @@ TEST_CASE("Coefficient table of vacuum", "[unit][cuda][coeffs]")
     CHECK(table.grid().nx() == 9);
 }
 
-// Verify that the PML cells read the arrays and the core inside the PML shares one entry, while
-// the interior's last column holds Hy half a cell into the PML.
+// Verify that the PML cells read the arrays and the core inside the PML shares one entry, while the interior's last column holds Hy half a
+// cell into the PML.
 TEST_CASE("Coefficient table of vacuum with a PML", "[unit][cuda][coeffs]")
 {
     const Grid grid(30, 24);
@@ -133,9 +131,8 @@ TEST_CASE("Coefficient table of a slab and a lossy circle", "[unit][cuda][coeffs
     CHECK(table.uniform_entry(1) == nullptr);
 }
 
-// Verify that a grid with more distinct tuples than the table holds fills the table, and the
-// cells past it read the arrays: cells 0 to 299 in row-major order take a medium each, cell 0's
-// being vacuum, so cells 255 to 299 find no room and the vacuum after them takes entry 0.
+// Verify that a grid with more distinct tuples than the table holds fills the table, and the cells past it read the arrays: cells 0 to 299
+// in row-major order take a medium each, cell 0's being vacuum, so cells 255 to 299 find no room and the vacuum after them takes entry 0.
 TEST_CASE("Coefficient table past its capacity", "[unit][cuda][coeffs]")
 {
     const Grid grid(20, 20);

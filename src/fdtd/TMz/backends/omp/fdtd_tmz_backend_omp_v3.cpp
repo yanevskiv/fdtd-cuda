@@ -74,9 +74,8 @@ namespace fdtd::TMz::backends::omp
         for (std::size_t j = lo; j < grid.ny() - lo - 1; ++j) {
             for (std::size_t i = lo; i < grid.nx() - lo - 1; ++i) {
                 const std::size_t k = grid.index(i, j);
-                if (!same_bits(ezX1[k], tuple.ez_1) || !same_bits(ezY1[k], tuple.ez_1) ||
-                    !same_bits(ezX2[k], tuple.ez_2) || !same_bits(ezY2[k], tuple.ez_2) ||
-                    !same_bits(hx1[k], tuple.hx_1) || !same_bits(hx2[k], tuple.hx_2) ||
+                if (!same_bits(ezX1[k], tuple.ez_1) || !same_bits(ezY1[k], tuple.ez_1) || !same_bits(ezX2[k], tuple.ez_2) ||
+                    !same_bits(ezY2[k], tuple.ez_2) || !same_bits(hx1[k], tuple.hx_1) || !same_bits(hx2[k], tuple.hx_2) ||
                     !same_bits(hy1[k], tuple.hy_1) || !same_bits(hy2[k], tuple.hy_2)) {
                     return std::nullopt;
                 }

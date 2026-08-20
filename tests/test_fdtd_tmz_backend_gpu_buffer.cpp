@@ -78,11 +78,9 @@ TEST_CASE("Device buffer round trip with padded rows", "[unit][cuda]")
     const Stream stream;
     DeviceBuffer<FloatType> device(pitch * ny);
     device.zero(stream);
-    fdtd::TMz::backends::gpu::upload_rows(device, pitch, std::span<const FloatType>(host), nx, nx,
-                                          ny, stream);
+    fdtd::TMz::backends::gpu::upload_rows(device, pitch, std::span<const FloatType>(host), nx, nx, ny, stream);
     std::vector<FloatType> back(nx * ny);
-    fdtd::TMz::backends::gpu::download_rows(std::span<FloatType>(back), nx, device, pitch, nx, ny,
-                                            stream);
+    fdtd::TMz::backends::gpu::download_rows(std::span<FloatType>(back), nx, device, pitch, nx, ny, stream);
     CHECK(back == host);
 
     std::vector<FloatType> padded(pitch * ny, FloatType(-1));
@@ -140,7 +138,6 @@ TEST_CASE("Device buffer sizes", "[unit][cuda]")
     const DeviceBuffer<FloatType> none(0);
     CHECK(none.empty());
     CHECK(none.data() == nullptr);
-    CHECK_THROWS_AS(DeviceBuffer<FloatType>(std::size_t(1) << 50),
-                    fdtd::TMz::backends::gpu::CudaError);
+    CHECK_THROWS_AS(DeviceBuffer<FloatType>(std::size_t(1) << 50), fdtd::TMz::backends::gpu::CudaError);
     CHECK_THROWS_AS(DeviceBuffer<FloatType>(~std::size_t(0)), std::length_error);
 }

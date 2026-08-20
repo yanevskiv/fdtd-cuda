@@ -41,12 +41,10 @@ namespace fdtd
                 /** Simd: v1 with `omp simd` inner loops. */
                 V2,
 
-                /** Table: v2 with the core cells reading the one tuple of coefficients they
-                 * share. */
+                /** Table: v2 with the core cells reading the one tuple of coefficients they share. */
                 V3,
 
-                /** Fused: v3 with H and E in one sweep of each thread's band of rows per step. The
-                 * default. */
+                /** Fused: v3 with H and E in one sweep of each thread's band of rows per step. The default. */
                 V4
             };
 
@@ -65,9 +63,8 @@ namespace fdtd
             /**
              * Settings of the OpenMP backend, each with a usable default.
              *
-             * A variant name, `<level>[+close|+spread]`, sets every field but the thread count.
-             * The level is `v1` to `v4`. `+close` and `+spread` select an affinity policy; enable
-             * affinity in the runtime with OMP_PROC_BIND=true and OMP_PLACES=threads. `default`
+             * A variant name, `<level>[+close|+spread]`, sets every field but the thread count. The level is `v1` to `v4`. `+close` and
+             * `+spread` select an affinity policy; enable affinity in the runtime with OMP_PROC_BIND=true and OMP_PLACES=threads. `default`
              * names the default settings.
              */
             struct OmpOptions
@@ -75,8 +72,7 @@ namespace fdtd
                 /** Optimization level. */
                 OmpLevel level = OmpLevel::V4;
 
-                /** Affinity policy; a runtime with affinity disabled ignores explicit policies,
-                 * as required by OpenMP. */
+                /** Affinity policy; a runtime with affinity disabled ignores explicit policies, as required by OpenMP. */
                 OmpBind bind = OmpBind::Default;
 
                 /** Thread count, 0 for the OpenMP default; no variant name sets it. */
@@ -87,8 +83,7 @@ namespace fdtd
                  *
                  * @param variant Variant name, as `v2+close`, or `default`.
                  * @return The settings, with the default thread count.
-                 * @throws std::invalid_argument When the name is malformed, with the reason and
-                 *         the name in the message.
+                 * @throws std::invalid_argument When the name is malformed, with the reason and the name in the message.
                  */
                 static OmpOptions parse(std::string_view variant);
 

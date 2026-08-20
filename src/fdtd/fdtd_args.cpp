@@ -49,8 +49,7 @@ namespace fdtd
     }
 
     // Walk the arguments, taking each option's value after '=' or from the next argument.
-    std::vector<Argument> split_arguments(std::span<const std::string_view> args,
-                                          std::span<const std::string_view> flags)
+    std::vector<Argument> split_arguments(std::span<const std::string_view> args, std::span<const std::string_view> flags)
     {
         std::vector<Argument> options;
         for (std::size_t k = 0; k < args.size(); ++k) {
@@ -168,8 +167,7 @@ namespace fdtd
     // Match the name of every backend type.
     TMz::BackendType parse_backend_arg(std::string_view name, std::string_view text)
     {
-        for (const auto type :
-             {TMz::BackendType::Serial, TMz::BackendType::OpenMP, TMz::BackendType::Cuda}) {
+        for (const auto type : {TMz::BackendType::Serial, TMz::BackendType::OpenMP, TMz::BackendType::Cuda}) {
             if (text == TMz::backend_name(type)) {
                 return type;
             }

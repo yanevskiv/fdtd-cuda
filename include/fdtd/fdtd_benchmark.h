@@ -70,8 +70,7 @@ namespace fdtd
         /** Backends to measure in order; none means every compiled backend. */
         std::vector<TMz::BackendType> backends;
 
-        /** Variant names (see TMz::variant_name()) to measure, OpenMP and CUDA ones mixed; none
-         * means "default". */
+        /** Variant names (see TMz::variant_name()) to measure, OpenMP and CUDA ones mixed; none means "default". */
         std::vector<std::string> variants;
 
         /** Thread counts to measure, read by OpenMP only; none means 1. */
@@ -139,8 +138,7 @@ namespace fdtd
     /**
      * Parse the command-line arguments, without the program name.
      *
-     * Each option takes its value as the next argument or after '='. "--backend all"
-     * adds every compiled backend.
+     * Each option takes its value as the next argument or after '='. "--backend all" adds every compiled backend.
      *
      * @param args Arguments in order.
      * @return The settings.
@@ -176,12 +174,10 @@ namespace fdtd
     /**
      * Write the peaks of the machine as '# key: value' lines, for the roofline of a report.
      *
-     * With CUDA available: the device's multiprocessors, clock and L2 size; its peak memory
-     * bandwidth and peak float and double flops from those; and the bandwidth a copy kernel
-     * measures over two 256 MiB buffers. With OpenMP: the best bandwidth of the STREAM triad over
-     * three 128 MiB arrays on 1, 2, 4 and so on up to every thread, and the thread count of it;
-     * on a machine shared with other processes, every thread can be slower than fewer. Each
-     * measurement is the median of 10 runs.
+     * With CUDA available: the device's multiprocessors, clock and L2 size; its peak memory bandwidth and peak float and double flops from
+     * those; and the bandwidth a copy kernel measures over two 256 MiB buffers. With OpenMP: the best bandwidth of the STREAM triad over
+     * three 128 MiB arrays on 1, 2, 4 and so on up to every thread, and the thread count of it; on a machine shared with other processes,
+     * every thread can be slower than fewer. Each measurement is the median of 10 runs.
      *
      * @param out Stream for the lines.
      * @throws std::runtime_error When a CUDA call fails.
@@ -191,27 +187,23 @@ namespace fdtd
     /**
      * Measure the workload in every configuration and write a CSV row per sample.
      *
-     * The workload is a grid of vacuum at Courant number 0.99 with a Gaussian Ez source
-     * 12 steps wide at the centre. A configuration is a backend, a variant and a thread
-     * count. A backend runs the variants it reads, or "default" when it reads none; serial reads
-     * "default" only. Serial and CUDA run with one thread, OpenMP with each thread count. Each
-     * configuration is warmed up with untimed runs, then measured repeat times; every sample
-     * builds a new Simulation and times only Simulation::run, which with snapshot_every takes a
-     * snapshot every so many steps and hands it to a handler that drops it. Grouped takes the
-     * samples of a configuration in a row after its warm-up; interleaved warms every configuration
-     * up, then takes one sample of each per round. A summary line per configuration goes to the log
-     * once its samples are taken.
+     * The workload is a grid of vacuum at Courant number 0.99 with a Gaussian Ez source 12 steps wide at the centre. A configuration is a
+     * backend, a variant and a thread count. A backend runs the variants it reads, or "default" when it reads none; serial reads "default"
+     * only. Serial and CUDA run with one thread, OpenMP with each thread count. Each configuration is warmed up with untimed runs, then
+     * measured repeat times; every sample builds a new Simulation and times only Simulation::run, which with snapshot_every takes a
+     * snapshot every so many steps and hands it to a handler that drops it. Grouped takes the samples of a configuration in a row after its
+     * warm-up; interleaved warms every configuration up, then takes one sample of each per round. A summary line per configuration goes to
+     * the log once its samples are taken.
      *
      * @param options Settings of the run.
      * @param out Stream for the CSV when no output file is set.
      * @param log Stream for the summary lines.
      * @return The samples in the order written.
-     * @throws std::invalid_argument On zero steps or repeats, a backend that is not
-     *         compiled in, a variant no backend reads, or settings the simulation rejects.
+     * @throws std::invalid_argument On zero steps or repeats, a backend that is not compiled in, a variant no backend reads, or settings
+     *         the simulation rejects.
      * @throws std::runtime_error When the output file cannot be written.
      */
-    std::vector<BenchmarkSample> run_benchmark(const BenchmarkOptions &options, std::ostream &out,
-                                               std::ostream &log);
+    std::vector<BenchmarkSample> run_benchmark(const BenchmarkOptions &options, std::ostream &out, std::ostream &log);
 }
 
 #endif

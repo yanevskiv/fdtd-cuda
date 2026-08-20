@@ -98,8 +98,7 @@ TEST_CASE("Snapshots round-trip", "[unit][output]")
     }
     const auto path = dir.path() / "snap.bin";
     fdtd::TMz::write_snapshot(path, fields, 42, 1.5e-12);
-    CHECK(std::filesystem::file_size(path) ==
-          fdtd::TMz::SNAPSHOT_HEADER_SIZE + 13 * 7 * sizeof(FloatType));
+    CHECK(std::filesystem::file_size(path) == fdtd::TMz::SNAPSHOT_HEADER_SIZE + 13 * 7 * sizeof(FloatType));
     CHECK(read_text(path).substr(0, 8) == "FDTDSNAP");
 
     const auto data = fdtd::TMz::read_snapshot(path);

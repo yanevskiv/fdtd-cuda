@@ -48,9 +48,7 @@ namespace fdtd
          * @param size Number of elements.
          */
         explicit inline AlignedBuffer(std::size_t size)
-            : m_data(size ? static_cast<T *>(::operator new(size * sizeof(T),
-                                                            std::align_val_t{BUFFER_ALIGNMENT}))
-                          : nullptr)
+            : m_data(size ? static_cast<T *>(::operator new(size * sizeof(T), std::align_val_t{BUFFER_ALIGNMENT})) : nullptr)
             , m_size(size)
         {
             fill(T{});

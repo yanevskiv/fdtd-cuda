@@ -43,11 +43,10 @@ namespace fdtd
             namespace omp
             {
                 /**
-                 * Namespace for level v3: the v2 kernels with the core cells reading the tuple
-                 * they share instead of the arrays.
+                 * Namespace for level v3: the v2 kernels with the core cells reading the tuple they share instead of the arrays.
                  *
-                 * The tuple holds the bits the arrays hold, so the results are v2's bit for bit.
-                 * The PML and the edge read the arrays as in v2.
+                 * The tuple holds the bits the arrays hold, so the results are v2's bit for bit. The PML and the edge read the arrays as in
+                 * v2.
                  */
                 namespace v3
                 {
@@ -59,8 +58,7 @@ namespace fdtd
                      * @param end One past the last index.
                      * @param body Body of the loop, free of dependences between indices.
                      */
-                    template <typename Body>
-                    inline void for_simd(std::size_t begin, std::size_t end, Body body) noexcept
+                    template <typename Body> inline void for_simd(std::size_t begin, std::size_t end, Body body) noexcept
                     {
 #pragma omp simd
                         for (std::size_t i = begin; i < end; ++i) {
@@ -69,8 +67,8 @@ namespace fdtd
                     }
 
                     /**
-                     * Call one of two bodies for every index of a row: the tuple body on the
-                     * cells of the core, the arrays body on the others.
+                     * Call one of two bodies for every index of a row: the tuple body on the cells of the core, the arrays body on the
+                     * others.
                      *
                      * @tparam Arrays Callable taking the index, reading the arrays.
                      * @tparam Tuple Callable taking the index, reading the shared tuple.
@@ -82,14 +80,12 @@ namespace fdtd
                      * @param tuple Body for the cells that read the tuple.
                      */
                     template <typename Arrays, typename Tuple>
-                    inline void for_row(const SharedTuple *shared, std::size_t j, std::size_t begin,
-                                        std::size_t end, Arrays arrays, Tuple tuple) noexcept
+                    inline void for_row(const SharedTuple *shared, std::size_t j, std::size_t begin, std::size_t end, Arrays arrays,
+                                        Tuple tuple) noexcept
                     {
                         if (shared != nullptr && j >= shared->core.j0 && j < shared->core.j1) {
-                            const std::size_t first =
-                                std::min(std::max(shared->core.i0, begin), end);
-                            const std::size_t last =
-                                std::min(std::max(shared->core.i1, first), end);
+                            const std::size_t first = std::min(std::max(shared->core.i0, begin), end);
+                            const std::size_t last = std::min(std::max(shared->core.i1, first), end);
                             for_simd(begin, first, arrays);
                             for_simd(first, last, tuple);
                             for_simd(last, end, arrays);
@@ -110,16 +106,14 @@ namespace fdtd
                     }
 
                     /**
-                     * Advance Hx and Hy over a block, as v2::update_h_block(), the core reading
-                     * the tuple.
+                     * Advance Hx and Hy over a block, as v2::update_h_block(), the core reading the tuple.
                      *
                      * @param fields Fields to update.
                      * @param coeffs Coefficient arrays on the same grid as the fields.
                      * @param shared The tuple and its core, or null for none.
                      * @param block Cells to update, inside the grid.
                      */
-                    inline void update_h_block(Fields &fields, serial::CoeffsView coeffs,
-                                               const SharedTuple *shared,
+                    inline void update_h_block(Fields &fields, serial::CoeffsView coeffs, const SharedTuple *shared,
                                                const serial::Block &block) noexcept
                     {
                         const Grid &grid = fields.grid();
@@ -144,13 +138,11 @@ namespace fdtd
                                 shared, j, block.i0, block.i1,
                                 [=](std::size_t i) {
                                     const std::size_t k = row + i;
-                                    Hx[k] =
-                                        Chx1[k] * Hx[k] - Chx2[k] * invDy * (Ez[k + pitch] - Ez[k]);
+                                    Hx[k] = Chx1[k] * Hx[k] - Chx2[k] * invDy * (Ez[k + pitch] - Ez[k]);
                                 },
                                 [=](std::size_t i) {
                                     const std::size_t k = row + i;
-                                    Hx[k] = tuple.hx_1 * Hx[k] -
-                                            tuple.hx_2 * invDy * (Ez[k + pitch] - Ez[k]);
+                                    Hx[k] = tuple.hx_1 * Hx[k] - tuple.hx_2 * invDy * (Ez[k + pitch] - Ez[k]);
                                 });
                         }
 
@@ -164,15 +156,13 @@ namespace fdtd
                                 },
                                 [=](std::size_t i) {
                                     const std::size_t k = row + i;
-                                    Hy[k] = tuple.hy_1 * Hy[k] +
-                                            tuple.hy_2 * invDx * (Ez[k + 1] - Ez[k]);
+                                    Hy[k] = tuple.hy_1 * Hy[k] + tuple.hy_2 * invDx * (Ez[k + 1] - Ez[k]);
                                 });
                         }
                     }
 
                     /**
-                     * Advance Ez over the part of a block inside the PML, as
-                     * v2::update_e_interior_block(), the core reading the tuple.
+                     * Advance Ez over the part of a block inside the PML, as v2::update_e_interior_block(), the core reading the tuple.
                      *
                      * @param fields Fields to update.
                      * @param coeffs Coefficient arrays on the same grid as the fields.
@@ -180,14 +170,11 @@ namespace fdtd
                      * @param block Cells to update, inside the grid.
                      * @param pml PML thickness in cells, zero for none.
                      */
-                    inline void update_e_interior_block(Fields &fields, serial::CoeffsView coeffs,
-                                                        const SharedTuple *shared,
-                                                        const serial::Block &block,
-                                                        std::size_t pml) noexcept
+                    inline void update_e_interior_block(Fields &fields, serial::CoeffsView coeffs, const SharedTuple *shared,
+                                                        const serial::Block &block, std::size_t pml) noexcept
                     {
                         const Grid &grid = fields.grid();
-                        const serial::Block cells =
-                            serial::intersect(block, serial::interior_block(grid, pml));
+                        const serial::Block cells = serial::intersect(block, serial::interior_block(grid, pml));
                         if (cells.empty()) {
                             return;
                         }
@@ -208,22 +195,19 @@ namespace fdtd
                                 shared, j, cells.i0, cells.i1,
                                 [=](std::size_t i) {
                                     const std::size_t k = row + i;
-                                    const FloatType curl = (Hy[k] - Hy[k - 1]) * invDx -
-                                                           (Hx[k] - Hx[k - pitch]) * invDy;
+                                    const FloatType curl = (Hy[k] - Hy[k - 1]) * invDx - (Hx[k] - Hx[k - pitch]) * invDy;
                                     Ez[k] = Cex1[k] * Ez[k] + Cex2[k] * curl;
                                 },
                                 [=](std::size_t i) {
                                     const std::size_t k = row + i;
-                                    const FloatType curl = (Hy[k] - Hy[k - 1]) * invDx -
-                                                           (Hx[k] - Hx[k - pitch]) * invDy;
+                                    const FloatType curl = (Hy[k] - Hy[k - 1]) * invDx - (Hx[k] - Hx[k - pitch]) * invDy;
                                     Ez[k] = tuple.ez_1 * Ez[k] + tuple.ez_2 * curl;
                                 });
                         }
                     }
 
                     /**
-                     * Advance every Ez of a block: the interior with the tuple, the PML as v2,
-                     * then the edge with the serial kernel.
+                     * Advance every Ez of a block: the interior with the tuple, the PML as v2, then the edge with the serial kernel.
                      *
                      * @param fields Fields to update.
                      * @param coeffs Coefficient arrays on the same grid as the fields.
@@ -232,10 +216,8 @@ namespace fdtd
                      * @param pml PML thickness in cells, zero for none.
                      * @param boundary Outer boundary condition.
                      */
-                    inline void update_e_block(Fields &fields, serial::CoeffsView coeffs,
-                                               const SharedTuple *shared,
-                                               const serial::Block &block, std::size_t pml,
-                                               Boundary boundary) noexcept
+                    inline void update_e_block(Fields &fields, serial::CoeffsView coeffs, const SharedTuple *shared,
+                                               const serial::Block &block, std::size_t pml, Boundary boundary) noexcept
                     {
                         v3::update_e_interior_block(fields, coeffs, shared, block, pml);
                         v2::update_pml_block(fields, coeffs, block, pml);
@@ -250,8 +232,7 @@ namespace fdtd
                      * @param part Part below the partition's size.
                      * @param n Step of this advance, from zero.
                      */
-                    inline void h_phase(const serial::Stepper &stepper, const SharedTuple *shared,
-                                        std::size_t part, std::size_t n) noexcept
+                    inline void h_phase(const serial::Stepper &stepper, const SharedTuple *shared, std::size_t part, std::size_t n) noexcept
                     {
                         for (const serial::Block &block : stepper.partition().blocks(part)) {
                             v3::update_h_block(stepper.fields(), stepper.coeffs(), shared, block);
@@ -267,12 +248,10 @@ namespace fdtd
                      * @param part Part below the partition's size.
                      * @param n Step of this advance, from zero.
                      */
-                    inline void e_phase(const serial::Stepper &stepper, const SharedTuple *shared,
-                                        std::size_t part, std::size_t n) noexcept
+                    inline void e_phase(const serial::Stepper &stepper, const SharedTuple *shared, std::size_t part, std::size_t n) noexcept
                     {
                         for (const serial::Block &block : stepper.partition().blocks(part)) {
-                            v3::update_e_block(stepper.fields(), stepper.coeffs(), shared, block,
-                                               stepper.pml(), stepper.boundary());
+                            v3::update_e_block(stepper.fields(), stepper.coeffs(), shared, block, stepper.pml(), stepper.boundary());
                         }
                         stepper.add_sources(part, n, serial::SourceField::Electric);
                         stepper.record_probes(part, n);

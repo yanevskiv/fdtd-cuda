@@ -59,10 +59,8 @@ namespace fdtd::TMz::backends
         std::size_t parse_side(std::string_view variant, std::string_view side)
         {
             std::size_t value = 0;
-            const auto [end, error] =
-                std::from_chars(side.data(), side.data() + side.size(), value);
-            if (side.empty() || error != std::errc() || end != side.data() + side.size() ||
-                value == 0) {
+            const auto [end, error] = std::from_chars(side.data(), side.data() + side.size(), value);
+            if (side.empty() || error != std::errc() || end != side.data() + side.size() || value == 0) {
                 malformed(variant, "block sides must be positive integers");
             }
             return value;

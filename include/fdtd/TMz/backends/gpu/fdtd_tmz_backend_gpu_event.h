@@ -38,11 +38,10 @@ namespace fdtd
             namespace gpu
             {
                 /**
-                 * A CUDA event: a point in a stream's work that the host or another stream can
-                 * wait for, and that times the work between two of them.
+                 * A CUDA event: a point in a stream's work that the host or another stream can wait for, and that times the work between
+                 * two of them.
                  *
-                 * Its header holds no CUDA type but the event's opaque pointer, so host code can
-                 * keep one.
+                 * Its header holds no CUDA type but the event's opaque pointer, so host code can keep one.
                  */
                 class Event
                 {

@@ -95,8 +95,7 @@ namespace fdtd
                 /**
                  * Measure the memory bandwidth of the current device with a copy kernel.
                  *
-                 * Copies a buffer to another, each of the given size, and counts the bytes read
-                 * and written.
+                 * Copies a buffer to another, each of the given size, and counts the bytes read and written.
                  *
                  * @param bytes Size of each buffer, rounded down to 16 bytes.
                  * @param repeats Timed copies after one untimed, at least one.

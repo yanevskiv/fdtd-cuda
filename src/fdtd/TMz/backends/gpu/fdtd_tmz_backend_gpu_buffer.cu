@@ -71,42 +71,36 @@ namespace fdtd::TMz::backends::gpu
     }
 
     // Queue the host-to-device copy of the rows.
-    void copy_rows_to_device(void *target, std::size_t targetPitch, const void *source,
-                             std::size_t sourcePitch, std::size_t width, std::size_t height,
-                             const Stream &stream)
+    void copy_rows_to_device(void *target, std::size_t targetPitch, const void *source, std::size_t sourcePitch, std::size_t width,
+                             std::size_t height, const Stream &stream)
     {
         if (width == 0 || height == 0) {
             return;
         }
-        check(cudaMemcpy2DAsync(target, targetPitch, source, sourcePitch, width, height,
-                                cudaMemcpyHostToDevice, stream.handle()),
+        check(cudaMemcpy2DAsync(target, targetPitch, source, sourcePitch, width, height, cudaMemcpyHostToDevice, stream.handle()),
               "cudaMemcpy2DAsync");
     }
 
     // Copy the rows to the host and wait for them.
-    void copy_rows_to_host(void *target, std::size_t targetPitch, const void *source,
-                           std::size_t sourcePitch, std::size_t width, std::size_t height,
-                           const Stream &stream)
+    void copy_rows_to_host(void *target, std::size_t targetPitch, const void *source, std::size_t sourcePitch, std::size_t width,
+                           std::size_t height, const Stream &stream)
     {
         if (width == 0 || height == 0) {
             return;
         }
-        check(cudaMemcpy2DAsync(target, targetPitch, source, sourcePitch, width, height,
-                                cudaMemcpyDeviceToHost, stream.handle()),
+        check(cudaMemcpy2DAsync(target, targetPitch, source, sourcePitch, width, height, cudaMemcpyDeviceToHost, stream.handle()),
               "cudaMemcpy2DAsync");
         stream.synchronize();
     }
 
     // Queue the device-to-host copy of the rows.
-    void queue_rows_to_host(void *target, std::size_t targetPitch, const void *source,
-                            std::size_t sourcePitch, std::size_t width, std::size_t height,
-                            const Stream &stream)
+    void queue_rows_to_host(void *target, std::size_t targetPitch, const void *source, std::size_t sourcePitch, std::size_t width,
+                            std::size_t height, const Stream &stream)
     {
         if (width == 0 || height == 0) {
             return;
         }
-        check(cudaMemcpy2DAsync(target, targetPitch, source, sourcePitch, width, height,
-                                cudaMemcpyDeviceToHost, stream.handle()),
+        check(cudaMemcpy2DAsync(target, targetPitch, source, sourcePitch, width, height, cudaMemcpyDeviceToHost, stream.handle()),
               "cudaMemcpy2DAsync");
     }
 
@@ -116,8 +110,7 @@ namespace fdtd::TMz::backends::gpu
         if (bytes == 0) {
             return;
         }
-        check(cudaMemcpyAsync(target, source, bytes, cudaMemcpyDeviceToDevice, stream.handle()),
-              "cudaMemcpyAsync");
+        check(cudaMemcpyAsync(target, source, bytes, cudaMemcpyDeviceToDevice, stream.handle()), "cudaMemcpyAsync");
     }
 
     // Queue the zeroing of the bytes.

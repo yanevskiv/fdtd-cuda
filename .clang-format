@@ -8,7 +8,7 @@ UseTab: Never
 NamespaceIndentation: All
 AccessModifierOffset: -4
 EmptyLineAfterAccessModifier: Never
-ColumnLimit: 100
+ColumnLimit: 140
 BreakBeforeBraces: Custom
 BraceWrapping:
   AfterCaseLabel: false

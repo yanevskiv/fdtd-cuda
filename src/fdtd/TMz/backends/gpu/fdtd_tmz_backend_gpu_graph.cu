@@ -74,8 +74,7 @@ namespace fdtd::TMz::backends::gpu
     // Capture only what this thread queues, so other threads' CUDA calls are not disturbed.
     void Graph::begin_capture(const Stream &stream)
     {
-        check(cudaStreamBeginCapture(stream.handle(), cudaStreamCaptureModeThreadLocal),
-              "cudaStreamBeginCapture");
+        check(cudaStreamBeginCapture(stream.handle(), cudaStreamCaptureModeThreadLocal), "cudaStreamBeginCapture");
     }
 
     // End the capture, instantiate it, and replace the graph held.

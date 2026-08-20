@@ -84,8 +84,7 @@ namespace fdtd
                 /**
                  * Pointers to the eight coefficient arrays the update kernels read.
                  *
-                 * The kernels take these rather than a Coeffs so a backend can keep its own
-                 * arrays. A Coeffs converts implicitly.
+                 * The kernels take these rather than a Coeffs so a backend can keep its own arrays. A Coeffs converts implicitly.
                  */
                 struct CoeffsView
                 {
@@ -94,8 +93,7 @@ namespace fdtd
                      *
                      * @param coeffs Coefficients to view.
                      */
-                    CoeffsView(
-                        const Coeffs &coeffs) noexcept; // NOLINT(google-explicit-constructor)
+                    CoeffsView(const Coeffs &coeffs) noexcept; // NOLINT(google-explicit-constructor)
 
                     /**
                      * View eight arrays over the same grid, laid out as in Coeffs.
@@ -109,9 +107,8 @@ namespace fdtd
                      * @param hy1 Hy decay factors.
                      * @param hy2 Hy curl factors.
                      */
-                    CoeffsView(const FloatType *ezX1, const FloatType *ezX2, const FloatType *ezY1,
-                               const FloatType *ezY2, const FloatType *hx1, const FloatType *hx2,
-                               const FloatType *hy1, const FloatType *hy2) noexcept;
+                    CoeffsView(const FloatType *ezX1, const FloatType *ezX2, const FloatType *ezY1, const FloatType *ezY2,
+                               const FloatType *hx1, const FloatType *hx2, const FloatType *hy1, const FloatType *hy2) noexcept;
 
                     /** Ez decay factors along x. */
                     const FloatType *coeff_ez_x1;
@@ -179,15 +176,14 @@ namespace fdtd
                  *     Hx(i, j) = Chx1 Hx(i, j) - Chx2 / dy (Ez(i, j + 1) - Ez(i, j)),  j < ny - 1,
                  *     Hy(i, j) = Chy1 Hy(i, j) + Chy2 / dx (Ez(i + 1, j) - Ez(i, j)),  i < nx - 1,
                  *
-                 * with the coefficients of cell (i, j). Hx on the last row and Hy on the last
-                 * column lie outside the domain and are left untouched. Inner loop along x.
+                 * with the coefficients of cell (i, j). Hx on the last row and Hy on the last column lie outside the domain and are left
+                 * untouched. Inner loop along x.
                  *
                  * @param fields Fields to update.
                  * @param coeffs Coefficient arrays on the same grid as the fields.
                  * @param block Cells to update, inside the grid.
                  */
-                inline void update_h_block(Fields &fields, CoeffsView coeffs,
-                                           const Block &block) noexcept
+                inline void update_h_block(Fields &fields, CoeffsView coeffs, const Block &block) noexcept
                 {
                     const Grid &grid = fields.grid();
                     const std::size_t pitch = grid.pitch();
@@ -222,8 +218,7 @@ namespace fdtd
                 }
 
                 /**
-                 * Block of the cells whose Ez takes the plain update: inside the PML and off the
-                 * edge.
+                 * Block of the cells whose Ez takes the plain update: inside the PML and off the edge.
                  *
                  * @param grid Grid of the fields.
                  * @param pml PML thickness in cells, zero for none.
@@ -241,23 +236,20 @@ namespace fdtd
                 }
 
                 /**
-                 * Advance Ez over the part of a block inside the PML by one step from the curl of
-                 * H.
+                 * Advance Ez over the part of a block inside the PML by one step from the curl of H.
                  *
                  *     Ez(i, j) = Cex1 Ez(i, j) + Cex2 ((Hy(i, j) - Hy(i - 1, j)) / dx
                  *                                    - (Hx(i, j) - Hx(i, j - 1)) / dy)
                  *
-                 * over the cells of the block in interior_block(), with the x coefficients, which
-                 * equal the y ones there. With no PML that is the whole interior. The PML is left
-                 * to update_pml_block, the edge Ez to update_boundary_block. Inner loop along x.
+                 * over the cells of the block in interior_block(), with the x coefficients, which equal the y ones there. With no PML that
+                 * is the whole interior. The PML is left to update_pml_block, the edge Ez to update_boundary_block. Inner loop along x.
                  *
                  * @param fields Fields to update.
                  * @param coeffs Coefficient arrays on the same grid as the fields.
                  * @param block Cells to update, inside the grid.
                  * @param pml PML thickness in cells, zero for none.
                  */
-                inline void update_e_interior_block(Fields &fields, CoeffsView coeffs,
-                                                    const Block &block, std::size_t pml) noexcept
+                inline void update_e_interior_block(Fields &fields, CoeffsView coeffs, const Block &block, std::size_t pml) noexcept
                 {
                     const Grid &grid = fields.grid();
                     const Block cells = intersect(block, interior_block(grid, pml));
@@ -278,8 +270,7 @@ namespace fdtd
                         const std::size_t row = j * pitch;
                         for (std::size_t i = cells.i0; i < cells.i1; ++i) {
                             const std::size_t k = row + i;
-                            const FloatType curl =
-                                (Hy[k] - Hy[k - 1]) * invDx - (Hx[k] - Hx[k - pitch]) * invDy;
+                            const FloatType curl = (Hy[k] - Hy[k - 1]) * invDx - (Hx[k] - Hx[k - pitch]) * invDy;
                             Ez[k] = Cex1[k] * Ez[k] + Cex2[k] * curl;
                         }
                     }
@@ -292,8 +283,7 @@ namespace fdtd
                  * @param coeffs Coefficient arrays on the same grid as the fields.
                  * @param cells Cells to update, off the edge.
                  */
-                inline void update_split_rect(Fields &fields, CoeffsView coeffs,
-                                              const Block &cells) noexcept
+                inline void update_split_rect(Fields &fields, CoeffsView coeffs, const Block &cells) noexcept
                 {
                     if (cells.empty()) {
                         return;
@@ -331,20 +321,17 @@ namespace fdtd
                  *     Ezy(i, j) = Cey1 Ezy(i, j) - Cey2 / dy (Hx(i, j) - Hx(i, j - 1)),
                  *     Ez(i, j)  = Ezx(i, j) + Ezy(i, j),
                  *
-                 * over the cells of the block that are neither in interior_block() nor on the edge:
-                 * the bottom and top slabs of pml - 1 rows across the width, then the left and
-                 * right slabs of pml - 1 columns between them. The corners lie in the bottom and
-                 * top slabs and carry both conductivities through the coefficients. Ez there is
-                 * rebuilt from its parts each step, so fields put in by hand keep Ez = Ezx + Ezy
-                 * inside the PML. Inner loop along x.
+                 * over the cells of the block that are neither in interior_block() nor on the edge: the bottom and top slabs of pml - 1
+                 * rows across the width, then the left and right slabs of pml - 1 columns between them. The corners lie in the bottom and
+                 * top slabs and carry both conductivities through the coefficients. Ez there is rebuilt from its parts each step, so fields
+                 * put in by hand keep Ez = Ezx + Ezy inside the PML. Inner loop along x.
                  *
                  * @param fields Fields to update.
                  * @param coeffs Coefficient arrays on the same grid as the fields.
                  * @param block Cells to update, inside the grid.
                  * @param pml PML thickness in cells, with 2 pml below nx and ny; zero for none.
                  */
-                inline void update_pml_block(Fields &fields, CoeffsView coeffs, const Block &block,
-                                             std::size_t pml) noexcept
+                inline void update_pml_block(Fields &fields, CoeffsView coeffs, const Block &block, std::size_t pml) noexcept
                 {
                     if (pml < 2) {
                         return;
@@ -362,12 +349,10 @@ namespace fdtd
                 }
 
                 /**
-                 * Update the edge Ez of a block, which update_e_interior_block and update_pml_block
-                 * leave alone; call it right after them.
+                 * Update the edge Ez of a block, which update_e_interior_block and update_pml_block leave alone; call it right after them.
                  *
-                 * Under PEC and PML the edge Ez is set to zero, with Ezx and Ezy. Under PMC it
-                 * takes the interior update, with the x coefficients, and every H outside the
-                 * domain read as zero: Hy(-1, j) and Hy(nx - 1, j), Hx(i, -1) and Hx(i, ny - 1).
+                 * Under PEC and PML the edge Ez is set to zero, with Ezx and Ezy. Under PMC it takes the interior update, with the x
+                 * coefficients, and every H outside the domain read as zero: Hy(-1, j) and Hy(nx - 1, j), Hx(i, -1) and Hx(i, ny - 1).
                  * Corners combine both.
                  *
                  * @param fields Fields to update.
@@ -375,8 +360,7 @@ namespace fdtd
                  * @param block Cells to update, inside the grid; only its edge cells change.
                  * @param boundary Outer boundary condition.
                  */
-                void update_boundary_block(Fields &fields, CoeffsView coeffs, const Block &block,
-                                           Boundary boundary) noexcept;
+                void update_boundary_block(Fields &fields, CoeffsView coeffs, const Block &block, Boundary boundary) noexcept;
 
                 /**
                  * Advance every Ez of a block by one step: the interior, the PML and the edge.
@@ -387,8 +371,8 @@ namespace fdtd
                  * @param pml PML thickness in cells, zero for none.
                  * @param boundary Outer boundary condition.
                  */
-                inline void update_e_block(Fields &fields, CoeffsView coeffs, const Block &block,
-                                           std::size_t pml, Boundary boundary) noexcept
+                inline void update_e_block(Fields &fields, CoeffsView coeffs, const Block &block, std::size_t pml,
+                                           Boundary boundary) noexcept
                 {
                     update_e_interior_block(fields, coeffs, block, pml);
                     update_pml_block(fields, coeffs, block, pml);
@@ -396,11 +380,10 @@ namespace fdtd
                 }
 
                 /**
-                 * A cut of a grid into parts, each part one to three blocks, every cell in one
-                 * part.
+                 * A cut of a grid into parts, each part one to three blocks, every cell in one part.
                  *
-                 * A part is the unit of work a backend hands to a thread or a task. Tiles are a
-                 * regular cut, rows being tiles of nx by 1, and know their neighbours.
+                 * A part is the unit of work a backend hands to a thread or a task. Tiles are a regular cut, rows being tiles of nx by 1,
+                 * and know their neighbours.
                  */
                 class Partition
                 {
@@ -414,8 +397,7 @@ namespace fdtd
                     static Partition whole(const Grid &grid);
 
                     /**
-                     * Cut a grid into tiles of tileX by tileY cells, row-major, the last ones
-                     * clipped.
+                     * Cut a grid into tiles of tileX by tileY cells, row-major, the last ones clipped.
                      *
                      * @param grid Grid to cut.
                      * @param tileX Tile width in cells, positive.
@@ -492,18 +474,14 @@ namespace fdtd
                 };
 
                 /**
-                 * One advance of the fields of the serial or OpenMP backend, as two phases per
-                 * part per step.
+                 * One advance of the fields of the serial or OpenMP backend, as two phases per part per step.
                  *
-                 * Step n of a part is h_phase(part, n) then e_phase(part, n). The H phase updates
-                 * the part's H and adds the H sources of its cells; the E phase updates its Ez,
-                 * adds the Ez sources of its cells and writes the records of the probes on them.
-                 * Whoever runs a phase owns the part's cells for that phase, so sources and probes
-                 * need no lock: a backend only has to finish the H phase of a part's neighbours
-                 * before its E phase, and the E phase of the neighbours before the next H phase.
-                 * The serial backend runs the one part of Partition::whole. A backend with kernels
-                 * of its own runs them over the part's blocks and calls add_sources() and
-                 * record_probes() as the phases do.
+                 * Step n of a part is h_phase(part, n) then e_phase(part, n). The H phase updates the part's H and adds the H sources of
+                 * its cells; the E phase updates its Ez, adds the Ez sources of its cells and writes the records of the probes on them.
+                 * Whoever runs a phase owns the part's cells for that phase, so sources and probes need no lock: a backend only has to
+                 * finish the H phase of a part's neighbours before its E phase, and the E phase of the neighbours before the next H phase.
+                 * The serial backend runs the one part of Partition::whole. A backend with kernels of its own runs them over the part's
+                 * blocks and calls add_sources() and record_probes() as the phases do.
                  */
                 class Stepper
                 {
@@ -519,12 +497,11 @@ namespace fdtd
                      * @param sources Distinct cells inside the grid to add to.
                      * @param values One value per source per step, step-major.
                      * @param probes Cells inside the grid to record.
-                     * @param records Space for one value per probe per step, step-major: step n of
-                     *        probe k goes to records[n * probes.size() + k].
+                     * @param records Space for one value per probe per step, step-major: step n of probe k goes to records[n *
+                     *        probes.size() + k].
                      */
-                    Stepper(Fields &fields, CoeffsView coeffs, std::size_t pml, Boundary boundary,
-                            const Partition &partition, std::span<const PointInjection> sources,
-                            std::span<const FloatType> values, std::span<const PointProbe> probes,
+                    Stepper(Fields &fields, CoeffsView coeffs, std::size_t pml, Boundary boundary, const Partition &partition,
+                            std::span<const PointInjection> sources, std::span<const FloatType> values, std::span<const PointProbe> probes,
                             FloatType *records);
 
                     /**
@@ -542,8 +519,7 @@ namespace fdtd
                     }
 
                     /**
-                     * Run the E phase of a part in step n: its Ez, the Ez sources on its cells,
-                     * then the probes on its cells.
+                     * Run the E phase of a part in step n: its Ez, the Ez sources on its cells, then the probes on its cells.
                      *
                      * @param part Part below the partition's size.
                      * @param n Step of this advance, from zero.
@@ -564,8 +540,7 @@ namespace fdtd
                      * @param n Step of this advance, from zero.
                      * @param field Fields the sources add to.
                      */
-                    void add_sources(std::size_t part, std::size_t n,
-                                     SourceField field) const noexcept;
+                    void add_sources(std::size_t part, std::size_t n, SourceField field) const noexcept;
 
                     /**
                      * Write step n's records of the probes of a part.
@@ -653,12 +628,10 @@ namespace fdtd
             }
 
             /**
-             * Single-threaded reference backend, the oracle for the others: fields,
-             * coefficients and probe records in host memory, advanced by a serial::Stepper over
-             * the one part of serial::Partition::whole.
+             * Single-threaded reference backend, the oracle for the others: fields, coefficients and probe records in host memory, advanced
+             * by a serial::Stepper over the one part of serial::Partition::whole.
              *
-             * The OpenMP backend derives from it, keeps its storage and runs the same Stepper over
-             * more parts.
+             * The OpenMP backend derives from it, keeps its storage and runs the same Stepper over more parts.
              */
             class SerialBackend : public Backend
             {
@@ -762,8 +735,7 @@ namespace fdtd
                  * @param points Distinct cells inside the grid.
                  * @param values One value per point per step, step-major.
                  */
-                void advance(std::size_t nsteps, std::span<const PointInjection> points,
-                             std::span<const FloatType> values) override;
+                void advance(std::size_t nsteps, std::span<const PointInjection> points, std::span<const FloatType> values) override;
 
                 /**
                  * Replace the probes and clear the records.
