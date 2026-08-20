@@ -75,7 +75,8 @@ namespace fdtd
 
                         for (std::size_t j = block.j0; j < hxEnd; ++j) {
                             const std::size_t row = j * pitch;
-#pragma omp simd
+
+                            #pragma omp simd
                             for (std::size_t i = block.i0; i < block.i1; ++i) {
                                 const std::size_t k = row + i;
                                 Hx[k] = Chx1[k] * Hx[k] - Chx2[k] * invDy * (Ez[k + pitch] - Ez[k]);
@@ -84,7 +85,8 @@ namespace fdtd
 
                         for (std::size_t j = block.j0; j < block.j1; ++j) {
                             const std::size_t row = j * pitch;
-#pragma omp simd
+
+                            #pragma omp simd
                             for (std::size_t i = block.i0; i < hyEnd; ++i) {
                                 const std::size_t k = row + i;
                                 Hy[k] = Chy1[k] * Hy[k] + Chy2[k] * invDx * (Ez[k + 1] - Ez[k]);
@@ -123,7 +125,8 @@ namespace fdtd
 
                         for (std::size_t j = cells.j0; j < cells.j1; ++j) {
                             const std::size_t row = j * pitch;
-#pragma omp simd
+
+                            #pragma omp simd
                             for (std::size_t i = cells.i0; i < cells.i1; ++i) {
                                 const std::size_t k = row + i;
                                 const FloatType curl =
@@ -164,7 +167,8 @@ namespace fdtd
 
                         for (std::size_t j = cells.j0; j < cells.j1; ++j) {
                             const std::size_t row = j * pitch;
-#pragma omp simd
+
+                            #pragma omp simd
                             for (std::size_t i = cells.i0; i < cells.i1; ++i) {
                                 const std::size_t k = row + i;
                                 Ezx[k] = Cex1[k] * Ezx[k] + Cex2[k] * invDx * (Hy[k] - Hy[k - 1]);

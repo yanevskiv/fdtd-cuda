@@ -45,17 +45,17 @@ namespace fdtd
                 template <typename Body> void run_team(int threads, OmpBind bind, const Body &body)
                 {
                     if (bind == OmpBind::Close) {
-#pragma omp parallel num_threads(threads) proc_bind(close)
+                        #pragma omp parallel num_threads(threads) proc_bind(close)
                         {
                             body();
                         }
                     } else if (bind == OmpBind::Spread) {
-#pragma omp parallel num_threads(threads) proc_bind(spread)
+                        #pragma omp parallel num_threads(threads) proc_bind(spread)
                         {
                             body();
                         }
                     } else {
-#pragma omp parallel num_threads(threads)
+                        #pragma omp parallel num_threads(threads)
                         {
                             body();
                         }

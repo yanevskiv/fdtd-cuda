@@ -55,14 +55,16 @@ namespace fdtd::TMz::backends::omp
                 if (begin < end) {
                     v3::h_phase(stepper, tuple, end - 1, n);
                 }
-#pragma omp barrier
+
+                #pragma omp barrier
                 for (std::size_t j = begin; j < end; ++j) {
                     if (j + 1 < end) {
                         v3::h_phase(stepper, tuple, j, n);
                     }
                     v3::e_phase(stepper, tuple, j, n);
                 }
-#pragma omp barrier
+
+                #pragma omp barrier
             }
         });
     }

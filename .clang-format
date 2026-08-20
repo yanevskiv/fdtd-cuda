@@ -36,4 +36,5 @@ DerivePointerAlignment: false
 PointerAlignment: Right
 ReflowComments: true
 FixNamespaceComments: false
+IndentPPDirectives: Leave
 ...

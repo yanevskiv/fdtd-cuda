@@ -62,7 +62,7 @@ namespace fdtd
                     template <typename Body>
                     inline void for_simd(std::size_t begin, std::size_t end, Body body) noexcept
                     {
-#pragma omp simd
+                        #pragma omp simd
                         for (std::size_t i = begin; i < end; ++i) {
                             body(i);
                         }

@@ -183,7 +183,8 @@ namespace fdtd::TMz::backends
         double *pa = a.get();
         double *pb = b.get();
         double *pc = c.get();
-#pragma omp parallel for schedule(static) num_threads(team)
+
+        #pragma omp parallel for schedule(static) num_threads(team)
         for (std::ptrdiff_t k = 0; k < count; ++k) {
             pa[k] = 0;
             pb[k] = 1;
@@ -194,7 +195,8 @@ namespace fdtd::TMz::backends
         std::vector<double> rates;
         for (std::size_t r = 0; r <= repeats; ++r) {
             const auto start = std::chrono::steady_clock::now();
-#pragma omp parallel for schedule(static) num_threads(team)
+
+            #pragma omp parallel for schedule(static) num_threads(team)
             for (std::ptrdiff_t k = 0; k < count; ++k) {
                 pa[k] = pb[k] + scalar * pc[k];
             }

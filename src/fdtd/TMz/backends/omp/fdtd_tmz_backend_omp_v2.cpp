@@ -37,11 +37,12 @@ namespace fdtd::TMz::backends::omp
         const std::size_t rows = stepper.partition().size();
         run_team(advance.threads, advance.bind, [&] {
             for (std::size_t n = 0; n < advance.nsteps; ++n) {
-#pragma omp for schedule(static)
+                #pragma omp for schedule(static)
                 for (std::size_t j = 0; j < rows; ++j) {
                     v2::h_phase(stepper, j, n);
                 }
-#pragma omp for schedule(static)
+
+                #pragma omp for schedule(static)
                 for (std::size_t j = 0; j < rows; ++j) {
                     v2::e_phase(stepper, j, n);
                 }

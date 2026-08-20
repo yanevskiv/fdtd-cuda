@@ -93,11 +93,12 @@ namespace fdtd::TMz::backends::omp
         const SharedTuple *tuple = shared.has_value() ? &*shared : nullptr;
         run_team(advance.threads, advance.bind, [&] {
             for (std::size_t n = 0; n < advance.nsteps; ++n) {
-#pragma omp for schedule(static)
+                #pragma omp for schedule(static)
                 for (std::size_t j = 0; j < rows; ++j) {
                     v3::h_phase(stepper, tuple, j, n);
                 }
-#pragma omp for schedule(static)
+
+                #pragma omp for schedule(static)
                 for (std::size_t j = 0; j < rows; ++j) {
                     v3::e_phase(stepper, tuple, j, n);
                 }
