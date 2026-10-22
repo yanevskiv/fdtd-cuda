@@ -50,21 +50,38 @@ make test
 
 `make` is a thin wrapper over `CMakePresets.json`; `make test PRESET=release` picks another preset. The CUDA backend is built when `nvcc` is found and OpenMP when the compiler supports it; the tests of a backend are built only with it.
 
-Run a simulation with the `fdtd` driver and plot it. Here two Gaussian pulses spread out, cross, and leave through the PML:
+Run a simulation with the `fdtd` driver. Here two Gaussian pulses spread out, cross, and leave through the PML. The driver writes each probe to `out/probe_<k>.csv` and Ez to `out/snapshot_<step>.bin`.
 
 ```sh
-build/out/debug/fdtd --nx 256 --steps 400 --boundary pml --backend cuda \
-    --pulse 96,128 --pulse 160,128 --probe 128,200 --snapshot-every 5 --output out
-tools/plot_sim.py out --animate --shared-scale --fps 15
+ $ build/out/debug/fdtd \
+    --nx 256            \
+    --ny 256            \
+    --steps 400         \
+    --boundary pml      \
+    --backend cuda      \
+    --pulse 96,128      \
+    --pulse 160,128     \
+    --probe 128,200     \
+    --snapshot-every 5  \
+    --output out
 ```
+
+Plot the simulation with the `plot_sim.py` tool script. This script draws a heatmap per snapshot and one plot of the probes into the same directory, and with `--animate` the snapshots as `ez.gif`.
+
+```sh
+ $ tools/plot_sim.py out \
+    --animate            \
+    --shared-scale       \
+    --fps 15
+```
+
+The resulting animation is the following:
 
 <div align="center">
 
 ![Two pulses](docs/splash/two_pulses.gif)
 
 </div>
-
-The driver writes each probe to `out/probe_<k>.csv` and Ez to `out/snapshot_<step>.bin`. `plot_sim.py` draws a heatmap per snapshot and one plot of the probes into the same directory, and with `--animate` the snapshots as `ez.gif`. `fdtd --help` lists every option.
 
 ## Using the library
 
