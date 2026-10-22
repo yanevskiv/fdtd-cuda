@@ -156,22 +156,29 @@ The project root, the build files and everything outside the other trees:
 
 ```
 .
-├── cmake                          - CMake module directory
-│   ├── FdtdBackends.cmake         - OpenMP and CUDA detection
-│   ├── FdtdWarnings.cmake         - Compiler warning flags
-│   └── fdtdConfig.cmake.in        - Package config template
-├── docs                           - Documentation directory
-│   └── splash                     - Banner directory
-│       └── fdtd-cuda.jpg          - Project banner
-├── samples                        - Sample program directory
-│   ├── sample_pml.cpp             - PML reflection sample
-│   └── sample_point_source.cpp    - Point source sample
-├── CMakeLists.txt                 - Build, install and package rules
-├── CMakePresets.json              - Build presets
-├── LICENSE                        - GPLv3 license text
-├── Makefile                       - Wrapper over the presets
-├── README.md                      - Project description
-└── config.example                 - Benchmark and profile settings
+├── cmake                      - CMake module directory
+│   ├── FdtdBackends.cmake     - OpenMP and CUDA detection
+│   ├── FdtdWarnings.cmake     - Compiler warning flags
+│   └── fdtdConfig.cmake.in    - Package config template
+├── docs                       - Documentation directory
+│   └── splash                 - Banner directory
+│       └── fdtd-cuda.jpg      - Project banner
+├── CMakeLists.txt             - Build, install and package rules
+├── CMakePresets.json          - Build presets
+├── LICENSE                    - GPLv3 license text
+├── Makefile                   - Wrapper over the presets
+├── README.md                  - Project description
+└── config.example             - Benchmark and profile settings
+```
+
+### Samples
+
+Small programs on the public API, built with the tests:
+
+```
+samples
+├── sample_pml.cpp             - PML reflection sample
+└── sample_point_source.cpp    - Point source sample
 ```
 
 ### Header files
