@@ -50,15 +50,21 @@ make test
 
 `make` is a thin wrapper over `CMakePresets.json`; `make test PRESET=release` picks another preset. The CUDA backend is built when `nvcc` is found and OpenMP when the compiler supports it; the tests of a backend are built only with it.
 
-Run a simulation with the `fdtd` driver and plot it:
+Run a simulation with the `fdtd` driver and plot it. Here two Gaussian pulses spread out, cross, and leave through the PML:
 
 ```sh
 build/out/debug/fdtd --nx 256 --steps 400 --boundary pml --backend cuda \
-    --probe 160,128 --snapshot-every 50 --output out
-tools/plot_sim.py out
+    --pulse 96,128 --pulse 160,128 --probe 128,200 --snapshot-every 5 --output out
+tools/plot_sim.py out --animate --shared-scale --fps 15
 ```
 
-The driver writes each probe to `out/probe_<k>.csv` and Ez to `out/snapshot_<step>.bin`. `plot_sim.py` draws a heatmap per snapshot and a plot per probe into the same directory, and a GIF with `--animate`. `fdtd --help` lists every option.
+<div align="center">
+
+![Two pulses](docs/splash/two_pulses.gif)
+
+</div>
+
+The driver writes each probe to `out/probe_<k>.csv` and Ez to `out/snapshot_<step>.bin`. `plot_sim.py` draws a heatmap per snapshot and one plot of the probes into the same directory, and with `--animate` the snapshots as `ez.gif`. `fdtd --help` lists every option.
 
 ## Using the library
 
@@ -161,8 +167,9 @@ The project root, the build files and everything outside the other trees:
 │   ├── FdtdWarnings.cmake     - Compiler warning flags
 │   └── fdtdConfig.cmake.in    - Package config template
 ├── docs                       - Documentation directory
-│   └── splash                 - Banner directory
-│       └── fdtd-cuda.jpg      - Project banner
+│   └── splash                 - Banner and animation directory
+│       ├── fdtd-cuda.jpg      - Project banner
+│       └── two_pulses.gif     - Two-pulse animation
 ├── CMakeLists.txt             - Build, install and package rules
 ├── CMakePresets.json          - Build presets
 ├── LICENSE                    - GPLv3 license text
